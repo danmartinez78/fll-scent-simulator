@@ -160,6 +160,7 @@ export default function App() {
       setPlanState(structuredClone(setup.plan));
       const known = SCENARIOS.find((s) => s.name === setup.scenarioName);
       if (known) setScenario(known);
+      setTool(defaultTool(setup.settings.treatment));
       resetSim(setup.settings, setup.plan);
     },
     [resetSim]
@@ -171,18 +172,23 @@ export default function App() {
     setRunning(true);
   }, []);
 
-  const saveRunToNotebook = useCallback(() => {
-    const captured = captureRun(simRef.current, scenario.name);
-    setEntries((list) => {
-      const target = list.find((e) => e.id === activeEntryId && !e.captured);
-      if (target) return list.map((e) => (e.id === target.id ? { ...e, captured } : e));
-      const e = { ...newEntry(nextName(list)), captured };
-      setActiveEntryId(e.id);
-      return [...list, e];
-    });
-    setTab('notebook');
-    setNotice(null);
-  }, [scenario.name, activeEntryId]);
+  const saveRunToNotebook = useCallback(
+    (targetId?: string) => {
+      const captured = captureRun(simRef.current, scenario.name);
+      const wanted = targetId ?? activeEntryId;
+      const target = entries.find((e) => e.id === wanted && (targetId !== undefined || !e.captured));
+      if (target) {
+        setEntries(entries.map((e) => (e.id === target.id ? { ...e, captured } : e)));
+      } else {
+        const e = { ...newEntry(nextName(entries)), captured };
+        setEntries([...entries, e]);
+        setActiveEntryId(e.id);
+      }
+      setTab('notebook');
+      setNotice(null);
+    },
+    [scenario.name, activeEntryId, entries]
+  );
 
   const sim = simRef.current;
   const surveys = sim.surveys;
@@ -261,7 +267,7 @@ export default function App() {
               <div className="notice" role="status">
                 <strong>Run finished.</strong> What happened? Did it match your prediction?
                 <div className="notice-actions">
-                  <button className="btn primary" onClick={saveRunToNotebook}>
+                  <button className="btn primary" onClick={() => saveRunToNotebook()}>
                     📓 Save results to notebook
                   </button>
                   <button className="btn" onClick={() => { setNotice(null); setRunning(true); }}>
@@ -307,7 +313,7 @@ export default function App() {
             ))}
           </nav>
           <div className="tab-body">
-            {tab === 'results' && <ResultsPanel sim={sim} onSave={saveRunToNotebook} />}
+            {tab === 'results' && <ResultsPanel sim={sim} onSave={() => saveRunToNotebook()} />}
             {tab === 'survey' && (
               <SurveyPanel
                 sim={sim}

@@ -22,7 +22,7 @@ interface Props {
   simTime: number;
   onActive: (id: string | null) => void;
   onEntries: (e: NotebookEntry[] | ((prev: NotebookEntry[]) => NotebookEntry[])) => void;
-  onSaveRun: () => void;
+  onSaveRun: (entryId: string) => void;
   onLoadSetup: (s: EntrySetup) => void;
 }
 
@@ -146,8 +146,7 @@ export function NotebookPanel({ entries, activeId, simTime, onActive, onEntries,
               disabled={simTime === 0}
               onClick={() => {
                 if (active.captured && !confirm('Replace the saved results in this experiment with the current run?')) return;
-                if (active.captured) update(active.id, { captured: null });
-                setTimeout(onSaveRun, 0);
+                onSaveRun(active.id);
               }}
             >
               📥 Save current run here
