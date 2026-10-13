@@ -20,9 +20,10 @@ function Card({ icon, label, value, sub, info, tone }: { icon: string; label: st
 
 type ChartKind = 'pests' | 'product' | 'scent';
 
-export function ResultsPanel({ sim, onSave }: { sim: Simulation; onSave: () => void }) {
+export function ResultsPanel({ sim, onSave, saved }: { sim: Simulation; onSave: () => void; saved?: string | null }) {
   const m = sim.metrics();
   const [chart, setChart] = useState<ChartKind>('pests');
+  const [more, setMore] = useState(false);
   const xs = sim.history.map((h) => h.t / 60);
   const treat = sim.settings.treatment;
   return (
@@ -36,11 +37,6 @@ export function ResultsPanel({ sim, onSave }: { sim: Simulation; onSave: () => v
           value={`${m.pestsDeterredPct.toFixed(0)}%`}
           sub={`average ${m.pestsDeterredAvgPct.toFixed(0)}%${m.pestsTrapped ? ` · ${m.pestsTrapped} trapped` : ''}`}
         />
-        <Card icon="💧" label="Product used" value={`${m.productUsedGal.toFixed(1)} gal`} sub={`${m.productLeftGal.toFixed(1)} gal left`} />
-        <Card icon="⏳" label="Scent devices used" value={String(m.devicesUsed)} sub={treat === 'pushPull' || treat === 'slowRelease' ? `of ${sim.settings.devices.maxDevices}` : ''} />
-        <Card icon="🚁" label="Drone flight time" info="flightTime" value={`${m.flightTimeMin.toFixed(1)} min`} sub={`${m.distanceKm.toFixed(2)} km flown`} />
-        <Card icon="🔁" label="Flights" value={String(m.flights)} sub={`${m.refills} refills · ${m.batterySwaps} battery swaps`} />
-        <Card icon="🗺️" label="Scent coverage now" info="scentCoverage" value={`${m.scentCoveragePct.toFixed(0)}%`} sub={`${m.acresSprayed.toFixed(2)} acres sprayed`} />
         <Card
           icon="💲"
           label="Estimated cost"
@@ -49,6 +45,18 @@ export function ResultsPanel({ sim, onSave }: { sim: Simulation; onSave: () => v
           sub={`application ${formatMoney(m.cost.application)} · product ${formatMoney(m.cost.material)} · devices ${formatMoney(m.cost.devices)}`}
         />
       </div>
+      <button className="link-btn" aria-expanded={more} onClick={() => setMore((x) => !x)}>
+        {more ? '▾ Fewer numbers' : '▸ More numbers'}
+      </button>
+      {more && (
+        <div className="metrics">
+          <Card icon="💧" label="Product used" value={`${m.productUsedGal.toFixed(1)} gal`} sub={`${m.productLeftGal.toFixed(1)} gal left`} />
+          <Card icon="⏳" label="Scent devices used" value={String(m.devicesUsed)} sub={treat === 'pushPull' || treat === 'slowRelease' ? `of ${sim.settings.devices.maxDevices}` : ''} />
+          <Card icon="🚁" label="Drone flight time" info="flightTime" value={`${m.flightTimeMin.toFixed(1)} min`} sub={`${m.distanceKm.toFixed(2)} km flown`} />
+          <Card icon="🔁" label="Flights" value={String(m.flights)} sub={`${m.refills} refills · ${m.batterySwaps} battery swaps`} />
+          <Card icon="🗺️" label="Scent coverage now" info="scentCoverage" value={`${m.scentCoveragePct.toFixed(0)}%`} sub={`${m.acresSprayed.toFixed(2)} acres sprayed`} />
+        </div>
+      )}
 
       <div className="chart-tabs">
         {(
@@ -84,6 +92,7 @@ export function ResultsPanel({ sim, onSave }: { sim: Simulation; onSave: () => v
       <button className="btn primary wide" onClick={onSave} disabled={sim.time === 0}>
         📓 Save these results to the notebook
       </button>
+      {saved && <p className="saved-note">✓ Saved to {saved}.</p>}
     </div>
   );
 }

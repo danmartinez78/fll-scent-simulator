@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import type { ViewOptions } from '../models/types';
 import { formatClock } from '../utils/units';
 
@@ -15,9 +16,11 @@ interface Props {
   onSpeed: (s: number) => void;
   onSurvey: () => void;
   onView: (v: ViewOptions) => void;
+  /** Show the Fly survey button (Guided mode hides it outside survey missions). */
+  showSurvey?: boolean;
 }
 
-const SPEEDS = [1, 2, 5, 10, 20];
+const SPEEDS = [1, 5, 20];
 
 const LAYERS: Array<[keyof ViewOptions, string, string]> = [
   ['showPests', '🐞', 'Pests'],
@@ -53,23 +56,39 @@ export function Toolbar(p: Props) {
           <span style={{ width: `${pct}%` }} />
         </span>
       </div>
-      <button className="btn survey-btn" onClick={p.onSurvey} disabled={p.surveying}>
-        {p.surveying ? `🛰️ Scanning ${Math.round(p.surveyProgress * 100)}%` : '🛰️ Fly survey'}
-      </button>
-      <div className="layers" role="group" aria-label="What to show on the map">
-        {LAYERS.map(([key, icon, label]) => (
-          <button
-            key={key}
-            className={p.view[key] ? 'chip active' : 'chip'}
-            aria-pressed={p.view[key]}
-            title={`Show or hide: ${label}`}
-            onClick={() => p.onView({ ...p.view, [key]: !p.view[key] })}
-          >
-            {icon} {label}
-          </button>
-        ))}
-      </div>
+      {p.showSurvey !== false && (
+        <button className="btn survey-btn" onClick={p.onSurvey} disabled={p.surveying}>
+          {p.surveying ? `🛰️ Scanning ${Math.round(p.surveyProgress * 100)}%` : '🛰️ Fly survey'}
+        </button>
+      )}
+      <MapMenu view={p.view} onView={p.onView} />
       {p.pendingReset && <div className="reset-hint">Some changes start on the next Reset.</div>}
+    </div>
+  );
+}
+
+/** "Map" button with a small menu of what to show on the map. */
+function MapMenu({ view, onView }: { view: ViewOptions; onView: (v: ViewOptions) => void }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="map-menu">
+      <button className="btn" aria-expanded={open} onClick={() => setOpen((o) => !o)}>
+        👁 Map ▾
+      </button>
+      {open && (
+        <>
+          {/* Catches the click that closes the menu, so it never reaches the map. */}
+          <div className="menu-backdrop" onPointerDown={() => setOpen(false)} />
+          <div className="menu-pop" role="group" aria-label="What to show on the map">
+            {LAYERS.map(([key, icon, label]) => (
+              <label key={key} className="menu-item">
+                <input type="checkbox" checked={view[key]} onChange={() => onView({ ...view, [key]: !view[key] })} />
+                <span aria-hidden="true">{icon}</span> {label}
+              </label>
+            ))}
+          </div>
+        </>
+      )}
     </div>
   );
 }

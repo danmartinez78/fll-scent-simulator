@@ -73,17 +73,18 @@ export function ExperimentPanel({ settings, sim, tool, running }: { settings: Se
   const tips = tipsFor(settings, sim);
   const tip = tips[i % tips.length];
   const toolHint = TOOL_HINTS[tool];
+  // One line: the most useful thing to know right now.
+  let line: { icon: string; text: string; tone: string };
+  if (sim.surveying) line = { icon: '🛰️', text: 'Survey drone is scanning the field…', tone: 'status-line' };
+  else if (running && settings.treatment !== 'none') line = { icon: '🚁', text: droneStatus(sim), tone: 'status-line' };
+  else if (!running && toolHint && !sim.finished) line = { icon: '✏️', text: toolHint, tone: 'tool-hint' };
+  else if (!running && sim.time === 0) line = { icon: '▶', text: 'Press Run to start.', tone: 'hint-strong' };
+  else line = { icon: '💡', text: tip, tone: 'tip' };
   return (
-    <div className="explain">
-      <div className="explain-status">
-        {settings.treatment !== 'none' && <span className="status-line">🚁 {droneStatus(sim)}</span>}
-        {sim.surveying && <span className="status-line">🛰️ Survey drone is scanning the field…</span>}
-        {!running && sim.time === 0 && <span className="status-line hint-strong">Tip: write a prediction in the Notebook, then press Run.</span>}
-      </div>
-      <div className="explain-tip">
-        {toolHint && <span className="tool-hint">✏️ {toolHint}</span>}
-        <span className="tip">💡 {tip}</span>
-      </div>
+    <div className="explain" role="status">
+      <span className={line.tone}>
+        {line.icon} {line.text}
+      </span>
     </div>
   );
 }

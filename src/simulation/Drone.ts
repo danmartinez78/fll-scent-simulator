@@ -197,6 +197,8 @@ export class Drone {
       this.x = tx;
       this.y = ty;
       this.distanceM += d;
+      // Mark every turn point (drops, strip ends, home) so the drawn path passes through it.
+      this.trail.push({ x: tx, y: ty });
       return true;
     }
     this.x += (dx / d) * maxStep;
