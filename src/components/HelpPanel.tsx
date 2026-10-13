@@ -1,5 +1,5 @@
 import { ACTIVITY_STEPS, HELP, HONESTY_NOTE } from '../content/help';
-import { SimToRealLoop } from './SimToReal';
+import { SimToRealLoop, WhySimulate } from './SimToReal';
 
 const ORDER = [
   'model',
@@ -33,7 +33,10 @@ export function HelpPanel() {
         <strong>Important:</strong> {HONESTY_NOTE}
       </div>
 
-      <h3>How engineers use simulators</h3>
+      <h3>Why engineers use simulators</h3>
+      <WhySimulate />
+
+      <h3>Making the simulator better</h3>
       <SimToRealLoop />
 
       <h3>How to use the map</h3>

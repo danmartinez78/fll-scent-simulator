@@ -454,7 +454,7 @@ export default function App() {
         <span className="honesty">
           ⚠️ {MODEL_NOTE}{' '}
           <button className="link-btn inline" onClick={() => setLoopOpen(true)}>
-            How do engineers make simulators better? →
+            Why use a simulator, and how do engineers make it better? →
           </button>
         </span>
       </footer>
