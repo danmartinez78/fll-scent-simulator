@@ -23,12 +23,40 @@ const LOOP = [
   }
 ];
 
+const WHY = [
+  { icon: '📅', text: 'Real tests are slow. A crop grows once a season, so a real field trial gives you a few tries a year. A simulator gives you hundreds in an afternoon.' },
+  { icon: '💲', text: 'Real tests cost money: product, devices, drone flights, a field to use. Simulated product is free.' },
+  { icon: '🛡️', text: 'Failing is safe. A bad plan in the simulator wastes a minute, not a crop. You can try wild ideas just to see what happens.' },
+  { icon: '🔁', text: 'You can repeat an experiment exactly. Outside, the wind, the weather and the pests are never the same twice. The same seed gives the same run every time, so you know your change caused the difference.' },
+  { icon: '👀', text: 'You can see the invisible. Scent clouds, every pest, the battery level: things you could never watch in a real field.' },
+  { icon: '🎯', text: 'It tells you what to test for real. Instead of guessing, you bring your best two or three ideas to the real world.' }
+];
+
+/** Why engineers use simulators at all. */
+export function WhySimulate() {
+  return (
+    <div className="why-sim">
+      <ul className="why-list">
+        {WHY.map((w) => (
+          <li key={w.icon}>
+            <span className="loop-icon" aria-hidden="true">{w.icon}</span>
+            <span>{w.text}</span>
+          </li>
+        ))}
+      </ul>
+      <p className="lead">
+        Self-driving cars, Mars rovers, airplanes and FLL robots are all tested in simulators long before they're trusted in the real world.
+      </p>
+    </div>
+  );
+}
+
 /** The sim-to-real loop: how engineers use a simulator and make it more trustworthy. */
 export function SimToRealLoop() {
   return (
     <div className="loop">
       <p className="lead">
-        Engineers don't trust a simulator because it looks real. They trust it because they keep checking it against the real world and fixing it when it's wrong.
+        A simulator is only as good as its model. Engineers don't trust one because it looks real. They trust it because they keep checking it against the real world and fixing it when it's wrong.
       </p>
       <ol className="loop-steps">
         {LOOP.map((s, i) => (
@@ -76,7 +104,9 @@ export function SimToRealDialog({ open, onClose }: { open: boolean; onClose: () 
       }}
     >
       <div className="loop-dialog-body">
-        <h2 id="loop-title">How engineers use simulators</h2>
+        <h2 id="loop-title">Why engineers use simulators</h2>
+        <WhySimulate />
+        <h3>Making the simulator better</h3>
         <SimToRealLoop />
         <button className="btn primary wide" onClick={onClose}>
           Got it
