@@ -15,6 +15,7 @@ import {
   type NotebookEntry
 } from '../notebook/notebook';
 import { downloadText, pickTextFile } from './ui';
+import { ReportButtons } from './ReportButtons';
 
 interface Props {
   entries: NotebookEntry[];
@@ -63,7 +64,13 @@ export function NotebookPanel({ entries, activeId, simTime, onActive, onEntries,
         <button className={mode === 'compare' ? 'btn small active' : 'btn small'} onClick={() => setMode(mode === 'compare' ? 'edit' : 'compare')} disabled={withResults.length < 2}>
           ⇆ Compare two
         </button>
-        <button className="btn small" onClick={() => downloadText('experiment-notebook.json', exportNotebook(entries))} disabled={!entries.length}>
+        <ReportButtons entries={entries} />
+        <button
+          className="btn small"
+          onClick={() => downloadText('experiment-notebook.json', exportNotebook(entries))}
+          disabled={!entries.length}
+          title="Save a notebook file you can import on another computer"
+        >
           ⬇ Export
         </button>
         <button
@@ -81,9 +88,6 @@ export function NotebookPanel({ entries, activeId, simTime, onActive, onEntries,
           }}
         >
           ⬆ Import
-        </button>
-        <button className="btn small" onClick={() => window.print()} disabled={!entries.length}>
-          🖨 Print summary
         </button>
       </div>
 

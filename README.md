@@ -42,7 +42,7 @@ The simulator has two modes, switched at the top right (the choice is remembered
 | **Fly the drone** | A T50-style drone flies the plan, sprays or drops devices, uses battery and payload, and returns home for refills and battery swaps. |
 | **Survey** | A separate survey drone scans the field. Its pretend computer-vision output labels squares as healthy, possible damage, high pest activity or uncertain. Fly another survey later to compare before and after. |
 | **Let the computer try** | A simple optimizer searches for a plan with the same method and limits, using only what it knows (nothing, or a survey map). Both plans are then tested in the full simulation. Students can change the score weights to decide what "best" means. |
-| **Keep a notebook** | Question, prediction, variables changed and kept the same, result, surprises, next steps. Results and settings are saved automatically from the run. Duplicate an experiment to change one thing, compare two side by side, export/import JSON, and print a summary. Stored in the browser's local storage. |
+| **Keep a notebook** | Question, prediction, variables changed and kept the same, result, surprises, next steps. Results and settings are saved automatically from the run. Duplicate an experiment to change one thing, compare two side by side, open a printable **report** (with a map picture of each run) or download a **spreadsheet (CSV)** of every experiment, and export/import JSON. Guided mode offers the report and spreadsheet on the Compare step. Stored in the browser's local storage. |
 
 Results shown: crop protected, pests kept off the crop (now and run average), product used and left, devices used, drone flight time, flights, refills and battery swaps, scent coverage, acres sprayed, and estimated cost with its parts. Charts show pests feeding, crop affected, scent coverage and product over time.
 
@@ -150,7 +150,7 @@ src/
     settingsRules.ts which settings need a reset
   render/drawScene.ts  canvas drawing (field, scent, pests, drones, compass, scale bar)
   components/        React UI (canvas, controls, results, survey, computer, notebook, help)
-  notebook/          notebook data, capture, compare, local storage, import/export
+  notebook/          notebook data, capture, compare, local storage, import/export, report and CSV
   content/help.ts    short explanations used by the info buttons and Learn tab
   models/types.ts    shared plain-data types (everything is JSON-serializable)
   utils/             seeded random numbers, geometry, unit conversions
@@ -212,7 +212,7 @@ Then open `http://<host>:8095`. To update, pull the new `:latest` (on Unraid: Do
 - [ ] Fly survey: the scan footprint moves across the field, then the survey map appears and the run pauses. Camera labels / estimated count switch. Instructor view shows real pests.
 - [ ] Run a treatment, fly a second survey, and compare before and after in the Survey tab.
 - [ ] Computer tab: Let the computer try shows progress, then a comparison table; Show computer plan / Back to my plan work.
-- [ ] Notebook: new experiment, save a finished run, duplicate, load setup, change one thing, run, save, compare two, refresh the page (entries remain), export and import, print summary.
+- [ ] Notebook: new experiment, save a finished run, duplicate, load setup, change one thing, run, save, compare two, refresh the page (entries remain), export and import, open the report and download the spreadsheet.
 - [ ] Results and charts update while running; the honesty note is visible at the bottom.
 - [ ] Layout is usable at tablet width (about 1024 px).
 

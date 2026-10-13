@@ -42,6 +42,26 @@ type Mode = 'guided' | 'playground';
 
 const MODE_KEY = 'scent-sim-mode';
 
+/** A small JPEG of the map for the notebook report, or nothing if it can't be drawn. */
+function mapSnapshot(): string | undefined {
+  const src = document.querySelector<HTMLCanvasElement>('.sim-canvas canvas');
+  if (!src || !src.width || !src.height) return undefined;
+  try {
+    const w = Math.min(480, src.width);
+    const out = document.createElement('canvas');
+    out.width = w;
+    out.height = Math.round((src.height / src.width) * w);
+    const ctx = out.getContext('2d');
+    if (!ctx) return undefined;
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(0, 0, out.width, out.height);
+    ctx.drawImage(src, 0, 0, out.width, out.height);
+    return out.toDataURL('image/jpeg', 0.7);
+  } catch {
+    return undefined;
+  }
+}
+
 function loadMode(): Mode {
   try {
     return localStorage.getItem(MODE_KEY) === 'playground' ? 'playground' : 'guided';
@@ -202,7 +222,7 @@ export default function App() {
 
   const saveRunToNotebook = useCallback(
     (targetId?: string) => {
-      const captured = captureRun(simRef.current, scenario.name);
+      const captured = captureRun(simRef.current, scenario.name, mapSnapshot());
       const wanted = targetId ?? activeEntryId;
       const target = entries.find((e) => e.id === wanted && (targetId !== undefined || !e.captured));
       // Guided mode carries the mission's question and the student's prediction into the notebook.
@@ -293,6 +313,7 @@ export default function App() {
               onSurvey={startSurvey}
               onSave={() => saveRunToNotebook()}
               saved={savedTo}
+              entries={entries}
               onTryAgain={() => {
                 resetSim(settings, plan);
                 setStep('plan');

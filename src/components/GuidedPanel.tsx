@@ -1,5 +1,8 @@
 import type { Scenario, Settings, TreatmentPlan } from '../models/types';
 import type { Simulation } from '../simulation/Simulation';
+import type { NotebookEntry } from '../notebook/notebook';
+import { activePlan } from '../simulation/Treatment';
+import { ReportButtons } from './ReportButtons';
 import { SCENARIOS } from '../simulation/scenarios';
 import { formatMoney } from '../utils/units';
 import { ControlPanel } from './ControlPanel';
@@ -34,6 +37,7 @@ interface Props {
   onSurvey: () => void;
   onSave: () => void;
   saved: string | null;
+  entries: NotebookEntry[];
   /** Reset the run with the current settings and go back to planning. */
   onTryAgain: () => void;
 }
@@ -168,10 +172,29 @@ function BigNumbers({ sim }: { sim: Simulation }) {
   );
 }
 
-function RunStep({ sim, running, onStep }: Props) {
+/** What the student still has to place on the map, or null when the plan has something in it. */
+function missingPlan(settings: Settings, plan: TreatmentPlan): string | null {
+  const eff = activePlan(plan, settings.treatment);
+  if (settings.treatment === 'spray' && !eff.sprayZones.length) return 'spray zones';
+  if ((settings.treatment === 'slowRelease' || settings.treatment === 'pushPull') && !eff.devices.length) return 'scent devices';
+  return null;
+}
+
+function RunStep({ sim, running, onStep, settings, plan }: Props) {
+  const missing = sim.time === 0 ? missingPlan(settings, plan) : null;
   return (
     <>
       <h2 className="guided-title">Run the experiment</h2>
+      {missing && (
+        <div className="guided-warn" role="note">
+          <span>
+            You haven't placed any {missing} yet, so nothing will be treated. That makes this run a <strong>no-treatment baseline</strong>.
+          </span>
+          <button className="btn small" onClick={() => onStep('plan')}>
+            ← Back to Plan
+          </button>
+        </div>
+      )}
       <p className="hint">
         {sim.time === 0
           ? 'Press ▶ Run above the map. Use 5x or 20x to speed it up.'
@@ -196,6 +219,16 @@ function CompareStep(p: Props) {
         <p className="hint">Run the experiment first, then come back here.</p>
       ) : (
         <ResultsPanel sim={p.sim} onSave={p.onSave} saved={p.saved} />
+      )}
+      {p.entries.length > 0 && (
+        <div className="guided-report">
+          <span className="hint small">
+            📓 {p.entries.length} experiment{p.entries.length === 1 ? '' : 's'} in the notebook
+          </span>
+          <div className="tool-row">
+            <ReportButtons entries={p.entries} />
+          </div>
+        </div>
       )}
       <div className="real-check">
         <strong>🌱 Sim vs. real world</strong>
