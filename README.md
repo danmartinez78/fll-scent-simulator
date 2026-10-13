@@ -97,7 +97,9 @@ Scent leaving the map edge is lost. A steady source in wind makes an elongated p
 - toward attractant when `C_att > 0.5 × threshold`: `+2.2 × sensitivity × min(2, C_att / threshold) × unit(∇C_att)`,
 - a push back inside within 4 m of the map edge.
 
-Speed is `speed × 0.2` while feeding (on the crop, repellent below threshold), `speed × 1.6` while bothered by repellent above threshold, and `speed` otherwise. Pests within 4 m of an attractant trap are caught. There is no breeding or death, so pests relocate rather than disappear.
+**Giving up.** Each second a pest is bothered by repellent above the threshold, it has a 10% chance to give up on that patch: it turns to a random direction and flies for 60 s, ignoring the crop and both scents, then goes back to the rules above. Without this rule, every pest fled straight down the scent slope, which in front of a spray pass points into the next unsprayed strip, so spraying herded pests into piles at the crop's edges.
+
+Speed is `speed × 0.2` while feeding (on the crop, repellent below threshold, not giving up), `speed × 1.6` while bothered by repellent above threshold, and `speed` otherwise. Pests within 4 m of an attractant trap are caught. There is no breeding or death, so pests relocate rather than disappear.
 
 **Crop damage** (`Simulation.ts`). Each feeding pest adds `dt / cellArea` pest-seconds per m² to its grid square. A crop square is *affected* once it reaches 12 pest-seconds/m². *Crop protected* = % of crop squares not affected. *Pests kept off the crop* = % of pests not feeding right now (off the crop, trapped, or bothered by repellent); the notebook also records its average over the run.
 
@@ -211,7 +213,7 @@ Then open `http://<host>:8095`. To update, pull the new `:latest` (on Unraid: Do
 - Pest behavior is a weighted-rules model, not insect biology. There is no breeding, death (except traps), day/night or species differences.
 - Scent drift is a grid shift plus blur; there is no terrain, canopy, rain, temperature or 3D movement. Strong wind blows most scent off a small field quickly.
 - Spraying deposits scent directly into the air layer; there is no residue on leaves.
-- Repellent pushes pests into untreated crop, where they keep feeding. A spray front can herd pests across the field, so whole-field spraying can sometimes protect less than expected. This is a property of the simple rules, worth discussing rather than trusting.
+- Repellent pushes pests into untreated crop, where they keep feeding. A spray front can still herd some pests ahead of it, and after a whole-field spray more of them collect near the crop's edges, where the scent is weakest. The "giving up" rule reduces this but does not remove it. It is a property of the simple rules, worth discussing rather than trusting.
 - The drone flies straight lines at constant speed; there are no takeoff, turn or climb costs, and the battery model is a straight line between two hover times.
 - The survey's computer vision is simulated from the true pest positions plus noise. It is not a real vision model.
 - The optimizer's quick test uses fewer pests and a coarser grid, so its own score can differ from the full-simulation result shown at the end.

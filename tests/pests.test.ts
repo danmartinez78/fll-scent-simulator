@@ -89,4 +89,21 @@ describe('pest movement', () => {
       expect(swarm.y[i]).toBeLessThanOrEqual(200);
     }
   });
+  it('lets some pests give up on repellent and fly off in a random direction', () => {
+    const { env, swarm, field, rng } = setup('repellent');
+    // Build up a strong cloud first, so the pests start inside it.
+    for (let i = 0; i < 240; i++) {
+      field.addGaussian(100, 100, 25, 10);
+      field.step(0.5, 0, 0, 0.5, 300);
+    }
+    let leftEver = 0;
+    for (let i = 0; i < 60; i++) {
+      field.addGaussian(100, 100, 25, 10);
+      field.step(0.5, 0, 0, 0.5, 300);
+      swarm.step(0.5, env, rng);
+      for (let k = 0; k < swarm.n; k++) if (swarm.leaving[k] > 0) leftEver++;
+    }
+    expect(leftEver).toBeGreaterThan(0);
+    for (let k = 0; k < swarm.n; k++) if (swarm.leaving[k] > 0) expect(swarm.feeding[k]).toBe(0);
+  });
 });

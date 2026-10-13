@@ -27,7 +27,14 @@ export const PEST_RULES = {
   /** A trap catches pests that come within this many meters. */
   trapRadius: 4,
   /** Pests within this many meters of the map edge get nudged back in. */
-  edgeMargin: 4
+  edgeMargin: 4,
+  /**
+   * Chance per second that a pest bothered by repellent gives up and flies
+   * off in a random direction instead of fleeing straight down the slope.
+   */
+  giveUpPerSec: 0.1,
+  /** How long a pest that gave up keeps flying before it heads for the crop again (seconds). */
+  giveUpSec: 60
 };
 
 export interface PestEnvironment {
@@ -55,6 +62,8 @@ export class PestSwarm {
   feeding: Uint8Array;
   /** 1 while repellent above the threshold is bothering this pest. */
   repelled: Uint8Array;
+  /** Seconds left flying off after giving up on the repellent (0 = not leaving). */
+  leaving: Float32Array;
 
   constructor(n: number) {
     this.n = n;
@@ -64,6 +73,7 @@ export class PestSwarm {
     this.trapped = new Uint8Array(n);
     this.feeding = new Uint8Array(n);
     this.repelled = new Uint8Array(n);
+    this.leaving = new Float32Array(n);
   }
 
   /** Place pests according to the chosen starting pattern. */
@@ -149,9 +159,11 @@ export class PestSwarm {
       let h = this.heading[i] + rng.gaussian() * turn;
       let dx = Math.cos(h);
       let dy = Math.sin(h);
+      const leaving = this.leaving[i] > 0;
+      if (leaving) this.leaving[i] = Math.max(0, this.leaving[i] - dt);
 
       // 2. Attraction toward the crop (only matters once off the crop).
-      if (!onCrop && env.cropAttraction > 0) {
+      if (!onCrop && !leaving && env.cropAttraction > 0) {
         const t = closestInRect(px, py, env.crop);
         const ddx = t.x - px;
         const ddy = t.y - py;
@@ -163,7 +175,13 @@ export class PestSwarm {
       // 3. Avoid repellent: move down the slope, harder where it's stronger.
       const rep = env.repellent.sample(px, py);
       const repelled = rep > th && sens > 0;
-      if (rep > th * 0.5 && sens > 0) {
+      if (repelled && !leaving && R.giveUpPerSec > 0 && rng.chance(R.giveUpPerSec * dt)) {
+        // Give up on this patch: pick a random direction and go.
+        this.leaving[i] = R.giveUpSec;
+        h = rng.range(0, Math.PI * 2);
+        dx = Math.cos(h);
+        dy = Math.sin(h);
+      } else if (!leaving && rep > th * 0.5 && sens > 0) {
         const g = env.repellent.gradient(px, py);
         const gl = Math.hypot(g.x, g.y);
         if (gl > 1e-7) {
@@ -175,7 +193,7 @@ export class PestSwarm {
 
       // 4. Follow attractant up the slope.
       const att = env.attractant.sample(px, py);
-      if (att > th * R.attractNoticeFraction && sens > 0) {
+      if (!leaving && att > th * R.attractNoticeFraction && sens > 0) {
         const g = env.attractant.gradient(px, py);
         const gl = Math.hypot(g.x, g.y);
         if (gl > 1e-7) {
@@ -195,7 +213,7 @@ export class PestSwarm {
       h = Math.atan2(dy, dx);
       this.heading[i] = h;
 
-      const feeding = onCrop && !repelled;
+      const feeding = onCrop && !repelled && !(this.leaving[i] > 0);
       this.feeding[i] = feeding ? 1 : 0;
       this.repelled[i] = repelled ? 1 : 0;
       const speed = env.speed * (feeding ? R.feedingSpeed : repelled ? R.agitatedSpeed : 1);
