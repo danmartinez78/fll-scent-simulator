@@ -120,8 +120,13 @@ export function drawScene(ctx: CanvasRenderingContext2D, sim: Simulation, o: Dra
       img.data[i * 4 + 3] = Math.round(level * level * 200);
     }
     g.putImageData(img, 0, 0);
-    ctx.imageSmoothingEnabled = false;
+    ctx.imageSmoothingEnabled = true;
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(crop.x, crop.y, crop.w, crop.h);
+    ctx.clip();
     ctx.drawImage(c, 0, 0, field.cols * field.cell, field.rows * field.cell);
+    ctx.restore();
   }
 
   // Scent clouds
@@ -139,7 +144,7 @@ export function drawScene(ctx: CanvasRenderingContext2D, sim: Simulation, o: Dra
         const v = f.data[i];
         if (v <= th * 0.05) continue;
         any = true;
-        const a = v < th ? (v / th) * 0.3 : 0.38 + Math.min(1, (v - th) / (th * 5)) * 0.45;
+        const a = v < th ? 0.05 + (v / th) * 0.35 : 0.45 + Math.min(1, (v - th) / (th * 5)) * 0.4;
         img.data[i * 4] = color[0];
         img.data[i * 4 + 1] = color[1];
         img.data[i * 4 + 2] = color[2];

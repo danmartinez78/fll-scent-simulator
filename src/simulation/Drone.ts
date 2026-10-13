@@ -142,8 +142,13 @@ export class Drone {
     const fitDevices = Math.floor((s.maxPayloadKg - this.payloadKg) / mass - this.devicesOnboard);
     this.devicesOnboard += Math.max(0, Math.min(wantDevices, fitDevices));
 
-    const needL = this.remainingSprayLiters() - this.payloadL;
-    if (needL > 0.01) {
+    // Drop slivers of strips too short to matter (left over from rounding).
+    this.tasks = this.tasks.filter(
+      (t) => t.kind !== 'spray' || dist(t.from.x, t.from.y, t.to.x, t.to.y) > 0.5
+    );
+    // A little extra over the exact need covers rounding along the way.
+    const needL = this.remainingSprayLiters() * 1.02 + 0.2 - this.payloadL;
+    if (this.remainingSprayLiters() > 0 && needL > 0.01) {
       const roomL = Math.min(
         s.tankL - this.payloadL,
         (s.maxPayloadKg - this.devicesOnboard * devicesMassKg) / KG_PER_LITER - this.payloadL
@@ -301,7 +306,7 @@ export class Drone {
       this.sprayedAreaM2 += move * s.swathM;
       this.progressThisFlight = true;
     }
-    if (!ranOut && dist(this.x, this.y, task.to.x, task.to.y) < 1e-3) {
+    if (dist(this.x, this.y, task.to.x, task.to.y) < 0.5) {
       this.tasks.shift();
       this.spraying = false;
     } else if (ranOut || this.payloadL <= 0.01) {

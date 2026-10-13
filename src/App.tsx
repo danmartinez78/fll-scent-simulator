@@ -28,6 +28,13 @@ const DEFAULT_VIEW: ViewOptions = {
   showPath: true
 };
 
+/** The map tool that fits a treatment method. */
+export function defaultTool(method: Settings['treatment']): Tool {
+  if (method === 'spray') return 'zone';
+  if (method === 'slowRelease' || method === 'pushPull') return 'repellent';
+  return 'none';
+}
+
 type Tab = 'results' | 'survey' | 'computer' | 'notebook' | 'learn';
 
 export default function App() {
@@ -38,7 +45,7 @@ export default function App() {
   const [surveyLayer, setSurveyLayer] = useState<SurveyLayer>('camera');
   const [selectedSurveyId, setSelectedSurveyId] = useState<number | null>(null);
   const [instructor, setInstructor] = useState(false);
-  const [tool, setTool] = useState<Tool>('none');
+  const [tool, setTool] = useState<Tool>(() => defaultTool(SCENARIOS[0].settings.treatment));
   const [running, setRunning] = useState(false);
   const [speed, setSpeed] = useState(1);
   const [pendingReset, setPendingReset] = useState(false);
@@ -141,7 +148,7 @@ export default function App() {
       setSettings(s);
       setPlanState(p);
       setView({ ...DEFAULT_VIEW, ...sc.view });
-      setTool('none');
+      setTool(defaultTool(s.treatment));
       resetSim(s, p);
     },
     [resetSim]

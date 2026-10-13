@@ -30,7 +30,7 @@ export function LineChart({ xs, series, yMax, yLabel, xLabel = 'minutes', height
           <g key={t}>
             <line x1={pad.l} x2={W - pad.r} y1={y(t)} y2={y(t)} className="grid" />
             <text x={pad.l - 4} y={y(t) + 3} className="axis" textAnchor="end">
-              {t >= 10 ? Math.round(t) : t.toFixed(1)}
+              {t === 0 ? 0 : t >= 10 ? Math.round(t) : t.toFixed(1)}
             </text>
           </g>
         ))}
