@@ -14,6 +14,7 @@ import { NotebookPanel } from './components/NotebookPanel';
 import { HelpPanel } from './components/HelpPanel';
 import { ScenarioSelector } from './components/ScenarioSelector';
 import { ExperimentPanel } from './components/ExperimentPanel';
+import { GuidedPanel, type GuidedStep } from './components/GuidedPanel';
 import { HONESTY_NOTE } from './content/help';
 import { captureRun, loadNotebook, newEntry, nextName, saveNotebook, type EntrySetup, type NotebookEntry } from './notebook/notebook';
 
@@ -36,6 +37,17 @@ export function defaultTool(method: Settings['treatment']): Tool {
 }
 
 type Tab = 'results' | 'survey' | 'computer' | 'notebook' | 'learn';
+type Mode = 'guided' | 'playground';
+
+const MODE_KEY = 'scent-sim-mode';
+
+function loadMode(): Mode {
+  try {
+    return localStorage.getItem(MODE_KEY) === 'playground' ? 'playground' : 'guided';
+  } catch {
+    return 'guided';
+  }
+}
 
 export default function App() {
   const [scenario, setScenario] = useState<Scenario>(SCENARIOS[0]);
@@ -53,6 +65,10 @@ export default function App() {
   const [tab, setTab] = useState<Tab>('results');
   const [entries, setEntries] = useState<NotebookEntry[]>(() => loadNotebook());
   const [activeEntryId, setActiveEntryId] = useState<string | null>(null);
+  const [mode, setModeState] = useState<Mode>(loadMode);
+  const [step, setStep] = useState<GuidedStep>('mission');
+  const [prediction, setPrediction] = useState('');
+  const [savedTo, setSavedTo] = useState<string | null>(null);
   const [, setTick] = useState(0);
 
   const simRef = useRef<Simulation>(new Simulation(settings, plan));
@@ -65,6 +81,15 @@ export default function App() {
 
   useEffect(() => saveNotebook(entries), [entries]);
 
+  const setMode = useCallback((m: Mode) => {
+    setModeState(m);
+    try {
+      localStorage.setItem(MODE_KEY, m);
+    } catch {
+      // Private windows can block storage; the mode just won't be remembered.
+    }
+  }, []);
+
   const resetSim = useCallback((s: Settings, p: TreatmentPlan) => {
     simRef.current = new Simulation(s, p);
     finishAck.current = false;
@@ -73,6 +98,7 @@ export default function App() {
     setRunning(false);
     setPendingReset(false);
     setNotice(null);
+    setSavedTo(null);
     setTick((t) => t + 1);
   }, []);
 
@@ -177,17 +203,27 @@ export default function App() {
       const captured = captureRun(simRef.current, scenario.name);
       const wanted = targetId ?? activeEntryId;
       const target = entries.find((e) => e.id === wanted && (targetId !== undefined || !e.captured));
+      // Guided mode carries the mission's question and the student's prediction into the notebook.
+      const guided = mode === 'guided' ? { question: scenario.question, prediction: prediction.trim() } : null;
       if (target) {
-        setEntries(entries.map((e) => (e.id === target.id ? { ...e, captured } : e)));
+        setEntries(
+          entries.map((e) =>
+            e.id === target.id
+              ? { ...e, captured, question: e.question || guided?.question || '', prediction: e.prediction || guided?.prediction || '' }
+              : e
+          )
+        );
+        setSavedTo(target.name);
       } else {
-        const e = { ...newEntry(nextName(entries)), captured };
+        const e = { ...newEntry(nextName(entries)), ...guided, captured };
         setEntries([...entries, e]);
         setActiveEntryId(e.id);
+        setSavedTo(e.name);
       }
-      setTab('notebook');
+      if (mode === 'playground') setTab('notebook');
       setNotice(null);
     },
-    [scenario.name, activeEntryId, entries]
+    [scenario.name, scenario.question, activeEntryId, entries, mode, prediction]
   );
 
   const sim = simRef.current;
@@ -196,6 +232,11 @@ export default function App() {
     if (!surveys.length) return null;
     return surveys.find((s) => s.id === selectedSurveyId) ?? surveys[surveys.length - 1];
   }, [surveys.length, selectedSurveyId, surveys]);
+
+  // Guided mode moves to the Compare step when a run finishes.
+  useEffect(() => {
+    if (notice === 'finished' && mode === 'guided') setStep('compare');
+  }, [notice, mode]);
 
   const activeEntry = entries.find((e) => e.id === activeEntryId) ?? null;
 
@@ -215,22 +256,59 @@ export default function App() {
             <p className="tagline">Explore how drones and scents might help keep pests off crops.</p>
           </div>
         </div>
-        <ScenarioSelector scenario={scenario} onLoad={loadScenario} />
+        <ScenarioSelector scenario={scenario} onLoad={loadScenario} pickable={mode === 'playground'} />
+        <div className="mode-switch" role="tablist" aria-label="Mode">
+          <button role="tab" aria-selected={mode === 'guided'} className={mode === 'guided' ? 'active' : ''} onClick={() => setMode('guided')}>
+            🧭 Guided
+          </button>
+          <button role="tab" aria-selected={mode === 'playground'} className={mode === 'playground' ? 'active' : ''} onClick={() => setMode('playground')}>
+            🛝 Playground
+          </button>
+        </div>
       </header>
 
-      <main className="layout">
-        <aside className="panel left" aria-label="Controls">
-          <ControlPanel
-            settings={settings}
-            plan={plan}
-            tool={tool}
-            simStarted={sim.time > 0}
-            onSettings={updateSettings}
-            onPlan={setPlan}
-            onTool={setTool}
-            onLoadScenario={loadScenario}
-            scenario={scenario}
-          />
+      <main className={`layout ${mode}`}>
+        <aside className="panel left" aria-label={mode === 'guided' ? 'Steps' : 'Controls'}>
+          {mode === 'guided' ? (
+            <GuidedPanel
+              step={step}
+              onStep={setStep}
+              scenario={scenario}
+              onLoadScenario={(sc) => {
+                if (sc.id !== scenario.id) setPrediction('');
+                loadScenario(sc);
+              }}
+              prediction={prediction}
+              onPrediction={setPrediction}
+              settings={settings}
+              plan={plan}
+              tool={tool}
+              sim={sim}
+              running={running}
+              onSettings={updateSettings}
+              onPlan={setPlan}
+              onTool={setTool}
+              onSurvey={startSurvey}
+              onSave={() => saveRunToNotebook()}
+              saved={savedTo}
+              onTryAgain={() => {
+                resetSim(settings, plan);
+                setStep('plan');
+              }}
+            />
+          ) : (
+            <ControlPanel
+              settings={settings}
+              plan={plan}
+              tool={tool}
+              simStarted={sim.time > 0}
+              onSettings={updateSettings}
+              onPlan={setPlan}
+              onTool={setTool}
+              onLoadScenario={loadScenario}
+              scenario={scenario}
+            />
+          )}
         </aside>
 
         <section className="center">
@@ -248,12 +326,14 @@ export default function App() {
               // A survey flown before the first Run only flies the survey drone;
               // pressing Run once it is done starts the treatment.
               if (!running && !simRef.current.surveying) simRef.current.startTreatment();
+              if (!running && mode === 'guided' && !simRef.current.surveying) setStep('run');
               setRunning((r) => !r);
             }}
             onReset={() => resetSim(settings, plan)}
             onSpeed={setSpeed}
             onSurvey={startSurvey}
             onView={setView}
+            showSurvey={mode === 'playground' || scenario.id === 'survey'}
           />
           <div className="canvas-wrap">
             <SimulationCanvas
@@ -266,7 +346,7 @@ export default function App() {
               settings={settings}
               onPlan={setPlan}
             />
-            {notice === 'finished' && (
+            {notice === 'finished' && mode === 'playground' && (
               <div className="notice" role="status">
                 <strong>Run finished.</strong> What happened? Did it match your prediction?
                 <div className="notice-actions">
@@ -286,7 +366,7 @@ export default function App() {
               <div className="notice" role="status">
                 <strong>Survey finished.</strong> The colored squares are what the camera software thinks it saw. Is it right everywhere?
                 <div className="notice-actions">
-                  <button className="btn primary" onClick={() => setNotice(null)}>
+                  <button className="btn primary" onClick={() => { setNotice(null); if (mode === 'guided') setStep('plan'); }}>
                     Plan a treatment
                   </button>
                   <button className="btn" onClick={() => { setNotice(null); simRef.current.startTreatment(); setRunning(true); }}>
@@ -299,71 +379,73 @@ export default function App() {
           <ExperimentPanel settings={settings} sim={sim} tool={tool} running={running} />
         </section>
 
-        <aside className="panel right" aria-label="Results and tools">
-          <nav className="tabs" role="tablist">
-            {(
-              [
-                ['results', '📊 Results'],
-                ['survey', '🛰️ Survey'],
-                ['computer', '🤖 Computer'],
-                ['notebook', '📓 Notebook'],
-                ['learn', '💡 Learn']
-              ] as Array<[Tab, string]>
-            ).map(([k, label]) => (
-              <button key={k} role="tab" aria-selected={tab === k} className={tab === k ? 'tab active' : 'tab'} onClick={() => setTab(k)}>
-                {label}
-              </button>
-            ))}
-          </nav>
-          <div className="tab-body">
-            {tab === 'results' && <ResultsPanel sim={sim} onSave={() => saveRunToNotebook()} />}
-            {tab === 'survey' && (
-              <SurveyPanel
-                sim={sim}
-                surveys={surveys}
-                shown={shownSurvey}
-                layer={surveyLayer}
-                instructor={instructor}
-                onInstructor={setInstructor}
-                onLayer={setSurveyLayer}
-                onSelect={setSelectedSurveyId}
-                onSurvey={startSurvey}
-                view={view}
-                onView={setView}
-              />
-            )}
-            {tab === 'computer' && (
-              <OptimizerPanel
-                settings={settings}
-                plan={plan}
-                surveys={surveys}
-                onSettings={updateSettings}
-                onUsePlan={(p) => {
-                  setPlanState(p);
-                  resetSim(settings, p);
-                }}
-              />
-            )}
-            {tab === 'notebook' && (
-              <NotebookPanel
-                entries={entries}
-                activeId={activeEntryId}
-                onActive={setActiveEntryId}
-                onEntries={setEntries}
-                onSaveRun={saveRunToNotebook}
-                onLoadSetup={loadSetup}
-                simTime={sim.time}
-              />
-            )}
-            {tab === 'learn' && <HelpPanel />}
-          </div>
-          {activeEntry && tab !== 'notebook' && (
-            <div className="active-entry">
-              📓 Recording into <strong>{activeEntry.name}</strong>
-              {activeEntry.prediction && <span className="muted"> · Prediction: “{activeEntry.prediction}”</span>}
+        {mode === 'playground' && (
+          <aside className="panel right" aria-label="Results and tools">
+            <nav className="tabs" role="tablist">
+              {(
+                [
+                  ['results', '📊 Results'],
+                  ['survey', '🛰️ Survey'],
+                  ['computer', '🤖 Computer'],
+                  ['notebook', '📓 Notebook'],
+                  ['learn', '💡 Learn']
+                ] as Array<[Tab, string]>
+              ).map(([k, label]) => (
+                <button key={k} role="tab" aria-selected={tab === k} className={tab === k ? 'tab active' : 'tab'} onClick={() => setTab(k)}>
+                  {label}
+                </button>
+              ))}
+            </nav>
+            <div className="tab-body">
+              {tab === 'results' && <ResultsPanel sim={sim} onSave={() => saveRunToNotebook()} />}
+              {tab === 'survey' && (
+                <SurveyPanel
+                  sim={sim}
+                  surveys={surveys}
+                  shown={shownSurvey}
+                  layer={surveyLayer}
+                  instructor={instructor}
+                  onInstructor={setInstructor}
+                  onLayer={setSurveyLayer}
+                  onSelect={setSelectedSurveyId}
+                  onSurvey={startSurvey}
+                  view={view}
+                  onView={setView}
+                />
+              )}
+              {tab === 'computer' && (
+                <OptimizerPanel
+                  settings={settings}
+                  plan={plan}
+                  surveys={surveys}
+                  onSettings={updateSettings}
+                  onUsePlan={(p) => {
+                    setPlanState(p);
+                    resetSim(settings, p);
+                  }}
+                />
+              )}
+              {tab === 'notebook' && (
+                <NotebookPanel
+                  entries={entries}
+                  activeId={activeEntryId}
+                  onActive={setActiveEntryId}
+                  onEntries={setEntries}
+                  onSaveRun={saveRunToNotebook}
+                  onLoadSetup={loadSetup}
+                  simTime={sim.time}
+                />
+              )}
+              {tab === 'learn' && <HelpPanel />}
             </div>
-          )}
-        </aside>
+            {activeEntry && tab !== 'notebook' && (
+              <div className="active-entry">
+                📓 Recording into <strong>{activeEntry.name}</strong>
+                {activeEntry.prediction && <span className="muted"> · Prediction: “{activeEntry.prediction}”</span>}
+              </div>
+            )}
+          </aside>
+        )}
       </main>
 
       <footer className="footer">
