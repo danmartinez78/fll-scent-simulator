@@ -41,6 +41,14 @@ There is no backend, database, login or network dependency. Everything runs in t
 
 Results shown: crop protected, pests kept off the crop (now and run average), product used and left, devices used, drone flight time, flights, refills and battery swaps, scent coverage, acres sprayed, and estimated cost with its parts. Charts show pests feeding, crop affected, scent coverage and product over time.
 
+## Screenshots
+
+| | |
+|---|---|
+| ![Push-pull with a trap](docs/screenshots/push-pull.png) Push-pull: repellent devices push, an attractant trap pulls. | ![Survey map](docs/screenshots/survey.png) The survey drone's imperfect camera map. |
+| ![Before and after](docs/screenshots/before-after.png) Comparing a survey before and after treatment. | ![Notebook comparison](docs/screenshots/notebook-compare.png) Two notebook experiments side by side. |
+| ![Computer plan](docs/screenshots/computer-plan.png) "Let the computer try" compared with the student's plan. | ![Limited flight time](docs/screenshots/flight-time.png) A big field needs several flights, refills and battery swaps. |
+
 ## For coaches
 
 The simulator is built to support this activity:
@@ -190,6 +198,7 @@ Add an entry to `SCENARIOS` in `src/simulation/scenarios.ts`:
 - Pest behavior is a weighted-rules model, not insect biology. There is no breeding, death (except traps), day/night or species differences.
 - Scent drift is a grid shift plus blur; there is no terrain, canopy, rain, temperature or 3D movement. Strong wind blows most scent off a small field quickly.
 - Spraying deposits scent directly into the air layer; there is no residue on leaves.
+- Repellent pushes pests into untreated crop, where they keep feeding. A spray front can herd pests across the field, so whole-field spraying can sometimes protect less than expected. This is a property of the simple rules, worth discussing rather than trusting.
 - The drone flies straight lines at constant speed; there are no takeoff, turn or climb costs, and the battery model is a straight line between two hover times.
 - The survey's computer vision is simulated from the true pest positions plus noise. It is not a real vision model.
 - The optimizer's quick test uses fewer pests and a coarser grid, so its own score can differ from the full-simulation result shown at the end.

@@ -93,7 +93,7 @@ export default function App() {
         steps = Math.min(steps, 600);
         for (let i = 0; i < steps; i++) {
           sim.step();
-          if (sim.finished && !finishAck.current) {
+          if (sim.finished && !finishAck.current && !sim.surveying) {
             finishAck.current = true;
             setRunning(false);
             setNotice('finished');
