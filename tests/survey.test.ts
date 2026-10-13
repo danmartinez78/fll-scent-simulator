@@ -49,4 +49,44 @@ describe('survey drone', () => {
     expect(sim.surveys.map((s) => s.label)).toEqual(['Survey 1', 'Survey 2']);
     expect(sim.surveys[1].timeSec).toBeGreaterThan(sim.surveys[0].timeSec);
   });
+
+  it('flies only the survey drone when surveying before the first Run', () => {
+    const plan = { sprayZones: [], devices: [{ id: 1, x: 100, y: 60, kind: 'repellent' as const, trap: false }] };
+    const sim = new Simulation(settingsWith({ treatment: 'slowRelease' }), plan);
+    sim.startSurvey(true);
+    while (sim.surveying) sim.step();
+    expect(sim.treatmentWaiting).toBe(true);
+    expect(sim.drone.mode).toBe('parked');
+    expect(sim.drone.flights).toBe(0);
+    expect(sim.devices[0].activatedAt).toBeNull();
+    expect(sim.repellent.max()).toBe(0);
+    // Pressing Run starts the treatment.
+    sim.startTreatment();
+    sim.advance(120);
+    expect(sim.devices[0].activatedAt).not.toBeNull();
+    expect(sim.repellent.max()).toBeGreaterThan(0);
+  });
+
+  it('starts hand-placed devices when the run starts, not during an earlier survey', () => {
+    const plan = { sprayZones: [], devices: [{ id: 1, x: 100, y: 60, kind: 'repellent' as const, trap: false }] };
+    const sim = new Simulation(settingsWith({ treatment: 'slowRelease', devices: { deployByDrone: false } }), plan);
+    sim.startSurvey(true);
+    while (sim.surveying) sim.step();
+    expect(sim.repellent.max()).toBe(0);
+    const t = sim.time;
+    sim.startTreatment();
+    sim.step();
+    expect(sim.devices[0].activatedAt).toBe(t);
+    expect(sim.repellent.max()).toBeGreaterThan(0);
+  });
+
+  it('keeps the treatment going during a survey flown mid-run', () => {
+    const plan = { sprayZones: [], devices: [{ id: 1, x: 100, y: 60, kind: 'repellent' as const, trap: false }] };
+    const sim = new Simulation(settingsWith({ treatment: 'slowRelease' }), plan);
+    sim.advance(10);
+    sim.startSurvey(true);
+    expect(sim.treatmentWaiting).toBe(false);
+    sim.advance(120);
+    expect(sim.devices[0].activatedAt).not.toBeNull();
+  });
 });

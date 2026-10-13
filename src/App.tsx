@@ -167,7 +167,7 @@ export default function App() {
   );
 
   const startSurvey = useCallback(() => {
-    simRef.current.startSurvey();
+    simRef.current.startSurvey(true);
     setNotice(null);
     setRunning(true);
   }, []);
@@ -245,6 +245,9 @@ export default function App() {
             view={view}
             onRun={() => {
               setNotice(null);
+              // A survey flown before the first Run only flies the survey drone;
+              // pressing Run once it is done starts the treatment.
+              if (!running && !simRef.current.surveying) simRef.current.startTreatment();
               setRunning((r) => !r);
             }}
             onReset={() => resetSim(settings, plan)}
@@ -270,7 +273,7 @@ export default function App() {
                   <button className="btn primary" onClick={() => saveRunToNotebook()}>
                     📓 Save results to notebook
                   </button>
-                  <button className="btn" onClick={() => { setNotice(null); setRunning(true); }}>
+                  <button className="btn" onClick={() => { setNotice(null); simRef.current.startTreatment(); setRunning(true); }}>
                     Keep going
                   </button>
                   <button className="btn" onClick={() => resetSim(settings, plan)}>
@@ -286,7 +289,7 @@ export default function App() {
                   <button className="btn primary" onClick={() => setNotice(null)}>
                     Plan a treatment
                   </button>
-                  <button className="btn" onClick={() => { setNotice(null); setRunning(true); }}>
+                  <button className="btn" onClick={() => { setNotice(null); simRef.current.startTreatment(); setRunning(true); }}>
                     Keep running
                   </button>
                 </div>

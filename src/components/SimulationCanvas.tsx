@@ -4,6 +4,7 @@ import type { Simulation } from '../simulation/Simulation';
 import { activePlan, allowedKinds } from '../simulation/Treatment';
 import { computeViewport, drawScene, toWorld, type SurveyLayer, type Viewport } from '../render/drawScene';
 import { clamp, dist, inRect, rectFromPoints } from '../utils/geometry';
+import { ClickGuard, type Press } from './clickGuard';
 
 export type Tool = 'none' | 'zone' | 'repellent' | 'attractant' | 'trap' | 'erase';
 
@@ -34,7 +35,41 @@ export function SimulationCanvas(props: Props) {
   propsRef.current = props;
   const vpRef = useRef<Viewport>({ scale: 1, ox: 0, oy: 0 });
   const dragRef = useRef<{ start: Vec; cur: Vec } | null>(null);
+  const guardRef = useRef(new ClickGuard());
   const [message, setMessage] = useState<string | null>(null);
+
+  // Watch dropdown menus: their native popups can sit on top of the map, and
+  // presses that pick an option or close the menu must not land on the map.
+  useEffect(() => {
+    const guard = guardRef.current;
+    const menuOf = (t: EventTarget | null) => (t instanceof Element ? t.closest('select') : null);
+    const onDown = (e: PointerEvent) => {
+      if (e.target === canvasRef.current) return;
+      const menu = menuOf(e.target);
+      if (menu) guard.menuPressed(menu, performance.now());
+      else guard.pressedElsewhere(performance.now());
+    };
+    const onClose = (e: Event) => {
+      if (menuOf(e.target)) guard.menuClosed(performance.now());
+    };
+    const onBlur = (e: FocusEvent) => {
+      // Moving focus from one dropdown straight to another keeps a menu open.
+      if (menuOf(e.target) && !menuOf(e.relatedTarget)) guard.menuClosed(performance.now());
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (['Enter', 'Escape', 'Tab', ' '].includes(e.key)) onClose(e);
+    };
+    document.addEventListener('pointerdown', onDown, true);
+    document.addEventListener('change', onClose, true);
+    document.addEventListener('focusout', onBlur, true);
+    document.addEventListener('keydown', onKey, true);
+    return () => {
+      document.removeEventListener('pointerdown', onDown, true);
+      document.removeEventListener('change', onClose, true);
+      document.removeEventListener('focusout', onBlur, true);
+      document.removeEventListener('keydown', onKey, true);
+    };
+  }, []);
 
   // Keep the canvas sharp and sized to its box.
   useEffect(() => {
@@ -105,16 +140,22 @@ export function SimulationCanvas(props: Props) {
     };
   };
 
+  const pressOf = (e: React.PointerEvent): Press => ({ pointerId: e.pointerId, x: e.clientX, y: e.clientY });
+
   const onPointerDown = (e: React.PointerEvent) => {
-    const { tool, plan, settings, onPlan } = propsRef.current;
+    const { tool, settings } = propsRef.current;
     if (tool === 'none') return;
-    const pt = worldPoint(e);
-    if (tool === 'zone') {
-      if (settings.treatment !== 'spray') return;
+    if (!guardRef.current.down(pressOf(e), performance.now(), e.isPrimary && e.button === 0)) return;
+    (e.target as Element).setPointerCapture(e.pointerId);
+    if (tool === 'zone' && settings.treatment === 'spray') {
+      const pt = worldPoint(e);
       dragRef.current = { start: pt, cur: pt };
-      (e.target as Element).setPointerCapture(e.pointerId);
-      return;
     }
+  };
+
+  /** A full click on the map: erase or place a device. */
+  const onClick = (pt: Vec) => {
+    const { tool, plan, settings, onPlan } = propsRef.current;
     if (tool === 'erase') {
       const eff = activePlan(plan, settings.treatment);
       // Nearest device within reach, otherwise the smallest zone under the pointer.
@@ -158,10 +199,15 @@ export function SimulationCanvas(props: Props) {
     if (dragRef.current) dragRef.current.cur = worldPoint(e);
   };
 
-  const onPointerUp = () => {
+  const onPointerUp = (e: React.PointerEvent) => {
     const drag = dragRef.current;
     dragRef.current = null;
-    if (!drag) return;
+    const clicked = guardRef.current.up(pressOf(e), performance.now());
+    if (!drag) {
+      const { tool } = propsRef.current;
+      if (clicked && tool !== 'none' && tool !== 'zone') onClick(worldPoint(e));
+      return;
+    }
     const { plan, onPlan } = propsRef.current;
     const z: Rect = rectFromPoints(drag.start, drag.cur);
     if (z.w < 4 || z.h < 4) {
@@ -179,7 +225,10 @@ export function SimulationCanvas(props: Props) {
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
-        onPointerCancel={() => (dragRef.current = null)}
+        onPointerCancel={() => {
+          dragRef.current = null;
+          guardRef.current.cancel();
+        }}
         aria-label="Top-down map of the field. Pests are small dots (blue ones ignore scent); purple clouds are repellent, orange clouds are attractant."
         role="img"
       />

@@ -25,6 +25,7 @@ export function droneStatus(sim: Simulation): string {
   const battery = `battery ${Math.round(Math.max(0, d.battery) * 100)}% (${d.minutesLeft(mass).toFixed(1)} min before reserve)`;
   switch (d.mode) {
     case 'parked':
+      if (sim.treatmentWaiting) return 'Drone is waiting at home (H) until you press Run to start the treatment.';
       if (d.outOfProduct) return 'Drone is parked: it ran out of product.';
       if (d.gaveUp) return 'Drone is parked: the job is too far for one battery.';
       return d.flights > 0 ? 'Drone is parked: all jobs done.' : 'Drone is parked at home (H), waiting for a plan.';
