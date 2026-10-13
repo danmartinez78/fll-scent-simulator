@@ -90,6 +90,12 @@ export class Simulation {
   surveys: SurveyResult[] = [];
   history: HistoryPoint[] = [];
   finished = false;
+  /**
+   * False until the treatment starts. A survey flown before the first Run
+   * keeps the treatment drone and devices waiting until the run starts.
+   */
+  treatmentStarted = false;
+  private holdTreatment = false;
   private awaySum = 0;
   private awayN = 0;
   private nextHistory = 0;
@@ -203,8 +209,13 @@ export class Simulation {
     if (methodChanged) this.setPlan(this.plan);
   }
 
-  /** Send the survey drone over the map. */
-  startSurvey(): void {
+  /**
+   * Send the survey drone over the map. With `holdTreatment`, a survey flown
+   * before the treatment has started leaves the treatment waiting until
+   * startTreatment() is called, so only the survey drone flies.
+   */
+  startSurvey(holdTreatment = false): void {
+    if (holdTreatment && !this.treatmentStarted) this.holdTreatment = true;
     if (this.survey && !this.survey.done) return;
     const id = this.surveys.length + 1;
     this.survey = new SurveyRun(
@@ -215,6 +226,21 @@ export class Simulation {
       this.settings.field.height,
       this.settings.survey
     );
+  }
+
+  /** Start the treatment: the drone takes off and hand-placed devices start releasing now. */
+  startTreatment(): void {
+    this.holdTreatment = false;
+    if (this.treatmentStarted) return;
+    this.treatmentStarted = true;
+    if (!this.settings.devices.deployByDrone) {
+      for (const d of this.devices) if (d.activatedAt !== null) d.activatedAt = this.time;
+    }
+  }
+
+  /** True while a survey flown before the first Run is keeping the treatment waiting. */
+  get treatmentWaiting(): boolean {
+    return this.holdTreatment && !this.treatmentStarted;
   }
 
   get surveying(): boolean {
@@ -229,7 +255,7 @@ export class Simulation {
     const s = this.settings;
     const traps: Vec[] = [];
     for (const d of this.devices) {
-      if (d.kind === 'attractant' && d.trap && d.activatedAt !== null) traps.push({ x: d.x, y: d.y });
+      if (d.kind === 'attractant' && d.trap && d.activatedAt !== null && this.treatmentStarted) traps.push({ x: d.x, y: d.y });
     }
     return {
       width: s.field.width,
@@ -251,10 +277,12 @@ export class Simulation {
     const s = this.settings;
     const cell = this.repellent.cell;
     const cols = this.repellent.cols;
+    if (!this.holdTreatment) this.startTreatment();
+    const treating = this.treatmentStarted;
 
     // Drone: flies its jobs, sprays and drops devices.
     const sprayed = this.sprayed;
-    this.drone.step(dt, {
+    if (treating) this.drone.step(dt, {
       devicesMassKg: s.devices.massKg,
       spray: (x, y, liters, swath) => {
         const amount = (liters / REFERENCE_RATE_L_PER_M2) * s.scent.strength;
@@ -277,7 +305,7 @@ export class Simulation {
     // Slow-release devices: steady scent while they last.
     const emit = DEVICE_BASE_EMISSION * s.scent.strength * s.devices.releaseRate * dt;
     for (const d of this.devices) {
-      if (!deviceActive(d, this.time, s.devices.lifetimeMin)) continue;
+      if (!treating || !deviceActive(d, this.time, s.devices.lifetimeMin)) continue;
       const field = d.kind === 'repellent' ? this.repellent : this.attractant;
       field.addGaussian(d.x, d.y, emit, s.scent.rangeM / 2);
     }
