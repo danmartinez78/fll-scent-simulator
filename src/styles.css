@@ -943,58 +943,7 @@ textarea {
   text-decoration: underline;
 }
 
-/* Sim-to-real loop (Learn tab and pop-up) */
-.loop-steps {
-  list-style: none;
-  padding: 0;
-  margin: 8px 0;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-.loop-steps li {
-  display: flex;
-  gap: 10px;
-  align-items: flex-start;
-  background: #f8fafc;
-  border-radius: 10px;
-  padding: 8px 10px;
-}
-.loop-steps li div {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  font-size: 13px;
-}
-.loop-icon {
-  font-size: 20px;
-  line-height: 1.2;
-}
-.why-list {
-  list-style: none;
-  padding: 0;
-  margin: 8px 0;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-.why-list li {
-  display: flex;
-  gap: 10px;
-  align-items: flex-start;
-  font-size: 13px;
-}
-.loop-dialog-body h3 {
-  margin-top: 12px;
-}
-.loop-dialog-body {
-  max-height: calc(100vh - 80px);
-  overflow-y: auto;
-}
-.loop-again {
-  font-weight: 600;
-  margin: 4px 0 8px;
-}
+/* Sim-to-real lesson (Learn tab and pop-up) */
 .loop-example,
 .real-check {
   background: var(--accent-soft);
@@ -1013,18 +962,131 @@ textarea {
   border: none;
   border-radius: 14px;
   padding: 0;
-  max-width: min(560px, calc(100vw - 32px));
+  width: min(520px, calc(100vw - 32px));
+  max-width: none;
   box-shadow: 0 20px 50px rgba(15, 23, 42, 0.35);
 }
 .loop-dialog::backdrop {
   background: rgba(15, 23, 42, 0.45);
 }
 .loop-dialog-body {
+  position: relative;
   padding: 16px 18px;
+  max-height: calc(100vh - 80px);
+  overflow-y: auto;
 }
-.loop-dialog-body h2 {
+.dialog-close {
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  border: none;
+  background: transparent;
   font-size: 18px;
-  margin-bottom: 6px;
+  line-height: 1;
+  padding: 4px 6px;
+  cursor: pointer;
+  color: var(--muted);
+}
+.lesson {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.lesson-box {
+  background: #f8fafc;
+  border-radius: 12px;
+  padding: 12px 14px;
+}
+.lesson-progress {
+  display: flex;
+  gap: 6px;
+}
+.pip {
+  width: 22px;
+  height: 6px;
+  border-radius: 3px;
+  border: none;
+  padding: 0;
+  background: #e2e8f0;
+  cursor: pointer;
+}
+.pip.done {
+  background: #a7d7b5;
+}
+.pip.current {
+  background: var(--accent);
+}
+.lesson-title {
+  font-size: 18px;
+  margin: 4px 0 0;
+}
+.lesson-body {
+  font-size: 14px;
+  line-height: 1.5;
+  min-height: 220px;
+}
+.lesson-body p {
+  margin: 0 0 8px;
+}
+.lesson-nav {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-top: 1px solid #e2e8f0;
+  padding-top: 10px;
+}
+.dots {
+  display: block;
+  width: 100%;
+  max-width: 340px;
+  margin: 4px 0 6px;
+}
+.dots-label,
+.dots-tick {
+  font-size: 11px;
+  fill: var(--muted);
+}
+.dots-label {
+  font-weight: 600;
+  fill: #334155;
+}
+.dots-axis {
+  stroke: #cbd5e1;
+  stroke-width: 1;
+}
+.dot-a {
+  fill: var(--accent);
+  fill-opacity: 0.75;
+}
+.dot-b {
+  fill: #d97706;
+  fill-opacity: 0.75;
+}
+.can-cant {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.can,
+.cant {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  border-radius: 10px;
+  padding: 8px 10px;
+  font-size: 13px;
+}
+.can {
+  background: var(--accent-soft);
+}
+.cant {
+  background: #fef2f2;
+}
+@media (max-width: 520px) {
+  .can-cant {
+    grid-template-columns: 1fr;
+  }
 }
 
 .honesty {

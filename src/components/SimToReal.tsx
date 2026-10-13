@@ -1,89 +1,217 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 
-const LOOP = [
+/**
+ * A short, paged lesson: why engineers use simulators, why every simulator
+ * is wrong, and how they still draw conclusions they can trust.
+ */
+
+/** Small dot plot of crop protected (%) for a few runs. Illustrative numbers, not real results. */
+function DotRows({ rows }: { rows: Array<{ label: string; values: number[]; tone: string }> }) {
+  const w = 300;
+  const rowH = 34;
+  const x = (v: number) => 46 + ((v - 30) / 70) * (w - 60);
+  return (
+    <svg className="dots" viewBox={`0 0 ${w} ${rows.length * rowH + 22}`} role="img" aria-label="Dot plot of crop protected for each run">
+      {rows.map((r, i) => {
+        const y = 18 + i * rowH;
+        return (
+          <g key={r.label}>
+            <text x={0} y={y + 4} className="dots-label">
+              {r.label}
+            </text>
+            <line x1={x(30)} x2={x(100)} y1={y} y2={y} className="dots-axis" />
+            {r.values.map((v, k) => (
+              <circle key={k} cx={x(v)} cy={y} r={5} className={`dot-${r.tone}`} />
+            ))}
+          </g>
+        );
+      })}
+      {[30, 50, 70, 90].map((v) => (
+        <text key={v} x={x(v)} y={rows.length * rowH + 16} className="dots-tick" textAnchor="middle">
+          {v}%
+        </text>
+      ))}
+    </svg>
+  );
+}
+
+interface Page {
+  title: string;
+  body: ReactNode;
+}
+
+const PAGES: Page[] = [
   {
-    icon: '🧠',
-    title: 'Model',
-    text: 'Write down what we think is true: pests avoid repellent, wind carries scent, a heavy drone flies for less time. The simulator is these ideas turned into math.'
+    title: 'Why use a simulator?',
+    body: (
+      <>
+        <p>
+          A crop grows once a season, so a real field gives you only a few tries a year. Real tests cost money, and a bad idea can ruin a crop.
+        </p>
+        <p>
+          A simulator gives you hundreds of tries in an afternoon. You can fail safely, repeat an experiment exactly, and see things you can't see
+          outside, like scent clouds.
+        </p>
+      </>
+    )
   },
   {
-    icon: '💻',
-    title: 'Simulate',
-    text: 'Try many plans fast, cheaply and safely. Find the ideas worth testing for real, and the ones that are not.'
+    title: 'Every simulator is wrong',
+    body: (
+      <>
+        <p>
+          Our simulator leaves out a lot: real insects, rain, hills, and exactly how scent drifts. The difference between a simulator and the real
+          world is called the <strong>sim-to-real gap</strong>. It will never be zero.
+        </p>
+        <p>So how can a simulator that is wrong still help us decide anything? Engineers use a few tricks. The next pages show them.</p>
+      </>
+    )
   },
   {
-    icon: '🌱',
-    title: 'Test for real',
-    text: 'Run a small real trial with the best idea: a test plot, a real device, a real drone flight. Measure the same things the simulator measures.'
+    title: 'Trick 1: Never trust one run',
+    body: (
+      <>
+        <p>
+          Pests move a little randomly, so one run is partly luck. Change the <strong>random seed</strong> and run again. Do that many times and
+          look at the spread: the lowest, the highest and the middle.
+        </p>
+        <DotRows rows={[{ label: 'Plan A', values: [58, 63, 66, 69, 71, 72, 74, 77, 81], tone: 'a' }]} />
+        <p className="hint small">Each dot is one run of the same plan with a different seed.</p>
+      </>
+    )
   },
   {
-    icon: '🔧',
-    title: 'Compare and improve',
-    text: 'If the real result is different, the model is missing something. Change its numbers to match what you measured (this is called calibrating), then simulate again.'
+    title: "Trick 2: Wiggle what you're not sure about",
+    body: (
+      <>
+        <p>
+          We don't know exactly how well the real scent works. Maybe half the pests react, maybe 9 out of 10. So test your plan with{' '}
+          <em>Scent effectiveness</em> at 50%, 70% and 90%. Do the same for other things you're unsure of, like wind or how fast pests fly.
+        </p>
+        <p>
+          Engineers call this <strong>randomizing the parameters</strong>. A plan that does well across the whole range is called{' '}
+          <strong>robust</strong>, and a robust plan is much more likely to work in the real world.
+        </p>
+      </>
+    )
+  },
+  {
+    title: 'Trick 3: Add the mess on purpose',
+    body: (
+      <>
+        <p>
+          Real cameras miss things, positions are a few meters off, and wind gusts. Our simulator adds that mess on purpose: the survey camera misses
+          pests and reports fake ones, and the wind can swing back and forth. This is called <strong>noise modeling</strong>.
+        </p>
+        <p>If a plan only works when everything is perfect, it probably won't work outside.</p>
+      </>
+    )
+  },
+  {
+    title: 'Trick 4: Let the evidence pile up',
+    body: (
+      <>
+        <p>Run two plans many times each, with different seeds and settings, and compare them.</p>
+        <DotRows
+          rows={[
+            { label: 'Plan A', values: [62, 66, 70, 72, 74, 77, 80], tone: 'a' },
+            { label: 'Plan B', values: [40, 45, 48, 52, 55, 58, 64], tone: 'b' }
+          ]}
+        />
+        <p>
+          If A beats B in 18 of 20 runs, that's <strong>strong evidence</strong>. If A wins only 11 of 20, it's close to a coin flip, and you can't
+          really tell them apart.
+        </p>
+      </>
+    )
+  },
+  {
+    title: 'What can we conclude?',
+    body: (
+      <>
+        <div className="can-cant">
+          <div className="can">
+            <strong>✅ We can say</strong>
+            <span>"Plan A beat Plan B in almost every condition we tried."</span>
+            <span>"Putting repellent upwind helped every time."</span>
+          </div>
+          <div className="cant">
+            <strong>❌ We can't say</strong>
+            <span>"Plan A will save exactly 72% of a real crop."</span>
+          </div>
+        </div>
+        <p>
+          Comparisons and patterns cross the sim-to-real gap much better than exact numbers. So use the simulator to pick the winner, then test the
+          winner for real.
+        </p>
+      </>
+    )
+  },
+  {
+    title: 'Close the gap',
+    body: (
+      <>
+        <p>When the real test comes back, compare it with the simulator. If they disagree, the model is missing something, so fix it.</p>
+        <div className="loop-example">
+          <strong>Example:</strong> in a real test plot, only about 6 out of 10 pests moved away from the scent. Set <em>Scent effectiveness</em> to
+          60% and run your plans again. Does the winner change?
+        </div>
+        <p>
+          Every loop of <strong>simulate → test for real → fix the model</strong> makes the simulator a little more trustworthy. Robot teams do the
+          same with the SPIKE simulator and the real mat.
+        </p>
+      </>
+    )
   }
 ];
 
-const WHY = [
-  { icon: '📅', text: 'Real tests are slow. A crop grows once a season, so a real field trial gives you a few tries a year. A simulator gives you hundreds in an afternoon.' },
-  { icon: '💲', text: 'Real tests cost money: product, devices, drone flights, a field to use. Simulated product is free.' },
-  { icon: '🛡️', text: 'Failing is safe. A bad plan in the simulator wastes a minute, not a crop. You can try wild ideas just to see what happens.' },
-  { icon: '🔁', text: 'You can repeat an experiment exactly. Outside, the wind, the weather and the pests are never the same twice. The same seed gives the same run every time, so you know your change caused the difference.' },
-  { icon: '👀', text: 'You can see the invisible. Scent clouds, every pest, the battery level: things you could never watch in a real field.' },
-  { icon: '🎯', text: 'It tells you what to test for real. Instead of guessing, you bring your best two or three ideas to the real world.' }
-];
-
-/** Why engineers use simulators at all. */
-export function WhySimulate() {
+/** The lesson, one short page at a time. */
+export function SimLesson({ onDone }: { onDone?: () => void }) {
+  const [i, setI] = useState(0);
+  const page = PAGES[i];
+  const last = i === PAGES.length - 1;
   return (
-    <div className="why-sim">
-      <ul className="why-list">
-        {WHY.map((w) => (
-          <li key={w.icon}>
-            <span className="loop-icon" aria-hidden="true">{w.icon}</span>
-            <span>{w.text}</span>
-          </li>
+    <div className="lesson">
+      <div className="lesson-progress" aria-label={`Page ${i + 1} of ${PAGES.length}`}>
+        {PAGES.map((p, k) => (
+          <button
+            key={p.title}
+            className={k === i ? 'pip current' : k < i ? 'pip done' : 'pip'}
+            aria-label={`Go to page ${k + 1}: ${p.title}`}
+            onClick={() => setI(k)}
+          />
         ))}
-      </ul>
-      <p className="lead">
-        Self-driving cars, Mars rovers, airplanes and FLL robots are all tested in simulators long before they're trusted in the real world.
-      </p>
-    </div>
-  );
-}
-
-/** The sim-to-real loop: how engineers use a simulator and make it more trustworthy. */
-export function SimToRealLoop() {
-  return (
-    <div className="loop">
-      <p className="lead">
-        A simulator is only as good as its model. Engineers don't trust one because it looks real. They trust it because they keep checking it against the real world and fixing it when it's wrong.
-      </p>
-      <ol className="loop-steps">
-        {LOOP.map((s, i) => (
-          <li key={s.title}>
-            <span className="loop-icon" aria-hidden="true">{s.icon}</span>
-            <div>
-              <strong>
-                {i + 1}. {s.title}
-              </strong>
-              <span>{s.text}</span>
-            </div>
-          </li>
-        ))}
-      </ol>
-      <p className="loop-again">🔁 Then go around again. Every loop makes the model a little more trustworthy.</p>
-      <div className="loop-example">
-        <strong>Example:</strong> the simulator says 80% of pests react to the scent. In a real test plot, only about 6 out of 10 pests moved away.
-        Set <em>Scent effectiveness</em> to 60% and run your plans again. Does the best plan change?
       </div>
-      <p className="hint small">
-        Robot teams work the same way: test a program in the SPIKE simulator, run it on the real mat, and adjust when the robot doesn't do what the simulator showed.
-      </p>
+      <h3 className="lesson-title">{page.title}</h3>
+      <div className="lesson-body">{page.body}</div>
+      <div className="lesson-nav">
+        <button className="btn" disabled={i === 0} onClick={() => setI(i - 1)}>
+          ← Back
+        </button>
+        <span className="muted">
+          {i + 1} of {PAGES.length}
+        </span>
+        {last ? (
+          onDone ? (
+            <button className="btn primary" onClick={onDone}>
+              Done
+            </button>
+          ) : (
+            <button className="btn" onClick={() => setI(0)}>
+              Start over
+            </button>
+          )
+        ) : (
+          <button className="btn primary" onClick={() => setI(i + 1)}>
+            Next →
+          </button>
+        )}
+      </div>
     </div>
   );
 }
 
-/** Pop-up version of the loop, opened from the note at the bottom of the page. */
+/** Pop-up version of the lesson, opened from the note at the bottom of the page. */
 export function SimToRealDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
   const ref = useRef<HTMLDialogElement>(null);
   useEffect(() => {
@@ -96,7 +224,7 @@ export function SimToRealDialog({ open, onClose }: { open: boolean; onClose: () 
     <dialog
       ref={ref}
       className="loop-dialog"
-      aria-labelledby="loop-title"
+      aria-label="Simulators and the real world"
       onClose={onClose}
       onClick={(e) => {
         // A click on the dark area around the box closes it.
@@ -104,13 +232,11 @@ export function SimToRealDialog({ open, onClose }: { open: boolean; onClose: () 
       }}
     >
       <div className="loop-dialog-body">
-        <h2 id="loop-title">Why engineers use simulators</h2>
-        <WhySimulate />
-        <h3>Making the simulator better</h3>
-        <SimToRealLoop />
-        <button className="btn primary wide" onClick={onClose}>
-          Got it
+        <button className="dialog-close" aria-label="Close" onClick={onClose}>
+          ✕
         </button>
+        {/* Remount on each open so the lesson starts at page 1. */}
+        {open && <SimLesson onDone={onClose} />}
       </div>
     </dialog>
   );
