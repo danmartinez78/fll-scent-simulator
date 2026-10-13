@@ -180,7 +180,7 @@ export function SimulationCanvas(props: Props) {
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
         onPointerCancel={() => (dragRef.current = null)}
-        aria-label="Top-down map of the field. Pests are small dots; purple clouds are repellent, orange clouds are attractant."
+        aria-label="Top-down map of the field. Pests are small dots (blue ones ignore scent); purple clouds are repellent, orange clouds are attractant."
         role="img"
       />
       {message && <div className="canvas-msg">{message}</div>}

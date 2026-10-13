@@ -32,6 +32,8 @@ export const COLORS = {
   attractant: [240, 150, 20] as const,
   pest: '#2b2118',
   pestAgitated: '#c2410c',
+  /** Pests that ignore scent (shown only when a treatment is in use). */
+  pestIgnores: '#1d4ed8',
   zone: '#2563eb',
   drone: '#1f2937',
   survey: {
@@ -254,14 +256,27 @@ export function drawScene(ctx: CanvasRenderingContext2D, sim: Simulation, o: Dra
   if (o.view.showPests) {
     const p = sim.pests;
     const pr2 = Math.max(0.55, 1.6 / s);
+    const eff = (sim.settings.scent.effectivenessPct ?? 100) / 100;
+    const markIgnorers = sim.settings.treatment !== 'none' && eff < 1;
+    const ignores = (i: number) => markIgnorers && !p.reacts(i, eff);
     ctx.fillStyle = COLORS.pest;
     ctx.beginPath();
     for (let i = 0; i < p.n; i++) {
-      if (p.trapped[i] || p.repelled[i]) continue;
+      if (p.trapped[i] || p.repelled[i] || ignores(i)) continue;
       ctx.moveTo(p.x[i] + pr2, p.y[i]);
       ctx.arc(p.x[i], p.y[i], pr2, 0, Math.PI * 2);
     }
     ctx.fill();
+    if (markIgnorers) {
+      ctx.fillStyle = COLORS.pestIgnores;
+      ctx.beginPath();
+      for (let i = 0; i < p.n; i++) {
+        if (p.trapped[i] || !ignores(i)) continue;
+        ctx.moveTo(p.x[i] + pr2, p.y[i]);
+        ctx.arc(p.x[i], p.y[i], pr2, 0, Math.PI * 2);
+      }
+      ctx.fill();
+    }
     ctx.fillStyle = COLORS.pestAgitated;
     ctx.beginPath();
     for (let i = 0; i < p.n; i++) {

@@ -128,6 +128,7 @@ export class Simulation {
     this.pests = opts.initialPests
       ? PestSwarm.fromPositions(opts.initialPests, rngStart)
       : PestSwarm.create(settings.pests, f.width, f.height, this.crop, rngStart, opts.pestCount);
+    this.pests.assignToughness(new Random(childSeed(seed, 4)));
     this.drone = new Drone(settings.drone, this.home);
     this.setPlan(plan);
     this.recordHistory();
@@ -239,6 +240,8 @@ export class Simulation {
       attractant: this.attractant,
       threshold: s.scent.threshold,
       sensitivity: s.pests.sensitivity,
+      // Setups saved before this setting existed keep their old behavior.
+      effectiveness: (s.scent.effectivenessPct ?? 100) / 100,
       cropAttraction: s.pests.cropAttraction,
       speed: s.pests.speed,
       traps

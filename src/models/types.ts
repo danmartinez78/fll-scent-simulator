@@ -58,6 +58,11 @@ export interface ScentSettings {
   rangeM: number;
   /** Pests only notice scent above this concentration. */
   threshold: number;
+  /**
+   * Percent of pests that react to the scent at all (0 to 100). The rest
+   * ignore repellent and attractant, as some real insects do.
+   */
+  effectivenessPct: number;
 }
 
 export interface DroneSettings {

@@ -198,6 +198,16 @@ export function ControlPanel({ settings: s, plan, tool, simStarted, scenario, on
       </Section>
 
       <Section title="Scent" icon="💜">
+        <Slider
+          label="Scent effectiveness"
+          info="effectiveness"
+          value={s.scent.effectivenessPct ?? 100}
+          min={0}
+          max={100}
+          step={5}
+          format={(v) => `${v}% of pests react`}
+          onChange={(v) => set('scent', { effectivenessPct: v })}
+        />
         <Slider label="Scent strength" info="scentStrength" value={s.scent.strength} min={0.2} max={3} step={0.1} onChange={(v) => set('scent', { strength: v })} />
         <Slider label="Scent lifetime" info="scentLifetime" value={s.scent.lifetimeMin} min={1} max={30} unit="min" onChange={(v) => set('scent', { lifetimeMin: v })} />
         <Slider label="Effective range (devices)" info="scentRange" value={s.scent.rangeM} min={4} max={30} unit="m" onChange={(v) => set('scent', { rangeM: v })} />

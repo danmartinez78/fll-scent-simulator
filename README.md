@@ -32,7 +32,7 @@ There is no backend, database, login or network dependency. Everything runs in t
 | | |
 |---|---|
 | **Choose a scenario** | Basic Field, Windy Field, Pest Hotspots, Limited Product, Push-Pull, Survey Uncertainty, Limited Flight Time, No Treatment (baseline). |
-| **Change the conditions** | Wind direction and speed (and a changing-wind option), pest count, starting pattern, crop attraction, sensitivity, scent strength, lifetime, range and noticing threshold. |
+| **Change the conditions** | Wind direction and speed (and a changing-wind option), pest count, starting pattern, crop attraction, sensitivity, scent effectiveness, scent strength, lifetime, range and noticing threshold. |
 | **Plan a treatment** | *Spray*: drag zones on the map, or use Whole field / Border strips. *Slow-release*: click to place repellent devices. *Push-pull*: place repellent, attractant, and attractant-with-trap devices. *No treatment*: the baseline. |
 | **Fly the drone** | A T50-style drone flies the plan, sprays or drops devices, uses battery and payload, and returns home for refills and battery swaps. |
 | **Survey** | A separate survey drone scans the field. Its pretend computer-vision output labels squares as healthy, possible damage, high pest activity or uncertain. Fly another survey later to compare before and after. |
@@ -98,6 +98,8 @@ Scent leaving the map edge is lost. A steady source in wind makes an elongated p
 - a push back inside within 4 m of the map edge.
 
 **Giving up.** Each second a pest is bothered by repellent above the threshold, it has a 10% chance to give up on that patch: it turns to a random direction and flies for 60 s, ignoring the crop and both scents, then goes back to the rules above. Without this rule, every pest fled straight down the scent slope, which in front of a spray pass points into the next unsprayed strip, so spraying herded pests into piles at the crop's edges.
+
+**Scent effectiveness.** Not every pest reacts to a scent. Each pest gets a fixed random toughness between 0 and 1 at the start of a run (from its own seeded stream, so starting positions don't change). A pest whose toughness is at or above the effectiveness (default 80%) ignores repellent and attractant completely: it is never bothered, never gives up, and keeps feeding inside a scent cloud. Because toughness is fixed, changing the slider mid-run switches the same pests on or off, and the same seed always picks the same pests. These pests are drawn in blue when a treatment is in use. Setups saved before this setting existed load at 100%.
 
 Speed is `speed × 0.2` while feeding (on the crop, repellent below threshold, not giving up), `speed × 1.6` while bothered by repellent above threshold, and `speed` otherwise. Pests within 4 m of an attractant trap are caught. There is no breeding or death, so pests relocate rather than disappear.
 

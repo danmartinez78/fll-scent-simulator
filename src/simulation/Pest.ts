@@ -45,6 +45,8 @@ export interface PestEnvironment {
   attractant: ScentField;
   threshold: number;
   sensitivity: number;
+  /** Fraction of pests (0 to 1) that react to scent; see PestSwarm.toughness. */
+  effectiveness: number;
   cropAttraction: number;
   speed: number;
   traps: Vec[];
@@ -64,6 +66,11 @@ export class PestSwarm {
   repelled: Uint8Array;
   /** Seconds left flying off after giving up on the repellent (0 = not leaving). */
   leaving: Float32Array;
+  /**
+   * A fixed random number (0 to 1) per pest. Pests whose toughness is at or
+   * above the scent effectiveness ignore scent completely.
+   */
+  toughness: Float32Array;
 
   constructor(n: number) {
     this.n = n;
@@ -74,6 +81,17 @@ export class PestSwarm {
     this.feeding = new Uint8Array(n);
     this.repelled = new Uint8Array(n);
     this.leaving = new Float32Array(n);
+    this.toughness = new Float32Array(n);
+  }
+
+  /** Give every pest its toughness (uses its own random stream so starting positions don't change). */
+  assignToughness(rng: Random): void {
+    for (let i = 0; i < this.n; i++) this.toughness[i] = rng.next();
+  }
+
+  /** True if this pest reacts to scent at the given effectiveness (0 to 1). */
+  reacts(i: number, effectiveness: number): boolean {
+    return this.toughness[i] < effectiveness;
   }
 
   /** Place pests according to the chosen starting pattern. */
@@ -148,9 +166,9 @@ export class PestSwarm {
     const R = PEST_RULES;
     const th = Math.max(1e-4, env.threshold);
     const turn = R.wanderTurn * Math.sqrt(dt);
-    const sens = env.sensitivity;
     for (let i = 0; i < this.n; i++) {
       if (this.trapped[i]) continue;
+      const sens = this.reacts(i, env.effectiveness) ? env.sensitivity : 0;
       const px = this.x[i];
       const py = this.y[i];
       const onCrop = inRect(px, py, env.crop);
