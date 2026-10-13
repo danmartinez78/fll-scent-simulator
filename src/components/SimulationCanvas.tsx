@@ -28,6 +28,9 @@ const CURSORS: Record<Tool, string> = {
   erase: 'not-allowed'
 };
 
+/** How far outside the field edge (in screen pixels) a press still counts as on the field. */
+const FIELD_SLACK_PX = 8;
+
 export function SimulationCanvas(props: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -130,6 +133,35 @@ export function SimulationCanvas(props: Props) {
     return () => clearTimeout(t);
   }, [message]);
 
+  /**
+   * Whether a screen point is on the field. Presses on the empty map around
+   * the field never draw or place anything, and on a touch screen they scroll
+   * the page instead.
+   */
+  const onField = (clientX: number, clientY: number): boolean => {
+    const canvas = canvasRef.current;
+    if (!canvas) return false;
+    const r = canvas.getBoundingClientRect();
+    const vp = vpRef.current;
+    const { field } = propsRef.current.simRef.current.settings;
+    const p = toWorld(vp, clientX - r.left, clientY - r.top);
+    const slack = FIELD_SLACK_PX / Math.max(1e-6, vp.scale);
+    return p.x >= -slack && p.y >= -slack && p.x <= field.width + slack && p.y <= field.height + slack;
+  };
+
+  // A touch that starts on the field draws; anywhere else on the map it
+  // scrolls the page as usual. touch-action can't vary across one canvas,
+  // so block the scroll from touchstart instead.
+  useEffect(() => {
+    const canvas = canvasRef.current!;
+    const onTouchStart = (e: TouchEvent) => {
+      const t = e.touches[0];
+      if (propsRef.current.tool !== 'none' && e.touches.length === 1 && onField(t.clientX, t.clientY)) e.preventDefault();
+    };
+    canvas.addEventListener('touchstart', onTouchStart, { passive: false });
+    return () => canvas.removeEventListener('touchstart', onTouchStart);
+  }, []);
+
   const worldPoint = (e: React.PointerEvent): Vec => {
     const r = canvasRef.current!.getBoundingClientRect();
     const sim = propsRef.current.simRef.current;
@@ -145,6 +177,10 @@ export function SimulationCanvas(props: Props) {
   const onPointerDown = (e: React.PointerEvent) => {
     const { tool, settings } = propsRef.current;
     if (tool === 'none') return;
+    if (!onField(e.clientX, e.clientY)) {
+      guardRef.current.cancel();
+      return;
+    }
     if (!guardRef.current.down(pressOf(e), performance.now(), e.isPrimary && e.button === 0)) return;
     (e.target as Element).setPointerCapture(e.pointerId);
     if (tool === 'zone' && settings.treatment === 'spray') {
@@ -221,7 +257,7 @@ export function SimulationCanvas(props: Props) {
     <div className="sim-canvas" ref={wrapRef}>
       <canvas
         ref={canvasRef}
-        style={{ cursor: CURSORS[props.tool], touchAction: 'none' }}
+        style={{ cursor: CURSORS[props.tool], touchAction: 'manipulation' }}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}

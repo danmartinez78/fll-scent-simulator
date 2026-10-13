@@ -1426,6 +1426,9 @@ textarea {
   .center {
     grid-column: 1;
   }
+  .layout.guided {
+    grid-template-columns: minmax(0, 1fr);
+  }
   .layout.guided .panel.left {
     grid-column: 1;
   }
