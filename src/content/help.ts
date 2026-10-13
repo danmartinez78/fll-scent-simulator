@@ -119,6 +119,18 @@ export const HELP: Record<string, HelpTopic> = {
     title: 'Score',
     text: 'The score is how the computer judges a plan. You choose the weights, so you decide what "best" means.'
   },
+  model: {
+    title: 'Model',
+    text: 'A simplified description of how something works, written as rules or math. Every simulator is a model, and every model leaves things out.'
+  },
+  calibration: {
+    title: 'Calibrating',
+    text: 'Changing a model\'s numbers so it matches what was measured in the real world. A calibrated model makes better predictions.'
+  },
+  validation: {
+    title: 'Validating',
+    text: 'Checking a model against real results it was not tuned to. If it predicts those well too, you can trust it more.'
+  },
   seed: {
     title: 'Random seed',
     text: 'Pests move with some randomness. The same seed gives the exact same randomness, so you can repeat an experiment and change only one thing.'
@@ -141,6 +153,9 @@ export const HELP: Record<string, HelpTopic> = {
   }
 };
 
+/** Short version for the bar at the bottom of the page. */
+export const MODEL_NOTE = 'This is a simplified model, not the real world, so its results do not predict how a real product or method would perform.';
+
 export const HONESTY_NOTE =
   'This is a simplified educational simulation. Real insect behavior, scent movement, weather, crop conditions, and drone performance are much more complicated. Results here do not predict how any real product or method would perform.';
 
@@ -156,5 +171,6 @@ export const ACTIVITY_STEPS = [
   'Ask why the result changed.',
   'Let the optimizer try.',
   'Compare its strategy with yours.',
-  'Discuss whether its result would actually make sense in the real world.'
+  'Discuss whether its result would actually make sense in the real world.',
+  'Plan a real-world test, then use what it shows to improve the model.'
 ];

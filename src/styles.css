@@ -936,6 +936,76 @@ textarea {
   font-size: 12px;
   color: #78350f;
 }
+.link-btn.inline {
+  padding: 0;
+  font-size: inherit;
+  font-weight: 600;
+  text-decoration: underline;
+}
+
+/* Sim-to-real loop (Learn tab and pop-up) */
+.loop-steps {
+  list-style: none;
+  padding: 0;
+  margin: 8px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.loop-steps li {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  background: #f8fafc;
+  border-radius: 10px;
+  padding: 8px 10px;
+}
+.loop-steps li div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 13px;
+}
+.loop-icon {
+  font-size: 20px;
+  line-height: 1.2;
+}
+.loop-again {
+  font-weight: 600;
+  margin: 4px 0 8px;
+}
+.loop-example,
+.real-check {
+  background: var(--accent-soft);
+  border-radius: 10px;
+  padding: 8px 10px;
+  font-size: 13px;
+  margin-bottom: 8px;
+}
+.real-check {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 10px;
+}
+.loop-dialog {
+  border: none;
+  border-radius: 14px;
+  padding: 0;
+  max-width: min(560px, calc(100vw - 32px));
+  box-shadow: 0 20px 50px rgba(15, 23, 42, 0.35);
+}
+.loop-dialog::backdrop {
+  background: rgba(15, 23, 42, 0.45);
+}
+.loop-dialog-body {
+  padding: 16px 18px;
+}
+.loop-dialog-body h2 {
+  font-size: 18px;
+  margin-bottom: 6px;
+}
+
 .honesty {
   display: block;
   background: #fffbeb;

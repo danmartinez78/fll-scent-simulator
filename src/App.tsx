@@ -15,7 +15,8 @@ import { HelpPanel } from './components/HelpPanel';
 import { ScenarioSelector } from './components/ScenarioSelector';
 import { ExperimentPanel } from './components/ExperimentPanel';
 import { GuidedPanel, type GuidedStep } from './components/GuidedPanel';
-import { HONESTY_NOTE } from './content/help';
+import { MODEL_NOTE } from './content/help';
+import { SimToRealDialog } from './components/SimToReal';
 import { captureRun, loadNotebook, newEntry, nextName, saveNotebook, type EntrySetup, type NotebookEntry } from './notebook/notebook';
 
 /** Simulated seconds per real second at "1x". */
@@ -69,6 +70,7 @@ export default function App() {
   const [step, setStep] = useState<GuidedStep>('mission');
   const [prediction, setPrediction] = useState('');
   const [savedTo, setSavedTo] = useState<string | null>(null);
+  const [loopOpen, setLoopOpen] = useState(false);
   const [, setTick] = useState(0);
 
   const simRef = useRef<Simulation>(new Simulation(settings, plan));
@@ -449,8 +451,14 @@ export default function App() {
       </main>
 
       <footer className="footer">
-        <span className="honesty">⚠️ {HONESTY_NOTE}</span>
+        <span className="honesty">
+          ⚠️ {MODEL_NOTE}{' '}
+          <button className="link-btn inline" onClick={() => setLoopOpen(true)}>
+            How do engineers make simulators better? →
+          </button>
+        </span>
       </footer>
+      <SimToRealDialog open={loopOpen} onClose={() => setLoopOpen(false)} />
     </div>
   );
 }
