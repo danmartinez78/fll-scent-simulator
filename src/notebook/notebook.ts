@@ -15,6 +15,8 @@ export interface CapturedRun {
   plan: TreatmentPlan;
   metrics: Metrics;
   surveysDone: number;
+  /** Small JPEG picture of the map when the run was saved, for reports. */
+  snapshot?: string;
 }
 
 /** Settings to load back into the simulator (for repeating or changing one thing). */
@@ -133,8 +135,9 @@ export function entrySetup(e: NotebookEntry): EntrySetup | null {
   return e.setup ? structuredClone(e.setup) : null;
 }
 
-export function captureRun(sim: Simulation, scenarioName: string): CapturedRun {
+export function captureRun(sim: Simulation, scenarioName: string, snapshot?: string): CapturedRun {
   return {
+    ...(snapshot ? { snapshot } : {}),
     savedAt: new Date().toISOString(),
     scenarioName,
     timeSec: sim.time,
@@ -208,7 +211,13 @@ export function saveNotebook(entries: NotebookEntry[]): void {
   try {
     localStorage.setItem(NOTEBOOK_KEY, JSON.stringify(entries));
   } catch {
-    // Storage full or blocked: the notebook still works until the page closes.
+    // Storage full: keep the notes and numbers, drop the map pictures.
+    try {
+      const lean = entries.map((e) => (e.captured?.snapshot ? { ...e, captured: { ...e.captured, snapshot: undefined } } : e));
+      localStorage.setItem(NOTEBOOK_KEY, JSON.stringify(lean));
+    } catch {
+      // Storage blocked: the notebook still works until the page closes.
+    }
   }
 }
 

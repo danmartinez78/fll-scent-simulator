@@ -216,3 +216,12 @@ export function pickTextFile(accept = '.json,application/json'): Promise<string 
     input.click();
   });
 }
+
+/** Show an HTML page in a new tab; if pop-ups are blocked, download it instead. */
+export function openHtml(filename: string, html: string): void {
+  const url = URL.createObjectURL(new Blob([html], { type: 'text/html' }));
+  const win = window.open(url, '_blank');
+  if (!win) downloadText(filename, html, 'text/html');
+  // The new tab keeps its own copy, so the link can go after it loads.
+  setTimeout(() => URL.revokeObjectURL(url), 60_000);
+}
