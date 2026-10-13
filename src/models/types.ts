@@ -90,6 +90,8 @@ export interface DeviceSettings {
   releaseRate: number;
   lifetimeMin: number;
   massKg: number;
+  /** Most devices the drone's drop rack holds on one trip (its weight limit can lower this). */
+  perTrip: number;
   /** Drone flies each device to its spot; otherwise devices are placed by hand at the start. */
   deployByDrone: boolean;
 }

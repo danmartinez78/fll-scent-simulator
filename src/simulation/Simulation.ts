@@ -259,6 +259,8 @@ export class Simulation {
     const sprayed = this.sprayed;
     this.drone.step(dt, {
       devicesMassKg: s.devices.massKg,
+      // Setups saved before this setting existed keep their old behavior (no rack limit).
+      devicesPerTrip: s.devices.perTrip,
       spray: (x, y, liters, swath) => {
         const amount = (liters / REFERENCE_RATE_L_PER_M2) * s.scent.strength;
         this.repellent.addGaussian(x, y, amount, swath / 2.5);

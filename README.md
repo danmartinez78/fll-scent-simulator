@@ -108,6 +108,7 @@ Speed is `speed × 0.2` while feeding (on the crop, repellent below threshold, n
 **Drone** (`src/simulation/Drone.ts`). Default reference values loosely based on the DJI Agras T50: 40 L tank, 40 kg max payload, 16.5 min hover empty, 7 min hover full. These are reference numbers, not guaranteed mission endurance.
 
 - Endurance (seconds) at payload fraction `p`: `T(p) = (16.5 + (7 − 16.5) p) × 60` (straight line). Liquid weighs 1 kg/L; devices add their mass.
+- Devices per trip are the smaller of the drop rack's slots (default 4) and `floor(max payload / device mass)`. More devices than fit on one trip means more flights home to reload. Setups saved before the rack setting existed have no rack limit.
 - Battery drops by `dt / T(p)` each airborne step, so heavier loads drain it faster.
 - The drone heads home when `battery ≤ reserve + 1.15 × (time to fly home) / T(p)`, when the tank is empty, or when it needs more devices. On the ground it waits the turnaround time, swaps the battery and refills (only as much product as remains in stock), then resumes where it stopped.
 - Spray uses `application rate × swath × distance` liters. At 2 gal/acre a 10.5 gal tank covers about 5.25 acres.
