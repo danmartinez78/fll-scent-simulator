@@ -34,6 +34,8 @@ export interface NotebookEntry {
   result: string;
   surprise: string;
   next: string;
+  /** How a real test could check this, and what to change in the model if it disagreed. */
+  realWorld: string;
   createdAt: string;
   setup: EntrySetup | null;
   captured: CapturedRun | null;
@@ -46,7 +48,12 @@ export const ENTRY_FIELDS: Array<{ key: keyof NotebookEntry; label: string; hint
   { key: 'variablesSame', label: 'Variables kept the same', hint: 'What did you keep the same?' },
   { key: 'result', label: 'Result', hint: 'What happened? Did it match your prediction?' },
   { key: 'surprise', label: 'What surprised you?', hint: '' },
-  { key: 'next', label: 'What would you try next?', hint: '' }
+  { key: 'next', label: 'What would you try next?', hint: '' },
+  {
+    key: 'realWorld',
+    label: 'Real-world check',
+    hint: 'How could we test this for real? If a real test came out different, what would we change in the model?'
+  }
 ];
 
 const METHOD_NAMES: Record<string, string> = {
@@ -77,6 +84,7 @@ export function newEntry(name: string): NotebookEntry {
     result: '',
     surprise: '',
     next: '',
+    realWorld: '',
     createdAt: new Date().toISOString(),
     setup: null,
     captured: null

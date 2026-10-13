@@ -197,6 +197,10 @@ function CompareStep(p: Props) {
       ) : (
         <ResultsPanel sim={p.sim} onSave={p.onSave} saved={p.saved} />
       )}
+      <div className="real-check">
+        <strong>🌱 Sim vs. real world</strong>
+        <span>How could you test this plan for real? If a real test came out different, which setting would you change to make the model match?</span>
+      </div>
       <div className="guided-again">
         <button className="btn wide" onClick={p.onTryAgain}>
           🔁 Try another change

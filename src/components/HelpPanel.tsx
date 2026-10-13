@@ -1,6 +1,10 @@
 import { ACTIVITY_STEPS, HELP, HONESTY_NOTE } from '../content/help';
+import { SimToRealLoop } from './SimToReal';
 
 const ORDER = [
+  'model',
+  'calibration',
+  'validation',
   'pheromone',
   'repellent',
   'attractant',
@@ -28,6 +32,9 @@ export function HelpPanel() {
       <div className="honesty-box">
         <strong>Important:</strong> {HONESTY_NOTE}
       </div>
+
+      <h3>How engineers use simulators</h3>
+      <SimToRealLoop />
 
       <h3>How to use the map</h3>
       <ul className="legend-list">
