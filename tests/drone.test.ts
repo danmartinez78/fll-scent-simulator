@@ -128,4 +128,16 @@ describe('T50-style drone', () => {
     expect(devicesPerTrip(T50_REFERENCE, 15, 4)).toBe(2);
     expect(devicesPerTrip(T50_REFERENCE, 50, 4)).toBe(0);
   });
+
+  it('records each drop point in its flight path', () => {
+    const d = new Drone(T50_REFERENCE, home);
+    const spots = [
+      { x: 53, y: 7 },
+      { x: 81, y: 33 }
+    ];
+    spots.forEach((at, i) => d.tasks.push({ kind: 'drop', at, deviceId: i + 1 }));
+    const w = world();
+    for (let i = 0; i < 2000 && d.busy; i++) d.step(0.5, w);
+    for (const at of spots) expect(d.trail.some((p) => p.x === at.x && p.y === at.y)).toBe(true);
+  });
 });
