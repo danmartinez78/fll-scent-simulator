@@ -407,14 +407,15 @@ export default function App() {
             <nav className="tabs" role="tablist">
               {(
                 [
-                  ['results', '📊 Results'],
-                  ['survey', '🛰️ Survey'],
-                  ['computer', '🤖 Computer'],
-                  ['notebook', '📓 Notebook'],
-                  ['learn', '💡 Learn']
-                ] as Array<[Tab, string]>
-              ).map(([k, label]) => (
+                  ['results', '📊', 'Results'],
+                  ['survey', '🛰️', 'Survey'],
+                  ['computer', '🤖', 'Computer'],
+                  ['notebook', '📓', 'Notebook'],
+                  ['learn', '💡', 'Learn']
+                ] as Array<[Tab, string, string]>
+              ).map(([k, icon, label]) => (
                 <button key={k} role="tab" aria-selected={tab === k} className={tab === k ? 'tab active' : 'tab'} onClick={() => setTab(k)}>
+                  <span className="tab-icon" aria-hidden="true">{icon}</span>
                   {label}
                 </button>
               ))}

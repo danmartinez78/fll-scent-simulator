@@ -27,7 +27,7 @@ interface Props {
   onLoadSetup: (s: EntrySetup) => void;
 }
 
-const FLOW = ['Question', 'Prediction', 'Run experiment', 'Save results', 'What happened?', 'What next?'];
+const FLOW = ['question', 'prediction', 'run', 'save results', 'what happened', 'what next'];
 
 export function NotebookPanel({ entries, activeId, simTime, onActive, onEntries, onSaveRun, onLoadSetup }: Props) {
   const [mode, setMode] = useState<'edit' | 'compare'>('edit');
@@ -51,11 +51,7 @@ export function NotebookPanel({ entries, activeId, simTime, onActive, onEntries,
 
   return (
     <div className="notebook">
-      <ol className="flow" aria-label="Experiment steps">
-        {FLOW.map((f) => (
-          <li key={f}>{f}</li>
-        ))}
-      </ol>
+      <p className="flow">Each experiment: {FLOW.join(' → ')}.</p>
 
       <div className="tool-row">
         <button className="btn small primary" onClick={add}>
@@ -64,6 +60,9 @@ export function NotebookPanel({ entries, activeId, simTime, onActive, onEntries,
         <button className={mode === 'compare' ? 'btn small active' : 'btn small'} onClick={() => setMode(mode === 'compare' ? 'edit' : 'compare')} disabled={withResults.length < 2}>
           ⇆ Compare two
         </button>
+      </div>
+      <div className="tool-row share-row">
+        <span className="row-label">Save or share</span>
         <ReportButtons entries={entries} />
         <button
           className="btn small"
