@@ -1,5 +1,6 @@
 import type { PestDistribution, Scenario, Settings, TreatmentMethod, TreatmentPlan } from '../models/types';
 import { cropRect } from '../simulation/Simulation';
+import { devicesPerTrip } from '../simulation/Drone';
 import { activePlan, estimateSprayLiters } from '../simulation/Treatment';
 import { parseScenario } from '../simulation/scenarios';
 import { compassLabel, compassName } from '../utils/geometry';
@@ -53,6 +54,8 @@ export function ControlPanel({ settings: s, plan, tool, simStarted, scenario, on
   };
 
   const border = Math.max(s.drone.swathM * 2, 8);
+  const perTrip = devicesPerTrip(s.drone, s.devices.massKg, s.devices.perTrip);
+  const trips = perTrip > 0 ? Math.ceil(eff.devices.length / perTrip) : 0;
   const toolButton = (t: Tool, label: string) => (
     <button className={tool === t ? 'chip active' : 'chip'} onClick={() => onTool(tool === t ? 'none' : t)}>
       {label}
@@ -153,7 +156,11 @@ export function ControlPanel({ settings: s, plan, tool, simStarted, scenario, on
             </div>
             <p className="plan-summary">
               {eff.devices.length} of {s.devices.maxDevices} devices placed
-              {s.devices.deployByDrone ? ' · the drone will fly them out' : ' · placed by hand at the start'}
+              {s.devices.deployByDrone
+                ? perTrip === 0
+                  ? ' · too heavy for the drone to carry!'
+                  : ` · the drone will fly them out in ${trips} trip${trips === 1 ? '' : 's'} (${perTrip} per trip)`
+                : ' · placed by hand at the start'}
             </p>
           </>
         )}
@@ -198,6 +205,16 @@ export function ControlPanel({ settings: s, plan, tool, simStarted, scenario, on
       </Section>
 
       <Section title="Scent" icon="💜">
+        <Slider
+          label="Scent effectiveness"
+          info="effectiveness"
+          value={s.scent.effectivenessPct ?? 100}
+          min={0}
+          max={100}
+          step={5}
+          format={(v) => `${v}% of pests react`}
+          onChange={(v) => set('scent', { effectivenessPct: v })}
+        />
         <Slider label="Scent strength" info="scentStrength" value={s.scent.strength} min={0.2} max={3} step={0.1} onChange={(v) => set('scent', { strength: v })} />
         <Slider label="Scent lifetime" info="scentLifetime" value={s.scent.lifetimeMin} min={1} max={30} unit="min" onChange={(v) => set('scent', { lifetimeMin: v })} />
         <Slider label="Effective range (devices)" info="scentRange" value={s.scent.rangeM} min={4} max={30} unit="m" onChange={(v) => set('scent', { rangeM: v })} />
@@ -246,6 +263,11 @@ export function ControlPanel({ settings: s, plan, tool, simStarted, scenario, on
         <Slider label="Release rate" value={s.devices.releaseRate} min={0.25} max={3} step={0.25} format={(v) => `${v}x standard`} onChange={(v) => set('devices', { releaseRate: v })} />
         <Slider label="Device lifetime" value={s.devices.lifetimeMin} min={2} max={120} unit="min" onChange={(v) => set('devices', { lifetimeMin: v })} />
         <Slider label="Mass per device" info="payload" value={s.devices.massKg} min={0.1} max={5} step={0.1} unit="kg" onChange={(v) => set('devices', { massKg: v })} />
+        <Slider label="Devices per trip (drop rack)" info="perTrip" value={s.devices.perTrip ?? 20} min={1} max={20} onChange={(v) => set('devices', { perTrip: v })} />
+        <p className="hint small">
+          The drone carries {perTrip} device{perTrip === 1 ? '' : 's'} per trip
+          {perTrip < (s.devices.perTrip ?? Infinity) ? ' (limited by weight)' : ''}.
+        </p>
         <Toggle label="Drone flies devices out" checked={s.devices.deployByDrone} onChange={(v) => set('devices', { deployByDrone: v })} />
       </Section>
 

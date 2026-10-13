@@ -15,6 +15,7 @@ function setup(kind: 'repellent' | 'attractant' | 'none') {
     attractant: att,
     threshold: 0.15,
     sensitivity: 1,
+    effectiveness: 1,
     cropAttraction: 1,
     speed: 1,
     traps: []
@@ -105,5 +106,31 @@ describe('pest movement', () => {
     }
     expect(leftEver).toBeGreaterThan(0);
     for (let k = 0; k < swarm.n; k++) if (swarm.leaving[k] > 0) expect(swarm.feeding[k]).toBe(0);
+  });
+
+  it('lets pests that ignore the scent keep feeding inside a repellent cloud', () => {
+    const { env, swarm, field, rng } = setup('repellent');
+    swarm.assignToughness(new Random(11));
+    env.effectiveness = 0.6;
+    for (let i = 0; i < 240; i++) {
+      field.addGaussian(100, 100, 25, 10);
+      field.step(0.5, 0, 0, 0.5, 300);
+    }
+    swarm.step(0.5, env, rng);
+    let ignorers = 0;
+    let repelledIgnorers = 0;
+    let reactorsRepelled = 0;
+    for (let k = 0; k < swarm.n; k++) {
+      if (swarm.reacts(k, env.effectiveness)) reactorsRepelled += swarm.repelled[k];
+      else {
+        ignorers++;
+        repelledIgnorers += swarm.repelled[k];
+      }
+    }
+    // About 40% ignore the scent; none of them are bothered by it.
+    expect(ignorers / swarm.n).toBeGreaterThan(0.3);
+    expect(ignorers / swarm.n).toBeLessThan(0.5);
+    expect(repelledIgnorers).toBe(0);
+    expect(reactorsRepelled).toBeGreaterThan(0);
   });
 });

@@ -14,10 +14,10 @@ export function defaultSettings(): Settings {
       speed: 0.8
     },
     wind: { direction: 90, speedMph: 0, changing: false },
-    scent: { strength: 1, lifetimeMin: 8, rangeM: 12, threshold: 0.15 },
+    scent: { strength: 1, lifetimeMin: 8, rangeM: 12, threshold: 0.15, effectivenessPct: 80 },
     treatment: 'spray',
     drone: { ...T50_REFERENCE },
-    devices: { maxDevices: 12, releaseRate: 1, lifetimeMin: 30, massKg: 0.5, deployByDrone: true },
+    devices: { maxDevices: 12, releaseRate: 1, lifetimeMin: 30, massKg: 0.5, perTrip: 4, deployByDrone: true },
     survey: { detectionPct: 90, falsePositivesPer1000m2: 0.5, positionNoiseM: 3, uncertainPct: 5 },
     cost: { ...DEFAULT_COSTS },
     weights: { protection: 1, pestsDeterred: 0.5, material: 2, flightTime: 1, cost: 0.5 },

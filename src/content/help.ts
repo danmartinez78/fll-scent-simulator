@@ -79,6 +79,14 @@ export const HELP: Record<string, HelpTopic> = {
     title: 'Noticing threshold',
     text: 'Pests only react when the scent is stronger than this. Below it, they ignore the scent.'
   },
+  effectiveness: {
+    title: 'Scent effectiveness',
+    text: 'How many pests react to the scent at all. At 80%, 8 out of 10 pests notice it and 2 ignore it and keep feeding. Pests that ignore the scent are shown in blue.'
+  },
+  perTrip: {
+    title: 'Devices per trip',
+    text: 'How many devices the drone\'s drop rack can hold at once. If the devices are heavy, the weight limit may let it carry fewer. More trips means more flying, battery swaps and time.'
+  },
   sensitivity: {
     title: 'Pest sensitivity',
     text: 'How strongly pests react to scent. 0 means they ignore it completely.'

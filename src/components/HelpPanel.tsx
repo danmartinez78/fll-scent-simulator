@@ -31,7 +31,7 @@ export function HelpPanel() {
 
       <h3>How to use the map</h3>
       <ul className="legend-list">
-        <li><i className="dot pest" /> Pest (dark = normal, orange = bothered by repellent)</li>
+        <li><i className="dot pest" /> Pest (dark = normal, orange = bothered by repellent, blue = ignores scent)</li>
         <li><i className="dot rep" /> Repellent A cloud (stronger = more purple)</li>
         <li><i className="dot att" /> Attractant B cloud</li>
         <li><i className="dot dmg" /> Crop damage from feeding</li>

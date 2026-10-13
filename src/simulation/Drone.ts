@@ -36,6 +36,13 @@ export interface DroneWorld {
   /** A device was dropped and should start working. */
   dropDevice(deviceId: number): void;
   devicesMassKg: number;
+  /** Most devices the drop rack holds on one trip (no limit if left out). */
+  devicesPerTrip?: number;
+}
+
+/** How many devices fit on one trip: the drop rack's slots or the weight limit, whichever is smaller. */
+export function devicesPerTrip(s: DroneSettings, massKg: number, rackSlots = Infinity): number {
+  return Math.max(0, Math.min(rackSlots, Math.floor(s.maxPayloadKg / Math.max(0.001, massKg))));
 }
 
 /**
@@ -131,7 +138,7 @@ export class Drone {
   }
 
   /** Fill up at home: battery, tank and devices. */
-  private loadUp(devicesMassKg: number): void {
+  private loadUp(devicesMassKg: number, rackSlots: number): void {
     const s = this.settings;
     if (this.battery < 0.98 && this.flights > 0) this.batterySwaps++;
     this.battery = 1;
@@ -139,7 +146,10 @@ export class Drone {
     const dropsLeft = this.tasks.filter((t) => t.kind === 'drop').length;
     const mass = Math.max(0.001, devicesMassKg);
     const wantDevices = Math.max(0, dropsLeft - this.devicesOnboard);
-    const fitDevices = Math.floor((s.maxPayloadKg - this.payloadKg) / mass - this.devicesOnboard);
+    const fitDevices = Math.min(
+      Math.floor((s.maxPayloadKg - this.payloadKg) / mass - this.devicesOnboard),
+      rackSlots - this.devicesOnboard
+    );
     this.devicesOnboard += Math.max(0, Math.min(wantDevices, fitDevices));
 
     // Drop slivers of strips too short to matter (left over from rounding).
@@ -167,9 +177,9 @@ export class Drone {
     }
   }
 
-  private launchIfReady(devicesMassKg: number): void {
+  private launchIfReady(world: DroneWorld): void {
     if (this.tasks.length === 0) return;
-    this.loadUp(devicesMassKg);
+    this.loadUp(world.devicesMassKg, world.devicesPerTrip ?? Infinity);
     if (this.tasks.length === 0) return;
     this.mode = 'flying';
     this.flights++;
@@ -209,12 +219,12 @@ export class Drone {
       this.turnaroundLeft -= dt;
       if (this.turnaroundLeft <= 0) {
         this.mode = 'parked';
-        this.launchIfReady(mass);
+        this.launchIfReady(world);
       }
       return;
     }
     if (this.mode === 'parked') {
-      this.launchIfReady(mass);
+      this.launchIfReady(world);
       if (this.mode === 'parked') return;
     }
 

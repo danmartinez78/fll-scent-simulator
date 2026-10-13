@@ -134,6 +134,7 @@ export class Simulation {
     this.pests = opts.initialPests
       ? PestSwarm.fromPositions(opts.initialPests, rngStart)
       : PestSwarm.create(settings.pests, f.width, f.height, this.crop, rngStart, opts.pestCount);
+    this.pests.assignToughness(new Random(childSeed(seed, 4)));
     this.drone = new Drone(settings.drone, this.home);
     this.setPlan(plan);
     this.recordHistory();
@@ -265,6 +266,8 @@ export class Simulation {
       attractant: this.attractant,
       threshold: s.scent.threshold,
       sensitivity: s.pests.sensitivity,
+      // Setups saved before this setting existed keep their old behavior.
+      effectiveness: (s.scent.effectivenessPct ?? 100) / 100,
       cropAttraction: s.pests.cropAttraction,
       speed: s.pests.speed,
       traps
@@ -284,6 +287,8 @@ export class Simulation {
     const sprayed = this.sprayed;
     if (treating) this.drone.step(dt, {
       devicesMassKg: s.devices.massKg,
+      // Setups saved before this setting existed keep their old behavior (no rack limit).
+      devicesPerTrip: s.devices.perTrip,
       spray: (x, y, liters, swath) => {
         const amount = (liters / REFERENCE_RATE_L_PER_M2) * s.scent.strength;
         this.repellent.addGaussian(x, y, amount, swath / 2.5);

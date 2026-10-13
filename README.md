@@ -32,7 +32,7 @@ There is no backend, database, login or network dependency. Everything runs in t
 | | |
 |---|---|
 | **Choose a scenario** | Basic Field, Windy Field, Pest Hotspots, Limited Product, Push-Pull, Survey Uncertainty, Limited Flight Time, No Treatment (baseline). |
-| **Change the conditions** | Wind direction and speed (and a changing-wind option), pest count, starting pattern, crop attraction, sensitivity, scent strength, lifetime, range and noticing threshold. |
+| **Change the conditions** | Wind direction and speed (and a changing-wind option), pest count, starting pattern, crop attraction, sensitivity, scent effectiveness, scent strength, lifetime, range and noticing threshold. |
 | **Plan a treatment** | *Spray*: drag zones on the map, or use Whole field / Border strips. *Slow-release*: click to place repellent devices. *Push-pull*: place repellent, attractant, and attractant-with-trap devices. *No treatment*: the baseline. |
 | **Fly the drone** | A T50-style drone flies the plan, sprays or drops devices, uses battery and payload, and returns home for refills and battery swaps. |
 | **Survey** | A separate survey drone scans the field. Its pretend computer-vision output labels squares as healthy, possible damage, high pest activity or uncertain. Fly another survey later to compare before and after. |
@@ -99,6 +99,8 @@ Scent leaving the map edge is lost. A steady source in wind makes an elongated p
 
 **Giving up.** Each second a pest is bothered by repellent above the threshold, it has a 10% chance to give up on that patch: it turns to a random direction and flies for 60 s, ignoring the crop and both scents, then goes back to the rules above. Without this rule, every pest fled straight down the scent slope, which in front of a spray pass points into the next unsprayed strip, so spraying herded pests into piles at the crop's edges.
 
+**Scent effectiveness.** Not every pest reacts to a scent. Each pest gets a fixed random toughness between 0 and 1 at the start of a run (from its own seeded stream, so starting positions don't change). A pest whose toughness is at or above the effectiveness (default 80%) ignores repellent and attractant completely: it is never bothered, never gives up, and keeps feeding inside a scent cloud. Because toughness is fixed, changing the slider mid-run switches the same pests on or off, and the same seed always picks the same pests. These pests are drawn in blue when a treatment is in use. Setups saved before this setting existed load at 100%.
+
 Speed is `speed × 0.2` while feeding (on the crop, repellent below threshold, not giving up), `speed × 1.6` while bothered by repellent above threshold, and `speed` otherwise. Pests within 4 m of an attractant trap are caught. There is no breeding or death, so pests relocate rather than disappear.
 
 **Crop damage** (`Simulation.ts`). Each feeding pest adds `dt / cellArea` pest-seconds per m² to its grid square. A crop square is *affected* once it reaches 12 pest-seconds/m². *Crop protected* = % of crop squares not affected. *Pests kept off the crop* = % of pests not feeding right now (off the crop, trapped, or bothered by repellent); the notebook also records its average over the run.
@@ -106,6 +108,7 @@ Speed is `speed × 0.2` while feeding (on the crop, repellent below threshold, n
 **Drone** (`src/simulation/Drone.ts`). Default reference values loosely based on the DJI Agras T50: 40 L tank, 40 kg max payload, 16.5 min hover empty, 7 min hover full. These are reference numbers, not guaranteed mission endurance.
 
 - Endurance (seconds) at payload fraction `p`: `T(p) = (16.5 + (7 − 16.5) p) × 60` (straight line). Liquid weighs 1 kg/L; devices add their mass.
+- Devices per trip are the smaller of the drop rack's slots (default 4) and `floor(max payload / device mass)`. More devices than fit on one trip means more flights home to reload. Setups saved before the rack setting existed have no rack limit.
 - Battery drops by `dt / T(p)` each airborne step, so heavier loads drain it faster.
 - The drone heads home when `battery ≤ reserve + 1.15 × (time to fly home) / T(p)`, when the tank is empty, or when it needs more devices. On the ground it waits the turnaround time, swaps the battery and refills (only as much product as remains in stock), then resumes where it stopped.
 - Spray uses `application rate × swath × distance` liters. At 2 gal/acre a 10.5 gal tank covers about 5.25 acres.

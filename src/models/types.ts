@@ -58,6 +58,11 @@ export interface ScentSettings {
   rangeM: number;
   /** Pests only notice scent above this concentration. */
   threshold: number;
+  /**
+   * Percent of pests that react to the scent at all (0 to 100). The rest
+   * ignore repellent and attractant, as some real insects do.
+   */
+  effectivenessPct: number;
 }
 
 export interface DroneSettings {
@@ -85,6 +90,8 @@ export interface DeviceSettings {
   releaseRate: number;
   lifetimeMin: number;
   massKg: number;
+  /** Most devices the drone's drop rack holds on one trip (its weight limit can lower this). */
+  perTrip: number;
   /** Drone flies each device to its spot; otherwise devices are placed by hand at the start. */
   deployByDrone: boolean;
 }

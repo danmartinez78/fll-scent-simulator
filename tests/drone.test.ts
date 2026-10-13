@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { Drone, enduranceSec, T50_REFERENCE, type DroneWorld } from '../src/simulation/Drone';
+import { Drone, devicesPerTrip, enduranceSec, T50_REFERENCE, type DroneWorld } from '../src/simulation/Drone';
 import type { DroneSettings } from '../src/models/types';
 import { galToL } from '../src/utils/units';
 
@@ -112,5 +112,20 @@ describe('T50-style drone', () => {
     expect(w.drops).toEqual([1, 2]);
     expect(d.devicesDropped).toBe(2);
     expect(d.mode).toBe('parked');
+  });
+
+  it('makes extra trips when the drop rack is full', () => {
+    const d = new Drone(T50_REFERENCE, home);
+    for (let id = 1; id <= 10; id++) d.tasks.push({ kind: 'drop', at: { x: 20 + id * 5, y: 10 }, deviceId: id });
+    const w = { ...world(), devicesPerTrip: 4 };
+    for (let i = 0; i < 20000 && d.busy; i++) d.step(0.5, w);
+    expect(d.devicesDropped).toBe(10);
+    expect(d.flights).toBe(3);
+  });
+
+  it('carries fewer heavy devices per trip because of the weight limit', () => {
+    expect(devicesPerTrip(T50_REFERENCE, 0.5, 4)).toBe(4);
+    expect(devicesPerTrip(T50_REFERENCE, 15, 4)).toBe(2);
+    expect(devicesPerTrip(T50_REFERENCE, 50, 4)).toBe(0);
   });
 });

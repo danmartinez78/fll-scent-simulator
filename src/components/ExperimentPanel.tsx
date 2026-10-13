@@ -59,6 +59,7 @@ function tipsFor(s: Settings, sim: Simulation): string[] {
   if (sim.surveys.length) tips.push('Survey results may not show every pest.');
   else tips.push('Do you know where the pests are? A survey drone could help you find out.');
   tips.push('Pests shown in orange are being bothered by repellent; dark pests are feeding or flying normally.');
+  if (s.treatment !== 'none' && (s.scent.effectivenessPct ?? 100) < 100) tips.push('Blue pests ignore the scent completely. No scent works on every pest.');
   tips.push('Change one thing at a time so you know what caused the difference.');
   return tips;
 }
