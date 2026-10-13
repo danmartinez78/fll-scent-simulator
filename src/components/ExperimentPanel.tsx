@@ -1,0 +1,87 @@
+import { useEffect, useState } from 'react';
+import type { Settings } from '../models/types';
+import type { Simulation } from '../simulation/Simulation';
+import type { Tool } from './SimulationCanvas';
+
+const TOOL_HINTS: Record<Tool, string> = {
+  none: '',
+  zone: 'Drag on the map to draw a spray zone.',
+  repellent: 'Click the map to place a Repellent A device.',
+  attractant: 'Click the map to place an Attractant B device.',
+  trap: 'Click the map to place an attractant with a sticky trap.',
+  erase: 'Click a device or zone to remove it.'
+};
+
+/** One-line explanation of what the drone is doing right now. */
+export function droneStatus(sim: Simulation): string {
+  const d = sim.drone;
+  const mass = sim.settings.devices.massKg;
+  const load =
+    sim.settings.treatment === 'spray'
+      ? `tank ${d.payloadL.toFixed(1)} L`
+      : d.devicesOnboard > 0
+        ? `${d.devicesOnboard} device${d.devicesOnboard === 1 ? '' : 's'} on board`
+        : 'empty';
+  const battery = `battery ${Math.round(Math.max(0, d.battery) * 100)}% (${d.minutesLeft(mass).toFixed(1)} min before reserve)`;
+  switch (d.mode) {
+    case 'parked':
+      if (d.outOfProduct) return 'Drone is parked: it ran out of product.';
+      if (d.gaveUp) return 'Drone is parked: the job is too far for one battery.';
+      return d.flights > 0 ? 'Drone is parked: all jobs done.' : 'Drone is parked at home (H), waiting for a plan.';
+    case 'turnaround':
+      return `Drone is on the ground: refilling and swapping the battery (${Math.ceil(d.turnaroundLeft)} s left).`;
+    case 'returning':
+      return d.lastReturnReason === 'battery'
+        ? `Drone is flying home: the battery reached the reserve. ${battery}.`
+        : d.lastReturnReason === 'refill'
+          ? 'Drone is flying home to refill the tank.'
+          : d.lastReturnReason === 'reload devices'
+            ? 'Drone is flying home to pick up more devices.'
+            : 'Drone is flying home: jobs done.';
+    default: {
+      const t = d.tasks[0];
+      const job = t?.kind === 'drop' ? 'carrying a device to its spot' : d.spraying ? 'spraying' : 'flying to the next spray strip';
+      return `Drone is ${job} · ${load} · ${battery}.`;
+    }
+  }
+}
+
+function tipsFor(s: Settings, sim: Simulation): string[] {
+  const tips: string[] = [];
+  if (s.treatment === 'none') tips.push('No treatment is your baseline: it shows what happens naturally.');
+  if (s.treatment === 'spray') tips.push('Spray acts right away, but the scent drifts and fades over time.');
+  if (s.treatment === 'slowRelease') tips.push('A slow-release source stays in one place but can remain active longer.');
+  if (s.treatment === 'pushPull') tips.push('Push-pull: the repellent pushes pests off the crop while the attractant pulls them somewhere else.');
+  if (s.wind.speedMph > 0) tips.push('Wind can carry scent farther in one direction.');
+  if (s.wind.speedMph >= 12) tips.push('Strong wind carries scent far, but it also spreads it thin.');
+  if (s.scent.lifetimeMin <= 3) tips.push('This scent only lasts a short time. What happens when it fades?');
+  if (sim.surveys.length) tips.push('Survey results may not show every pest.');
+  else tips.push('Do you know where the pests are? A survey drone could help you find out.');
+  tips.push('Pests shown in orange are being bothered by repellent; dark pests are feeding or flying normally.');
+  tips.push('Change one thing at a time so you know what caused the difference.');
+  return tips;
+}
+
+export function ExperimentPanel({ settings, sim, tool, running }: { settings: Settings; sim: Simulation; tool: Tool; running: boolean }) {
+  const [i, setI] = useState(0);
+  useEffect(() => {
+    const t = setInterval(() => setI((x) => x + 1), 9000);
+    return () => clearInterval(t);
+  }, []);
+  const tips = tipsFor(settings, sim);
+  const tip = tips[i % tips.length];
+  const toolHint = TOOL_HINTS[tool];
+  return (
+    <div className="explain">
+      <div className="explain-status">
+        {settings.treatment !== 'none' && <span className="status-line">🚁 {droneStatus(sim)}</span>}
+        {sim.surveying && <span className="status-line">🛰️ Survey drone is scanning the field…</span>}
+        {!running && sim.time === 0 && <span className="status-line hint-strong">Tip: write a prediction in the Notebook, then press Run.</span>}
+      </div>
+      <div className="explain-tip">
+        {toolHint && <span className="tool-hint">✏️ {toolHint}</span>}
+        <span className="tip">💡 {tip}</span>
+      </div>
+    </div>
+  );
+}
