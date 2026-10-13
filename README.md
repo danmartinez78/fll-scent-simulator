@@ -169,6 +169,19 @@ Add an entry to `SCENARIOS` in `src/simulation/scenarios.ts`:
 
 ## Deploying
 
+### Docker (same setup as the SPIKE simulator)
+
+Every push to `main` runs `.github/workflows/docker.yml`, which builds the `Dockerfile` and publishes `ghcr.io/danmartinez78/fll-scent-simulator:latest`. Other branches publish `:branch-<name>` (slashes become dashes), for a test container. The image is nginx serving the built site on port 8080. It needs no volume or settings, because the notebook lives in each student's browser.
+
+```sh
+docker run -d --name fll-scent-simulator --restart unless-stopped \
+    -p 8095:8080 ghcr.io/danmartinez78/fll-scent-simulator:latest
+```
+
+Then open `http://<host>:8095`. To update, pull the new `:latest` (on Unraid: Docker tab, Force update). If the package is private on GitHub, either make it public (Packages, Package settings, Change visibility) or `docker login ghcr.io` on the server first.
+
+### Static hosting
+
 `npm run build` writes a static site to `dist/`. It uses relative paths, so it works from any folder:
 
 - **GitHub Pages:** push `dist/` to a `gh-pages` branch, or use a Pages workflow that runs `npm ci && npm run build` and uploads `dist/`.
