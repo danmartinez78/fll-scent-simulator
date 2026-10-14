@@ -117,3 +117,28 @@ describe('simulation', () => {
     expect(sim.fieldTime).toBeLessThan(2 * 86400 + 3600);
   });
 });
+
+describe('wind and spray', () => {
+  // Spray one strip with the wind blowing east, then compare where it landed.
+  function sprayStrip(speedMph: number) {
+    const s = settingsWith({ treatment: 'spray', wind: { speedMph, direction: 90 }, run: { treatStartDay: 1 } });
+    const sim = new Simulation(s, { sprayZones: [{ x: 185, y: 40, w: 15, h: 60 }], devices: [] });
+    while (!sim.finished && (sim.drone.flights === 0 || sim.droneFlying)) sim.step();
+    return sim;
+  }
+
+  it('lands spray downwind and loses more of it as the wind grows', () => {
+    const calm = sprayStrip(0);
+    const windy = sprayStrip(15);
+    expect(windy.sprayResidue.centerOfMass().x).toBeGreaterThan(calm.sprayResidue.centerOfMass().x + 1);
+    expect(windy.metrics().productUsedGal).toBeCloseTo(calm.metrics().productUsedGal, 1);
+    // Same product sprayed next to the east edge, but some blew off the map.
+    expect(windy.sprayResidue.total()).toBeLessThan(calm.sprayResidue.total());
+  });
+
+  it('carries the smell of spray residue downwind of the sprayed plants', () => {
+    const sim = sprayStrip(15);
+    sim.advance(120);
+    expect(sim.residueVapor.centerOfMass().x).toBeGreaterThan(sim.sprayResidue.centerOfMass().x + 1);
+  });
+});

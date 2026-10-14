@@ -61,7 +61,7 @@ export const HELP: Record<string, HelpTopic> = {
   },
   spray: {
     title: 'Spraying',
-    text: 'The drone flies back and forth and sprays scent over the zones you draw. Spray acts fast but fades as the scent drifts and breaks down.'
+    text: 'The drone flies back and forth and sprays scent over the zones you draw. Wind pushes the falling drops downwind, so in a breeze the spray lands a little downwind of the drone and some blows off the field. The spray stays on the plants and wears off over about a week, but its smell drifts downwind.'
   },
   scentStrength: {
     title: 'Scent strength',

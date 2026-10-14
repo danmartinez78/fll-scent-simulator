@@ -25,7 +25,7 @@ import {
   zoneKey,
   type DeviceState
 } from './Treatment';
-import { diffusionFor, scentDrift } from './Wind';
+import { diffusionFor, RESIDUE_VAPOR_LIFETIME_SEC, RESIDUE_VAPOR_SHARE, scentDrift, sprayLanding } from './Wind';
 import { SECONDS_PER_DAY, TIME_LAPSE } from '../utils/fieldTime';
 
 /**
@@ -94,6 +94,8 @@ export class Simulation {
   repellentAir: ScentField;
   /** Sprayed repellent left on the plants (stays put and slowly wears off). */
   sprayResidue: ScentField;
+  /** Smell given off by the spray residue, carried downwind by the wind. */
+  residueVapor: ScentField;
   attractant: ScentField;
   /** Feeding so far in each grid square (pest-seconds per square meter). */
   damage: Float32Array;
@@ -138,6 +140,7 @@ export class Simulation {
     this.repellent = new ScentField(f.width, f.height, cell);
     this.repellentAir = new ScentField(f.width, f.height, cell);
     this.sprayResidue = new ScentField(f.width, f.height, cell);
+    this.residueVapor = new ScentField(f.width, f.height, cell);
     this.attractant = new ScentField(f.width, f.height, cell);
     const n = this.repellent.cols * this.repellent.rows;
     this.damage = new Float32Array(n);
@@ -364,7 +367,10 @@ export class Simulation {
       devicesPerTrip: s.devices.perTrip,
       spray: (x, y, liters, swath) => {
         const amount = (liters / REFERENCE_RATE_L_PER_M2) * s.scent.strength;
-        this.sprayResidue.addGaussian(x, y, amount, swath / 2.5);
+        // Wind pushes the falling drops downwind; drops that land off the map are lost.
+        for (const part of sprayLanding(s.wind, this.time)) {
+          this.sprayResidue.addGaussian(x + part.dx, y + part.dy, amount * part.share, swath / 2.5 + part.spread);
+        }
         const half = swath / 2;
         for (let yy = y - half; yy <= y + half; yy += cell / 2) {
           for (let xx = x - half; xx <= x + half; xx += cell / 2) {
@@ -396,7 +402,16 @@ export class Simulation {
     this.attractant.step(dt, drift.x, drift.y, diff, plumeLife, bioDt);
     // Spray residue sits on the plants and wears off over the spray's lifetime.
     this.sprayResidue.fade(bioDt, s.scent.lifetimeMin * 60);
-    this.repellent.sumOf(this.repellentAir, this.sprayResidue);
+    // The residue's smell drifts downwind. Fed so that with no wind it matches
+    // RESIDUE_VAPOR_SHARE of the residue; it runs on the farm clock like the residue.
+    const vapor = this.residueVapor;
+    const feed = RESIDUE_VAPOR_SHARE * (1 - Math.exp(-bioDt / RESIDUE_VAPOR_LIFETIME_SEC));
+    for (let i = 0; i < vapor.data.length; i++) vapor.data[i] += this.sprayResidue.data[i] * feed;
+    vapor.step(bioDt, drift.x, drift.y, diff, RESIDUE_VAPOR_LIFETIME_SEC);
+    const rep = this.repellent.data;
+    const air = this.repellentAir.data;
+    const res = this.sprayResidue.data;
+    for (let i = 0; i < rep.length; i++) rep[i] = air[i] + res[i] * (1 - RESIDUE_VAPOR_SHARE) + vapor.data[i];
 
     // Pests arrive, move and feed.
     this.pests.now = this.time;
