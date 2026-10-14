@@ -55,7 +55,7 @@ export function WelcomeDialog({ open, onClose, phone }: Props) {
           ))}
         </ol>
         <p className="welcome-clock">
-          ⏱ Drone flights play in <strong>real time</strong>. Once the drone lands, the field <strong>fast-forwards</strong> through several days
+          ⏱ Drone flights play in <strong>real time</strong>. Once the drone lands, the field <strong>fast-forwards</strong> through several weeks
           so you can see what happens to the crop.
         </p>
         {phone && (

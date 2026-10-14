@@ -12,7 +12,7 @@ import { lToGal, m2ToAcres } from '../utils/units';
 export const DEFAULT_COSTS: CostSettings = {
   flightCostPerMin: 5,
   materialCostPerGal: 25,
-  deviceCost: 4
+  deviceCost: 12
 };
 
 export interface CostInputs {

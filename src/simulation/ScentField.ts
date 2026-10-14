@@ -149,6 +149,19 @@ export class ScentField {
   }
 
   /** Total scent on the map (concentration x area). */
+  /** Fade in place without moving (for spray residue stuck to plants). */
+  fade(dt: number, lifetimeSec: number): void {
+    const f = lifetimeSec > 0 ? Math.exp(-dt / lifetimeSec) : 0;
+    const d = this.data;
+    for (let i = 0; i < d.length; i++) d[i] = d[i] > 1e-6 ? d[i] * f : 0;
+  }
+
+  /** Set this field to the sum of two others of the same size. */
+  sumOf(a: ScentField, b: ScentField): void {
+    const d = this.data;
+    for (let i = 0; i < d.length; i++) d[i] = a.data[i] + b.data[i];
+  }
+
   total(): number {
     let sum = 0;
     for (let i = 0; i < this.data.length; i++) sum += this.data[i];
