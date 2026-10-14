@@ -31,6 +31,7 @@ There is no backend, database, login or network dependency. Everything runs in t
 
 The simulator has two modes, switched at the top right (the choice is remembered in the browser):
 
+- A **welcome pop-up** explains the idea, the five steps and the two clocks the first time someone opens the site (remembered in the browser; "👋 How this works" at the bottom reopens it).
 - **Guided** (the default) walks students through five steps: *Mission* (pick a scenario), *Predict* (write what they think will happen), *Plan* (treatment method and wind only), *Run*, and *Compare* (three big results, the chart, their prediction and Save to notebook). "Try another change" goes back to Plan with the same mission. The survey mission adds a Fly survey button to the Plan step. Each step unlocks only what it needs: Mission and Predict show the map as a still preview with no run buttons, Plan turns on drawing, and Run, Reset and the speed buttons appear only in the Run step (drawing is locked there). Going back to Plan after a run starts the run over.
 - **Playground** is the full sandbox below. Settings sections start closed, map layers are in the Map menu, and the results show three numbers with the rest under "More numbers".
 
