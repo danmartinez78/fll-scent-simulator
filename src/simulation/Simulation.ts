@@ -33,7 +33,7 @@ import { SECONDS_PER_DAY, TIME_LAPSE } from '../utils/fieldTime';
  * minutes. It sets how big a device's steady scent patch grows; the wind
  * carries the rest away.
  */
-export const DEVICE_PLUME_LIFETIME_MIN = 8;
+export const DEVICE_PLUME_LIFETIME_MIN = 0.5;
 
 /** Simulated seconds per step. */
 export const DEFAULT_DT = 0.5;
