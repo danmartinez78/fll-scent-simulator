@@ -31,7 +31,7 @@ There is no backend, database, login or network dependency. Everything runs in t
 
 The simulator has two modes, switched at the top right (the choice is remembered in the browser):
 
-- **Guided** (the default) walks students through five steps: *Mission* (pick a scenario), *Predict* (write what they think will happen), *Plan* (treatment method and wind only), *Run*, and *Compare* (three big results, the chart, their prediction and Save to notebook). "Try another change" goes back to Plan with the same mission. The survey mission adds a Fly survey button to the Plan step.
+- **Guided** (the default) walks students through five steps: *Mission* (pick a scenario), *Predict* (write what they think will happen), *Plan* (treatment method and wind only), *Run*, and *Compare* (three big results, the chart, their prediction and Save to notebook). "Try another change" goes back to Plan with the same mission. The survey mission adds a Fly survey button to the Plan step. Each step unlocks only what it needs: Mission and Predict show the map as a still preview with no run buttons, Plan turns on drawing, and Run, Reset and the speed buttons appear only in the Run step (drawing is locked there). Going back to Plan after a run starts the run over.
 - **Playground** is the full sandbox below. Settings sections start closed, map layers are in the Map menu, and the results show three numbers with the rest under "More numbers".
 
 | | |
@@ -226,7 +226,7 @@ Then open `http://<host>:8095`. To update, pull the new `:latest` (on Unraid: Do
 - The survey's computer vision is simulated from the true pest positions plus noise. It is not a real vision model.
 - The optimizer's quick test uses fewer pests and a coarser grid, so its own score can differ from the full-simulation result shown at the end.
 - The notebook lives in this browser's local storage. Export it to move it between computers.
-- Phones are not a target; tablets and laptops are.
+- Phones get a simple version: Guided mode only, the steps come first, the map appears from the Plan step on, and a note says the full simulator works best on a tablet or computer. Tablets and laptops are the main target.
 
 ## License
 
