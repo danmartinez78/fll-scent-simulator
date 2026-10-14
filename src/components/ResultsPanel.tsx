@@ -36,8 +36,9 @@ export function ResultsPanel({ sim, onSave, saved }: { sim: Simulation; onSave: 
           icon="🐞"
           label="Pests kept off crop"
           info="pestsDeterred"
-          value={`${m.pestsDeterredPct.toFixed(0)}%`}
-          sub={`average ${m.pestsDeterredAvgPct.toFixed(0)}%${m.pestsTrapped ? ` · ${m.pestsTrapped} trapped` : ''}`}
+          // During a run show right now; once it is over, the average over the whole run is the fairer summary.
+          value={`${(sim.finished ? m.pestsDeterredAvgPct : m.pestsDeterredPct).toFixed(0)}%`}
+          sub={`${sim.finished ? `on average · ${m.pestsDeterredPct.toFixed(0)}% at the end` : `right now · ${m.pestsDeterredAvgPct.toFixed(0)}% on average`}${m.pestsTrapped ? ` · ${m.pestsTrapped} trapped` : ''}`}
         />
         <Card
           icon="💲"
@@ -95,10 +96,13 @@ export function ResultsPanel({ sim, onSave, saved }: { sim: Simulation; onSave: 
         <LineChart xs={xs} xLabel="days" yLabel="gal" series={[{ label: 'Product used (gal)', color: '#2563eb', values: sim.history.map((h) => h.productUsedGal) }]} />
       )}
 
-      <button className="btn primary wide" onClick={onSave} disabled={sim.time === 0}>
-        📓 Save these results to the notebook
-      </button>
-      {saved && <p className="saved-note">✓ Saved to {saved}.</p>}
+      {saved ? (
+        <p className="saved-note">✓ Saved in the notebook as {saved}.</p>
+      ) : (
+        <button className="btn primary wide" onClick={onSave} disabled={sim.time === 0}>
+          📓 Save these results to the notebook
+        </button>
+      )}
     </div>
   );
 }
