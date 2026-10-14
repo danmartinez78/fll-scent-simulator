@@ -81,6 +81,10 @@ export interface DroneSettings {
   turnaroundSec: number;
   /** Total scent product the team has for this run, in gallons. */
   productAvailableGal: number;
+  /** Seconds to take off, and again to land, on each flight. */
+  takeoffLandingSec?: number;
+  /** Seconds loitering over each drop spot to release a device. */
+  dropLoiterSec?: number;
 }
 
 export interface DeviceSettings {
