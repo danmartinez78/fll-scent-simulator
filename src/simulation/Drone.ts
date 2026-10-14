@@ -19,6 +19,13 @@ export const T50_REFERENCE: DroneSettings = {
   productAvailableGal: 20
 };
 
+/** Seconds to take off and climb to working height at the start of each flight. */
+export const TAKEOFF_SEC = 15;
+/** Seconds to descend and land at home at the end of each flight. */
+export const LANDING_SEC = 15;
+/** Seconds hovering low over a spot to release one device. */
+export const DROP_HOVER_SEC = 8;
+
 /** The spray tank liquid is treated as water-like: 1 liter weighs 1 kg. */
 export const KG_PER_LITER = 1;
 
@@ -93,6 +100,10 @@ export class Drone {
   /** Path flown, for drawing (sampled points). */
   trail: Vec[] = [];
 
+  /** Seconds left hovering in place (taking off, landing or dropping a device). */
+  hoverLeft = 0;
+  hoverFor: 'takeoff' | 'landing' | 'drop' | null = null;
+
   private progressThisFlight = false;
   private idleFlights = 0;
 
@@ -124,7 +135,7 @@ export class Drone {
 
   /** Battery fraction needed to fly home from here, plus the reserve. */
   private batteryNeededToReturn(devicesMassKg: number): number {
-    const t = dist(this.x, this.y, this.home.x, this.home.y) / this.settings.speed;
+    const t = dist(this.x, this.y, this.home.x, this.home.y) / this.settings.speed + LANDING_SEC;
     const endurance = enduranceSec(this.settings, this.payloadFraction(devicesMassKg));
     return this.settings.reservePct / 100 + (t / endurance) * 1.15 + 0.005;
   }
@@ -184,6 +195,29 @@ export class Drone {
     this.mode = 'flying';
     this.flights++;
     this.progressThisFlight = false;
+    this.hover('takeoff', TAKEOFF_SEC);
+  }
+
+  private hover(kind: 'takeoff' | 'landing' | 'drop', sec: number): void {
+    this.hoverFor = sec > 0 ? kind : null;
+    this.hoverLeft = sec;
+  }
+
+  /** Back on the ground at home: refill and swap the battery, or park if the work is done. */
+  private landed(): void {
+    this.mode = 'turnaround';
+    this.turnaroundLeft = this.settings.turnaroundSec;
+    if (!this.progressThisFlight) this.idleFlights++;
+    else this.idleFlights = 0;
+    // Safety: if two flights in a row got nothing done, the job is out of reach.
+    if (this.idleFlights >= 2) {
+      this.tasks = [];
+      this.gaveUp = true;
+    }
+    if (this.tasks.length === 0) {
+      this.mode = 'parked';
+      this.turnaroundLeft = 0;
+    }
   }
 
   /** Move toward a point; returns true when it got there this step. */
@@ -238,21 +272,31 @@ export class Drone {
 
     const stepLen = s.speed * dt;
 
+    // Taking off, landing or hovering over a drop spot.
+    if (this.hoverFor) {
+      this.hoverLeft -= dt;
+      if (this.hoverLeft > 1e-9) return;
+      const done = this.hoverFor;
+      this.hoverFor = null;
+      this.hoverLeft = 0;
+      if (done === 'landing') this.landed();
+      else if (done === 'drop') {
+        const task = this.tasks[0];
+        if (task?.kind === 'drop') {
+          this.devicesOnboard--;
+          this.devicesDropped++;
+          this.progressThisFlight = true;
+          world.dropDevice(task.deviceId);
+          this.tasks.shift();
+        }
+      }
+      return;
+    }
+
     if (this.mode === 'returning') {
       if (this.moveToward(this.home.x, this.home.y, stepLen)) {
-        this.mode = 'turnaround';
-        this.turnaroundLeft = s.turnaroundSec;
-        if (!this.progressThisFlight) this.idleFlights++;
-        else this.idleFlights = 0;
-        // Safety: if two flights in a row got nothing done, the job is out of reach.
-        if (this.idleFlights >= 2) {
-          this.tasks = [];
-          this.gaveUp = true;
-        }
-        if (this.tasks.length === 0) {
-          this.mode = 'parked';
-          this.turnaroundLeft = 0;
-        }
+        if (LANDING_SEC > 0) this.hover('landing', LANDING_SEC);
+        else this.landed();
       }
       return;
     }
@@ -275,13 +319,7 @@ export class Drone {
         this.goHome('reload devices');
         return;
       }
-      if (this.moveToward(task.at.x, task.at.y, stepLen)) {
-        this.devicesOnboard--;
-        this.devicesDropped++;
-        this.progressThisFlight = true;
-        world.dropDevice(task.deviceId);
-        this.tasks.shift();
-      }
+      if (this.moveToward(task.at.x, task.at.y, stepLen)) this.hover('drop', DROP_HOVER_SEC);
       return;
     }
 

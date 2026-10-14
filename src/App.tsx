@@ -419,6 +419,8 @@ export default function App() {
             speed={speed}
             time={sim.time}
             duration={sim.durationSec}
+            fieldTime={sim.fieldTime}
+            flying={sim.droneFlying}
             surveying={sim.surveying}
             surveyProgress={sim.survey?.progress ?? 0}
             pendingReset={pendingReset}

@@ -23,6 +23,9 @@ export function droneStatus(sim: Simulation): string {
         ? `${d.devicesOnboard} device${d.devicesOnboard === 1 ? '' : 's'} on board`
         : 'empty';
   const battery = `battery ${Math.round(Math.max(0, d.battery) * 100)}% (${d.minutesLeft(mass).toFixed(1)} min before reserve)`;
+  if (d.hoverFor === 'takeoff') return `Drone is taking off and climbing to working height · ${load} · ${battery}.`;
+  if (d.hoverFor === 'landing') return `Drone is landing at home (H) · ${battery}.`;
+  if (d.hoverFor === 'drop') return `Drone is hovering low to drop a device · ${load} · ${battery}.`;
   switch (d.mode) {
     case 'parked':
       if (sim.treatmentWaiting) return 'Drone is waiting at home (H) until you press Run to start the treatment.';

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import type { SurveyCategory, SurveyResult, ViewOptions } from '../models/types';
 import type { Simulation } from '../simulation/Simulation';
 import { COLORS, type SurveyLayer } from '../render/drawScene';
-import { formatClock } from '../utils/units';
+import { formatFieldClock } from '../utils/fieldTime';
 import { InfoButton, Toggle } from './ui';
 
 interface Props {
@@ -93,7 +93,7 @@ export function SurveyPanel(p: Props) {
             <div className="tool-row">
               {surveys.map((s) => (
                 <button key={s.id} className={p.shown?.id === s.id ? 'chip small active' : 'chip small'} onClick={() => p.onSelect(s.id)}>
-                  {s.label} ({formatClock(s.timeSec)})
+                  {s.label} ({formatFieldClock(s.timeSec)})
                 </button>
               ))}
             </div>
@@ -121,7 +121,7 @@ export function SurveyPanel(p: Props) {
               <select value={a?.id} onChange={(e) => setAId(Number(e.target.value))}>
                 {surveys.map((s) => (
                   <option key={s.id} value={s.id}>
-                    {s.label} at {formatClock(s.timeSec)}
+                    {s.label} at {formatFieldClock(s.timeSec)}
                   </option>
                 ))}
               </select>
@@ -131,7 +131,7 @@ export function SurveyPanel(p: Props) {
               <select value={b?.id} onChange={(e) => setBId(Number(e.target.value))}>
                 {surveys.map((s) => (
                   <option key={s.id} value={s.id}>
-                    {s.label} at {formatClock(s.timeSec)}
+                    {s.label} at {formatFieldClock(s.timeSec)}
                   </option>
                 ))}
               </select>

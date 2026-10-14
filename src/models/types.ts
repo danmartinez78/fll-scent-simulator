@@ -179,7 +179,10 @@ export interface Scenario {
 
 /** The handful of numbers students see. Percentages are 0 to 100. */
 export interface Metrics {
+  /** Model clock (see utils/fieldTime.ts). */
   timeSec: number;
+  /** Farm clock: real time while a drone flies, time-lapse otherwise. */
+  fieldTimeSec?: number;
   cropAffectedPct: number;
   cropProtectedPct: number;
   pestsFeedingPct: number;

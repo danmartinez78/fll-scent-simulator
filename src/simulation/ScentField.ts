@@ -105,7 +105,7 @@ export class ScentField {
    * @param diffusion spreading, square meters per second
    * @param lifetimeSec time for scent to fade to about 37%
    */
-  step(dt: number, windX: number, windY: number, diffusion: number, lifetimeSec: number): void {
+  step(dt: number, windX: number, windY: number, diffusion: number, lifetimeSec: number, fadeDt = dt): void {
     const { cols, rows, cell } = this;
     const src = this.data;
     const dst = this.tmp;
@@ -132,7 +132,7 @@ export class ScentField {
     // 2. Spread to neighbors. Capped so the simple method stays stable.
     const k = Math.min(0.24, (diffusion * dt) / (cell * cell));
     // 3. Fade over time.
-    const fade = lifetimeSec > 0 ? Math.exp(-dt / lifetimeSec) : 0;
+    const fade = lifetimeSec > 0 ? Math.exp(-fadeDt / lifetimeSec) : 0;
     for (let r = 0; r < rows; r++) {
       for (let c = 0; c < cols; c++) {
         const i = r * cols + c;

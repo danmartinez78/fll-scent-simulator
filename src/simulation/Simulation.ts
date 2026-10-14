@@ -26,6 +26,7 @@ import {
   type DeviceState
 } from './Treatment';
 import { diffusionFor, scentDrift } from './Wind';
+import { TIME_LAPSE } from '../utils/fieldTime';
 
 /** Simulated seconds per step. */
 export const DEFAULT_DT = 0.5;
@@ -73,7 +74,13 @@ export class Simulation {
   readonly crop: Rect;
   readonly home: Vec;
   readonly dt: number;
+  /**
+   * Model clock in seconds. Pests, scent and damage run on it. It slows to
+   * 1/TIME_LAPSE while a drone flies (see utils/fieldTime.ts).
+   */
   time = 0;
+  /** Farm clock in seconds: real time while a drone flies, time-lapse otherwise. */
+  fieldTime = 0;
   repellent: ScentField;
   attractant: ScentField;
   /** Feeding so far in each grid square (pest-seconds per square meter). */
@@ -244,6 +251,11 @@ export class Simulation {
     return this.holdTreatment && !this.treatmentStarted;
   }
 
+  /** True while the treatment drone or the survey drone is working (the field clock runs in real time). */
+  get droneFlying(): boolean {
+    return (this.treatmentStarted && this.drone.busy) || this.surveying;
+  }
+
   get surveying(): boolean {
     return !!this.survey && !this.survey.done;
   }
@@ -282,6 +294,10 @@ export class Simulation {
     const cols = this.repellent.cols;
     if (!this.holdTreatment) this.startTreatment();
     const treating = this.treatmentStarted;
+    // While a drone flies, the field clock runs in real time and the field
+    // itself barely changes; otherwise it runs as a time-lapse.
+    const flying = this.droneFlying;
+    const bioDt = flying ? dt / TIME_LAPSE : dt;
 
     // Drone: flies its jobs, sprays and drops devices.
     const sprayed = this.sprayed;
@@ -308,7 +324,7 @@ export class Simulation {
     });
 
     // Slow-release devices: steady scent while they last.
-    const emit = DEVICE_BASE_EMISSION * s.scent.strength * s.devices.releaseRate * dt;
+    const emit = DEVICE_BASE_EMISSION * s.scent.strength * s.devices.releaseRate * bioDt;
     for (const d of this.devices) {
       if (!treating || !deviceActive(d, this.time, s.devices.lifetimeMin)) continue;
       const field = d.kind === 'repellent' ? this.repellent : this.attractant;
@@ -319,18 +335,18 @@ export class Simulation {
     const drift = scentDrift(s.wind, this.time);
     const diff = diffusionFor(s.wind);
     const life = s.scent.lifetimeMin * 60;
-    this.repellent.step(dt, drift.x, drift.y, diff, life);
-    this.attractant.step(dt, drift.x, drift.y, diff, life);
+    this.repellent.step(dt, drift.x, drift.y, diff, life, bioDt);
+    this.attractant.step(dt, drift.x, drift.y, diff, life, bioDt);
 
     // Pests move and feed.
-    this.pests.step(dt, this.pestEnvironment(), this.rngMotion);
+    this.pests.step(bioDt, this.pestEnvironment(), this.rngMotion);
     const area = cell * cell;
     const p = this.pests;
     for (let i = 0; i < p.n; i++) {
       if (!p.feeding[i]) continue;
       const c = Math.min(cols - 1, Math.floor(p.x[i] / cell));
       const r = Math.min(this.repellent.rows - 1, Math.floor(p.y[i] / cell));
-      this.damage[r * cols + c] += dt / area;
+      this.damage[r * cols + c] += bioDt / area;
     }
 
     // Survey drone.
@@ -338,17 +354,18 @@ export class Simulation {
       this.survey.step(dt, this.pests, this.rngSurvey);
       if (this.survey.done) {
         this.surveys.push(
-          this.survey.result(this.crop, (sq) => this.damageLevelIn(sq), this.rngSurvey, this.time + dt)
+          this.survey.result(this.crop, (sq) => this.damageLevelIn(sq), this.rngSurvey, this.fieldTime + dt)
         );
       }
     }
 
-    this.time += dt;
+    this.time += bioDt;
+    this.fieldTime += flying ? dt : dt * TIME_LAPSE;
     if (this.time + 1e-9 >= this.nextHistory) this.recordHistory();
     if (this.time + 1e-9 >= this.durationSec) this.finished = true;
   }
 
-  /** Run for a number of simulated seconds. */
+  /** Run this many seconds' worth of steps (the model clock moves less while a drone flies). */
   advance(seconds: number): void {
     const steps = Math.round(seconds / this.dt);
     for (let i = 0; i < steps; i++) this.step();
@@ -441,6 +458,7 @@ export class Simulation {
     );
     return {
       timeSec: this.time,
+      fieldTimeSec: this.fieldTime,
       cropAffectedPct: core.cropAffectedPct,
       cropProtectedPct: 100 - core.cropAffectedPct,
       pestsFeedingPct: core.pestsFeedingPct,

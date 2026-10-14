@@ -2,14 +2,18 @@ import type { Metrics, Settings, TreatmentPlan } from '../models/types';
 import type { Simulation } from '../simulation/Simulation';
 import { activePlan } from '../simulation/Treatment';
 import { compassName } from '../utils/geometry';
-import { formatClock, formatMoney } from '../utils/units';
+import { formatMoney } from '../utils/units';
+import { formatFieldSpan, formatModelMin, modelToFieldSec } from '../utils/fieldTime';
 
 export const NOTEBOOK_KEY = 'scent-sim-notebook-v1';
 
 export interface CapturedRun {
   savedAt: string;
   scenarioName: string;
+  /** Model clock when saved (see utils/fieldTime.ts). */
   timeSec: number;
+  /** Farm clock when saved; missing in runs saved before the two clocks. */
+  fieldTimeSec?: number;
   finished: boolean;
   settings: Settings;
   plan: TreatmentPlan;
@@ -141,6 +145,7 @@ export function captureRun(sim: Simulation, scenarioName: string, snapshot?: str
     savedAt: new Date().toISOString(),
     scenarioName,
     timeSec: sim.time,
+    fieldTimeSec: sim.fieldTime,
     finished: sim.finished,
     settings: structuredClone(sim.settings),
     plan: structuredClone(sim.plan),
@@ -157,11 +162,11 @@ export function summaryRows(c: CapturedRun): Array<[string, string]> {
   const devices = eff.devices.length;
   return [
     ['Scenario', c.scenarioName],
-    ['Run time', `${formatClock(c.timeSec)}${c.finished ? '' : ' (not finished)'}`],
+    ['Run time', `${formatFieldSpan(c.fieldTimeSec ?? modelToFieldSec(c.timeSec))}${c.finished ? '' : ' (not finished)'}`],
     ['Treatment', methodName(s.treatment)],
     ['Wind', s.wind.speedMph > 0 ? `${s.wind.speedMph} mph toward the ${compassName(s.wind.direction)}${s.wind.changing ? ' (changing)' : ''}` : 'No wind'],
     ['Pests', `${s.pests.count}, ${s.pests.distribution}`],
-    ['Scent', `strength ${s.scent.strength}, lifetime ${s.scent.lifetimeMin} min`],
+    ['Scent', `strength ${s.scent.strength}, lifetime ${formatModelMin(s.scent.lifetimeMin)}`],
     ['Spray zones planned', String(eff.sprayZones.length)],
     ['Scent devices planned', String(devices)],
     ['Crop protected', `${m.cropProtectedPct.toFixed(0)}%`],
