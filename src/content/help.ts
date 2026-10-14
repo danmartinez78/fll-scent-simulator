@@ -71,6 +71,14 @@ export const HELP: Record<string, HelpTopic> = {
     title: 'Spray lasts on plants',
     text: 'Sprayed repellent coats the leaves and slowly wears off. After this long, about a third of it is left. Real repellent sprays usually work for about 5 to 14 days.'
   },
+  treatStart: {
+    title: 'When to start treating',
+    text: 'Farmers usually find pests by scouting before they treat, so some feeding happens first. Starting early protects more of the crop but costs money before you know the pests are there. Waiting means you treat only when needed, but the crop is damaged in the meantime.'
+  },
+  buildUp: {
+    title: 'Pests arriving',
+    text: 'In a real field, pests do not all show up at once. A few are there at the start, and more fly in and land over the next days. Set this to 0 to have every pest there on Day 1.'
+  },
   respray: {
     title: 'How often to spray',
     text: 'Sprayed repellent wears off after about a week, so farmers often spray again. Each repeat spray is a whole new drone mission: it uses more product, more flight time and costs more.'

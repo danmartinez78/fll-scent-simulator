@@ -262,7 +262,7 @@ export function drawScene(ctx: CanvasRenderingContext2D, sim: Simulation, o: Dra
     ctx.fillStyle = COLORS.pest;
     ctx.beginPath();
     for (let i = 0; i < p.n; i++) {
-      if (p.trapped[i] || p.repelled[i] || ignores(i)) continue;
+      if (p.trapped[i] || !p.present(i) || p.repelled[i] || ignores(i)) continue;
       ctx.moveTo(p.x[i] + pr2, p.y[i]);
       ctx.arc(p.x[i], p.y[i], pr2, 0, Math.PI * 2);
     }
@@ -271,7 +271,7 @@ export function drawScene(ctx: CanvasRenderingContext2D, sim: Simulation, o: Dra
       ctx.fillStyle = COLORS.pestIgnores;
       ctx.beginPath();
       for (let i = 0; i < p.n; i++) {
-        if (p.trapped[i] || !ignores(i)) continue;
+        if (p.trapped[i] || !p.present(i) || !ignores(i)) continue;
         ctx.moveTo(p.x[i] + pr2, p.y[i]);
         ctx.arc(p.x[i], p.y[i], pr2, 0, Math.PI * 2);
       }
@@ -280,7 +280,7 @@ export function drawScene(ctx: CanvasRenderingContext2D, sim: Simulation, o: Dra
     ctx.fillStyle = COLORS.pestAgitated;
     ctx.beginPath();
     for (let i = 0; i < p.n; i++) {
-      if (p.trapped[i] || !p.repelled[i]) continue;
+      if (p.trapped[i] || !p.present(i) || !p.repelled[i]) continue;
       ctx.moveTo(p.x[i] + pr2, p.y[i]);
       ctx.arc(p.x[i], p.y[i], pr2, 0, Math.PI * 2);
     }

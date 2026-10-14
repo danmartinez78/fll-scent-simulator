@@ -95,7 +95,11 @@ Settings are stored in model minutes and shown as farm time (1 model minute = 1 
 
 **Spray vs. device scent.** Sprayed repellent goes into a *residue* grid that stays on the plants (no wind drift or spreading) and fades over the spray lifetime (default 7 days; real repellent sprays typically last 5 to 14). Device repellent goes into an *air* grid that drifts and spreads with the wind and fades over a fixed plume lifetime (`DEVICE_PLUME_LIFETIME_MIN`), which sets the size of a device's steady scent patch. It is short (30 model seconds) so the patch pests notice matches the 12 m range: about 13 m across in still air and about 11 m in a 6 mph wind, or about 0.1 acre per device. Pests sense the sum. Defaults were picked so the comparison is fair: a 3-week run, repeat spraying of Once / Every week / Every 3 days, and $12 per device (about $100 per acre at the ~9 devices per acre a 12 m range needs, in line with commercial dispenser programs). Saved setups and notebook entries keep working because the stored numbers did not change.
 
-**Repeat spraying.** In the spray method, "How often to spray" can be Once, Every 2 days or Every day. On schedule (farm clock), once the drone is free, it flies every spray zone again; each round uses product, flight time and cost like the first. The plan summary multiplies the product estimate by the number of sprays in the run.
+**Repeat spraying.** In the spray method, "How often to spray" can be Once, Every week or Every 3 days. The first spray goes out on the treatment start day; after that, once the drone is free, it flies every spray zone again on schedule (farm clock). Each round uses product, flight time and cost like the first. The plan summary multiplies the product estimate by the number of sprays left in the run.
+
+**Pests build up.** Pests do not all show up at once. With "Pests keep arriving for" set to N days (default 10), about 10% of the pests are there on Day 1 and the rest land at their starting spots at random times over the first N days. Pests that have not arrived yet are not drawn, do not feed and are not counted. "Pests kept off" is the share of pests *in the field* that are not feeding, and the Pests & crop chart shows pests in the field next to pests feeding (both as a share of all pests), so the gap between the two lines is the pests kept off. 0 days puts every pest there on Day 1 (the old behavior, and what setups saved before this setting get).
+
+**Treatment start day.** Farmers usually treat after scouting finds pests, so the treatment starts on a chosen day ("Start treatment on" Day 1, 3 or 7; default Day 3, at 8:00 AM). Until then the drone waits at home and hand-placed devices are not working, so some feeding happens first. A dashed line on the Pests & crop chart marks the start. The Survey Uncertainty mission has all pests there on Day 1 so the survey has something to find.
 
 **Scent** (`src/simulation/ScentField.ts`, `Wind.ts`). Repellent and attractant are two separate grids of concentration `C` (about 64 squares across). Every step:
 
@@ -232,11 +236,11 @@ Then open `http://<host>:8095`. To update, pull the new `:latest` (on Unraid: Do
 
 ## Known limitations
 
-- Pest behavior is a weighted-rules model, not insect biology. There is no breeding, death (except traps), day/night or species differences.
+- Pest behavior is a weighted-rules model, not insect biology. There is no breeding, death (except traps), day/night or species differences. Pests arrive at a steady random rate over the build-up days; real arrivals come in waves.
 - Scent drift is a grid shift plus blur; there is no terrain, canopy, rain, temperature or 3D movement. Strong wind blows most scent off a small field quickly.
-- Spraying deposits scent directly into the air layer; there is no residue on leaves.
 - Repellent pushes pests into untreated crop, where they keep feeding. A spray front can still herd some pests ahead of it, and after a whole-field spray more of them collect near the crop's edges, where the scent is weakest. The "giving up" rule reduces this but does not remove it. It is a property of the simple rules, worth discussing rather than trusting.
 - The drone flies straight lines at constant speed. It spends 6 s slowing down and turning at the end of each spray pass. Each flight adds takeoff and landing time (default 30 s each) and each device drop adds loiter time (default 30 s to descend, steady, release and climb). Both are fixed in `src/simulation/Drone.ts`. The battery model is a straight line between two hover times.
+- A crop square counts as "affected" only after enough feeding has built up there, so the Crop affected line stays near 0 for the first few days even with pests feeding. Light early feeding is real, but it is below what the model counts as damage.
 - The time-lapse uses one speed-up for everything biological. Real pests, products and crops each have their own timescales.
 - The survey's computer vision is simulated from the true pest positions plus noise. It is not a real vision model.
 - The optimizer's quick test uses fewer pests and a coarser grid, so its own score can differ from the full-simulation result shown at the end.

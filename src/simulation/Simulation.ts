@@ -160,6 +160,9 @@ export class Simulation {
       ? PestSwarm.fromPositions(opts.initialPests, rngStart)
       : PestSwarm.create(settings.pests, f.width, f.height, this.crop, rngStart, opts.pestCount);
     this.pests.assignToughness(new Random(childSeed(seed, 4)));
+    // Days stored in settings are farm days; pest rules run in model seconds.
+    const buildUpSec = ((settings.pests.buildUpDays ?? 0) * SECONDS_PER_DAY) / TIME_LAPSE;
+    this.pests.assignArrivals(buildUpSec, new Random(childSeed(seed, 5)));
     this.drone = new Drone(settings.drone, this.home);
     this.setPlan(plan);
     this.recordHistory();
@@ -254,9 +257,17 @@ export class Simulation {
     );
   }
 
-  /** Start the treatment: the drone takes off and hand-placed devices start releasing now. */
+  /**
+   * Let the treatment go: it starts now, or on the planned start day if that
+   * is later (see RunSettings.treatStartDay).
+   */
   startTreatment(): void {
     this.holdTreatment = false;
+    if (this.fieldTime + 1e-6 >= this.treatStartFieldSec) this.beginTreatment();
+  }
+
+  /** The drone takes off and hand-placed devices start releasing now. */
+  private beginTreatment(): void {
     if (this.treatmentStarted) return;
     this.treatmentStarted = true;
     if (!this.settings.devices.deployByDrone) {
@@ -267,6 +278,16 @@ export class Simulation {
   /** True while a survey flown before the first Run is keeping the treatment waiting. */
   get treatmentWaiting(): boolean {
     return this.holdTreatment && !this.treatmentStarted;
+  }
+
+  /** Farm time the treatment is planned to start (see RunSettings.treatStartDay). */
+  get treatStartFieldSec(): number {
+    return Math.max(0, (this.settings.run.treatStartDay ?? 1) - 1) * SECONDS_PER_DAY;
+  }
+
+  /** True while the run is waiting for the planned treatment day. */
+  get treatmentScheduled(): boolean {
+    return !this.treatmentStarted && !this.holdTreatment && this.settings.treatment !== 'none';
   }
 
   /** True while the treatment drone or the survey drone is working (the field clock runs in real time). */
@@ -377,7 +398,8 @@ export class Simulation {
     this.sprayResidue.fade(bioDt, s.scent.lifetimeMin * 60);
     this.repellent.sumOf(this.repellentAir, this.sprayResidue);
 
-    // Pests move and feed.
+    // Pests arrive, move and feed.
+    this.pests.now = this.time;
     this.pests.step(bioDt, this.pestEnvironment(), this.rngMotion);
     const area = cell * cell;
     const p = this.pests;
@@ -445,7 +467,7 @@ export class Simulation {
     const effectiveness = (this.settings.scent.effectivenessPct ?? 100) / 100;
     let k = 0;
     for (let i = 0; i < p.n; i++) {
-      if (p.trapped[i] || p.leaving[i] > 0 || !inRect(p.x[i], p.y[i], this.crop)) continue;
+      if (p.trapped[i] || !p.present(i) || p.leaving[i] > 0 || !inRect(p.x[i], p.y[i], this.crop)) continue;
       if (
         this.settings.pests.sensitivity > 0 &&
         p.reacts(i, effectiveness) &&
@@ -457,9 +479,11 @@ export class Simulation {
     return k;
   }
 
+  /** Percent of the pests in the field right now that are feeding. */
   private pestsFeedingNow(): number {
-    if (this.pests.n === 0) return 0;
-    return (this.feedingCount() / this.pests.n) * 100;
+    const present = this.pests.countPresent();
+    if (present === 0) return 0;
+    return (this.feedingCount() / present) * 100;
   }
 
   private recordHistory(): void {
@@ -467,6 +491,7 @@ export class Simulation {
     this.history.push({
       t: this.time,
       pestsFeedingPct: m.pestsFeedingPct,
+      pestsPresentPct: this.pests.n ? (this.pests.countPresent() / this.pests.n) * 100 : 0,
       cropAffectedPct: m.cropAffectedPct,
       productUsedGal: m.productUsedGal,
       scentCoveragePct: m.scentCoveragePct

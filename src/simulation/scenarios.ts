@@ -11,7 +11,8 @@ export function defaultSettings(): Settings {
       hotspotCount: 3,
       cropAttraction: 1,
       sensitivity: 1,
-      speed: 0.8
+      speed: 0.8,
+      buildUpDays: 10
     },
     wind: { direction: 90, speedMph: 0, changing: false },
     scent: { strength: 1, lifetimeMin: 7, rangeM: 12, threshold: 0.15, effectivenessPct: 80 },
@@ -21,7 +22,7 @@ export function defaultSettings(): Settings {
     survey: { detectionPct: 90, falsePositivesPer1000m2: 0.5, positionNoiseM: 3, uncertainPct: 5 },
     cost: { ...DEFAULT_COSTS },
     weights: { protection: 1, pestsDeterred: 0.5, material: 2, flightTime: 1, cost: 0.5 },
-    run: { durationMin: 21, seed: 42 }
+    run: { durationMin: 21, seed: 42, treatStartDay: 3 }
   };
 }
 
@@ -120,7 +121,8 @@ export const SCENARIOS: Scenario[] = [
     question: 'Does knowing where pests are help you plan, even when the map has mistakes?',
     settings: settingsWith({
       treatment: 'spray',
-      pests: { distribution: 'hotspots', hotspotCount: 3 },
+      // The pests are already there, so the survey has something to find.
+      pests: { distribution: 'hotspots', hotspotCount: 3, buildUpDays: 0 },
       drone: { productAvailableGal: 6 },
       survey: { detectionPct: 75, falsePositivesPer1000m2: 1.5, positionNoiseM: 6, uncertainPct: 10 }
     }),

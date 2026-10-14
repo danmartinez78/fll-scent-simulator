@@ -31,7 +31,7 @@ describe('simulation', () => {
 
   it('only activates devices after the drone drops them', () => {
     const plan: TreatmentPlan = { sprayZones: [], devices: [{ id: 1, x: 100, y: 60, kind: 'repellent', trap: false }] };
-    const sim = new Simulation(settingsWith({ treatment: 'slowRelease' }), plan);
+    const sim = new Simulation(settingsWith({ treatment: 'slowRelease', run: { treatStartDay: 1 } }), plan);
     expect(sim.devices[0].activatedAt).toBeNull();
     sim.advance(120);
     expect(sim.devices[0].activatedAt).not.toBeNull();
@@ -93,4 +93,27 @@ describe('simulation', () => {
     expect(daily.metrics().productUsedGal).toBeGreaterThan(once.metrics().productUsedGal * 2.5);
     expect(daily.metrics().pestsDeterredAvgPct).toBeGreaterThan(once.metrics().pestsDeterredAvgPct);
   }, 30000);
+  it('brings pests in over the build-up days', () => {
+    const sim = new Simulation(settingsWith({ treatment: 'none', pests: { buildUpDays: 10 } }), { sprayZones: [], devices: [] });
+    const start = sim.pests.countPresent();
+    expect(start).toBeGreaterThan(0);
+    expect(start).toBeLessThan(sim.pests.n * 0.2);
+    sim.advance(5 * 60);
+    const mid = sim.pests.countPresent();
+    expect(mid).toBeGreaterThan(sim.pests.n * 0.4);
+    expect(mid).toBeLessThan(sim.pests.n * 0.7);
+    sim.advance(6 * 60);
+    expect(sim.pests.countPresent()).toBe(sim.pests.n);
+  });
+
+  it('waits for the treatment start day', () => {
+    const sim = new Simulation(settingsWith({ treatment: 'spray', run: { treatStartDay: 3 } }), { sprayZones: [crop], devices: [] });
+    sim.advance(1.9 * 60);
+    expect(sim.treatmentStarted).toBe(false);
+    expect(sim.drone.flights).toBe(0);
+    expect(sim.damage.reduce((a, b) => a + b, 0)).toBeGreaterThan(0);
+    while (!sim.treatmentStarted) sim.step();
+    expect(sim.fieldTime).toBeGreaterThanOrEqual(2 * 86400);
+    expect(sim.fieldTime).toBeLessThan(2 * 86400 + 3600);
+  });
 });

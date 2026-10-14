@@ -29,6 +29,8 @@ export function droneStatus(sim: Simulation): string {
   if (d.hoverFor === 'drop') return `Drone is hovering low to drop a device · ${load} · ${battery}.`;
   switch (d.mode) {
     case 'parked':
+      if (sim.treatmentScheduled)
+        return `Drone is waiting at home (H). The treatment starts on Day ${sim.settings.run.treatStartDay ?? 1}.`;
       if (sim.treatmentWaiting) return 'Drone is waiting at home (H) until you press Run to start the treatment.';
       if (d.outOfProduct) return 'Drone is parked: it ran out of product.';
       if (d.gaveUp) return 'Drone is parked: the job is too far for one battery.';

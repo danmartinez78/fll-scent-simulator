@@ -39,6 +39,12 @@ export interface PestSettings {
   sensitivity: number;
   /** Cruising speed in meters per second. */
   speed: number;
+  /**
+   * Days over which pests keep arriving. A few are there on Day 1 and the
+   * rest land at their starting spots spread over this many days. 0 or
+   * missing (setups saved before this existed) = all pests there at the start.
+   */
+  buildUpDays?: number;
 }
 
 export interface WindSettings {
@@ -136,6 +142,11 @@ export interface ScoreWeights {
 export interface RunSettings {
   durationMin: number;
   seed: number;
+  /**
+   * Day the treatment starts, as shown on the farm clock (1 = right away).
+   * Missing (setups saved before this existed) = Day 1.
+   */
+  treatStartDay?: number;
 }
 
 export interface Settings {
@@ -219,7 +230,10 @@ export interface CostBreakdown {
 
 export interface HistoryPoint {
   t: number;
+  /** Percent of the pests in the field (arrived so far) that are feeding. */
   pestsFeedingPct: number;
+  /** Percent of all pests that have arrived so far (missing in old saves = 100). */
+  pestsPresentPct?: number;
   cropAffectedPct: number;
   productUsedGal: number;
   scentCoveragePct: number;

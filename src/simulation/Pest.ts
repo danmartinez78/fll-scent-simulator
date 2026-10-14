@@ -34,7 +34,9 @@ export const PEST_RULES = {
    */
   giveUpPerSec: 0.1,
   /** How long a pest that gave up keeps flying before it heads for the crop again (seconds). */
-  giveUpSec: 60
+  giveUpSec: 60,
+  /** Fraction of pests already in the field on Day 1 when pests build up over time. */
+  startingFraction: 0.1
 };
 
 export interface PestEnvironment {
@@ -71,6 +73,10 @@ export class PestSwarm {
    * above the scent effectiveness ignore scent completely.
    */
   toughness: Float32Array;
+  /** Model time (seconds) each pest arrives in the field. 0 = there from the start. */
+  arriveAt: Float32Array;
+  /** Current model time, set by the simulation before each step. */
+  now = 0;
 
   constructor(n: number) {
     this.n = n;
@@ -82,11 +88,35 @@ export class PestSwarm {
     this.repelled = new Uint8Array(n);
     this.leaving = new Float32Array(n);
     this.toughness = new Float32Array(n);
+    this.arriveAt = new Float32Array(n);
   }
 
   /** Give every pest its toughness (uses its own random stream so starting positions don't change). */
   assignToughness(rng: Random): void {
     for (let i = 0; i < this.n; i++) this.toughness[i] = rng.next();
+  }
+
+  /**
+   * Spread arrivals over `buildUpSec` model seconds: a few pests are there at
+   * the start and the rest land at their starting spots at random times.
+   * Uses its own random stream so starting positions don't change.
+   */
+  assignArrivals(buildUpSec: number, rng: Random): void {
+    for (let i = 0; i < this.n; i++) {
+      const late = buildUpSec > 0 && rng.next() >= PEST_RULES.startingFraction;
+      this.arriveAt[i] = late ? rng.range(0, buildUpSec) : 0;
+    }
+  }
+
+  /** True once this pest has arrived in the field. */
+  present(i: number): boolean {
+    return this.arriveAt[i] <= this.now;
+  }
+
+  countPresent(): number {
+    let k = 0;
+    for (let i = 0; i < this.n; i++) if (this.arriveAt[i] <= this.now) k++;
+    return k;
   }
 
   /** True if this pest reacts to scent at the given effectiveness (0 to 1). */
@@ -167,7 +197,7 @@ export class PestSwarm {
     const th = Math.max(1e-4, env.threshold);
     const turn = R.wanderTurn * Math.sqrt(dt);
     for (let i = 0; i < this.n; i++) {
-      if (this.trapped[i]) continue;
+      if (this.trapped[i] || this.arriveAt[i] > this.now) continue;
       const sens = this.reacts(i, env.effectiveness) ? env.sensitivity : 0;
       const px = this.x[i];
       const py = this.y[i];
@@ -253,7 +283,7 @@ export class PestSwarm {
   countOnCrop(crop: Rect): number {
     let k = 0;
     for (let i = 0; i < this.n; i++) {
-      if (!this.trapped[i] && inRect(this.x[i], this.y[i], crop)) k++;
+      if (!this.trapped[i] && this.present(i) && inRect(this.x[i], this.y[i], crop)) k++;
     }
     return k;
   }
@@ -270,7 +300,7 @@ export class PestSwarm {
     let sy = 0;
     let k = 0;
     for (let i = 0; i < this.n; i++) {
-      if (this.trapped[i]) continue;
+      if (this.trapped[i] || !this.present(i)) continue;
       sx += this.x[i];
       sy += this.y[i];
       k++;

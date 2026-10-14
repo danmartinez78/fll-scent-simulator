@@ -45,6 +45,13 @@ const RESPRAY_OPTIONS: Array<[number, string]> = [
   [3, 'Every 3 days']
 ];
 
+/** Day the treatment starts (farm clock day). */
+const START_DAY_OPTIONS: Array<[number, string]> = [
+  [1, 'Day 1'],
+  [3, 'Day 3'],
+  [7, 'Day 7']
+];
+
 export function ControlPanel({ settings: s, plan, tool, simStarted, scenario, onSettings, onPlan, onTool, onLoadScenario, only }: Props) {
   const shows = (k: SectionKey) => !only || only.includes(k);
   // In the full panel only the treatment plan starts open.
@@ -61,9 +68,10 @@ export function ControlPanel({ settings: s, plan, tool, simStarted, scenario, on
   const map = { x: 0, y: 0, w: s.field.width, h: s.field.height };
   const planLiters = estimateSprayLiters(eff.sprayZones, map, s.drone);
   const stockL = galToL(s.drone.productAvailableGal);
-  // Repeat sprays: one at the start, then one every N days until the run ends.
+  // Repeat sprays: one on the start day, then one every N days until the run ends.
   const every = s.drone.resprayEveryDays ?? 0;
-  const runDays = modelMinToDays(s.run.durationMin);
+  const startDay = s.run.treatStartDay ?? 1;
+  const runDays = Math.max(0, modelMinToDays(s.run.durationMin) - (startDay - 1));
   const sprays = every > 0 ? 1 + Math.floor((runDays - 1e-6) / every) : 1;
   const totalLiters = planLiters * sprays;
 
@@ -99,6 +107,26 @@ export function ControlPanel({ settings: s, plan, tool, simStarted, scenario, on
               </button>
             ))}
           </div>
+
+          {s.treatment !== 'none' && (
+            <div className="control">
+              <span className="control-label">
+                Start treatment on <InfoButton topic="treatStart" />
+              </span>
+              <div className="tool-row">
+                {START_DAY_OPTIONS.map(([day, label]) => (
+                  <button
+                    key={day}
+                    className={startDay === day ? 'chip active' : 'chip'}
+                    aria-pressed={startDay === day}
+                    onClick={() => set('run', { treatStartDay: day })}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
 
           {s.treatment === 'none' && (
             <p className="hint">Baseline: nothing is done. Run this first so you have something to compare treatments against.</p>
@@ -241,6 +269,16 @@ export function ControlPanel({ settings: s, plan, tool, simStarted, scenario, on
           {s.pests.distribution === 'hotspots' && (
             <Slider label="Number of hotspots" value={s.pests.hotspotCount} min={1} max={8} onChange={(v) => set('pests', { hotspotCount: v })} />
           )}
+          <Slider
+            label="Pests keep arriving for"
+            info="buildUp"
+            value={s.pests.buildUpDays ?? 0}
+            min={0}
+            max={14}
+            step={1}
+            format={(v) => (v === 0 ? 'all there on Day 1' : `${v} day${v === 1 ? '' : 's'}`)}
+            onChange={(v) => set('pests', { buildUpDays: v })}
+          />
           <Slider label="Crop attraction" info="cropAttraction" value={s.pests.cropAttraction} min={0} max={2} step={0.1} onChange={(v) => set('pests', { cropAttraction: v })} />
           <Slider label="Sensitivity to scent" info="sensitivity" value={s.pests.sensitivity} min={0} max={2} step={0.1} onChange={(v) => set('pests', { sensitivity: v })} />
           <Slider label="How far pests roam" value={s.pests.speed} min={0.2} max={2} step={0.1} format={(v) => `${Math.round((v * 3600) / TIME_LAPSE)} m per hour`} onChange={(v) => set('pests', { speed: v })} />
