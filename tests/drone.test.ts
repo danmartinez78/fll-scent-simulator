@@ -36,7 +36,8 @@ describe('T50-style drone', () => {
   it('uses payload while spraying', () => {
     const d = sprayDrone();
     const w = world();
-    for (let i = 0; i < 20; i++) d.step(0.5, w);
+    // Past takeoff and the flight out to the strip.
+    for (let i = 0; i < 80; i++) d.step(0.5, w);
     const start = d.payloadL;
     for (let i = 0; i < 40; i++) d.step(0.5, w);
     expect(d.spraying).toBe(true);

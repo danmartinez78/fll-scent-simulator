@@ -1,7 +1,7 @@
 import type { PestDistribution, Scenario, Settings, TreatmentMethod, TreatmentPlan } from '../models/types';
 import { formatModelMin, TIME_LAPSE } from '../utils/fieldTime';
 import { cropRect } from '../simulation/Simulation';
-import { devicesPerTrip } from '../simulation/Drone';
+import { devicesPerTrip, DROP_LOITER_SEC, TAKEOFF_LANDING_SEC } from '../simulation/Drone';
 import { activePlan, estimateSprayLiters } from '../simulation/Treatment';
 import { parseScenario } from '../simulation/scenarios';
 import { compassLabel, compassName } from '../utils/geometry';
@@ -272,6 +272,7 @@ export function ControlPanel({ settings: s, plan, tool, simStarted, scenario, on
           <Slider label="Hover time, full" info="flightTime" value={s.drone.hoverFullMin} min={2} max={30} step={0.5} unit="min" onChange={(v) => set('drone', { hoverFullMin: Math.min(v, s.drone.hoverEmptyMin) })} />
           <Slider label="Flying speed" value={s.drone.speed} min={2} max={12} step={0.5} unit="m/s" onChange={(v) => set('drone', { speed: v })} />
           <Slider label="Spray width (swath)" info="swath" value={s.drone.swathM} min={3} max={12} step={0.5} unit="m" onChange={(v) => set('drone', { swathM: v })} />
+          <Slider label="Takeoff and landing time" value={s.drone.takeoffLandingSec ?? TAKEOFF_LANDING_SEC} min={0} max={120} step={5} format={(v) => `${v} s each`} onChange={(v) => set('drone', { takeoffLandingSec: v })} />
           <Slider label="Refill / battery swap time" info="turnaround" value={s.drone.turnaroundSec} min={0} max={300} step={10} unit="s" onChange={(v) => set('drone', { turnaroundSec: v })} />
         </Section>
       )}
@@ -281,6 +282,7 @@ export function ControlPanel({ settings: s, plan, tool, simStarted, scenario, on
           <Slider label="Devices available" value={s.devices.maxDevices} min={1} max={40} onChange={(v) => set('devices', { maxDevices: v })} />
           <Slider label="Release rate" value={s.devices.releaseRate} min={0.25} max={3} step={0.25} format={(v) => `${v}x standard`} onChange={(v) => set('devices', { releaseRate: v })} />
           <Slider label="Device lifetime" value={s.devices.lifetimeMin} min={2} max={120} format={formatModelMin} onChange={(v) => set('devices', { lifetimeMin: v })} />
+          <Slider label="Loiter time per drop" value={s.drone.dropLoiterSec ?? DROP_LOITER_SEC} min={0} max={180} step={5} unit="s" onChange={(v) => set('drone', { dropLoiterSec: v })} />
           <Slider label="Mass per device" info="payload" value={s.devices.massKg} min={0.1} max={5} step={0.1} unit="kg" onChange={(v) => set('devices', { massKg: v })} />
           <Slider label="Devices per trip (drop rack)" info="perTrip" value={s.devices.perTrip ?? 20} min={1} max={20} onChange={(v) => set('devices', { perTrip: v })} />
           <p className="hint small">

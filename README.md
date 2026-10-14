@@ -230,7 +230,7 @@ Then open `http://<host>:8095`. To update, pull the new `:latest` (on Unraid: Do
 - Scent drift is a grid shift plus blur; there is no terrain, canopy, rain, temperature or 3D movement. Strong wind blows most scent off a small field quickly.
 - Spraying deposits scent directly into the air layer; there is no residue on leaves.
 - Repellent pushes pests into untreated crop, where they keep feeding. A spray front can still herd some pests ahead of it, and after a whole-field spray more of them collect near the crop's edges, where the scent is weakest. The "giving up" rule reduces this but does not remove it. It is a property of the simple rules, worth discussing rather than trusting.
-- The drone flies straight lines at constant speed with no turn costs. Each flight adds 15 s to take off and 15 s to land, and each device drop adds 8 s of hovering (`src/simulation/Drone.ts`). The battery model is a straight line between two hover times.
+- The drone flies straight lines at constant speed with no turn costs. Each flight adds takeoff and landing time (default 30 s each) and each device drop adds loiter time (default 30 s to descend, steady, release and climb). Both are Playground settings (`src/simulation/Drone.ts`). The battery model is a straight line between two hover times.
 - The time-lapse uses one speed-up for everything biological. Real pests, products and crops each have their own timescales.
 - The survey's computer vision is simulated from the true pest positions plus noise. It is not a real vision model.
 - The optimizer's quick test uses fewer pests and a coarser grid, so its own score can differ from the full-simulation result shown at the end.

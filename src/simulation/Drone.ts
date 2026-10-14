@@ -2,6 +2,11 @@ import type { DroneSettings, Vec } from '../models/types';
 import { dist } from '../utils/geometry';
 import { galPerAcreToLPerM2, galToL } from '../utils/units';
 
+/** Default seconds to take off and climb, and again to descend and land, on each flight. */
+export const TAKEOFF_LANDING_SEC = 30;
+/** Default seconds loitering over a spot to descend, steady, release one device and climb back. */
+export const DROP_LOITER_SEC = 30;
+
 /**
  * Educational reference values loosely based on the published DJI Agras T50
  * spec sheet. They are reference numbers, not guaranteed mission endurance.
@@ -16,15 +21,10 @@ export const T50_REFERENCE: DroneSettings = {
   swathM: 7,
   appRateGalPerAcre: 2,
   turnaroundSec: 60,
-  productAvailableGal: 20
+  productAvailableGal: 20,
+  takeoffLandingSec: TAKEOFF_LANDING_SEC,
+  dropLoiterSec: DROP_LOITER_SEC
 };
-
-/** Seconds to take off and climb to working height at the start of each flight. */
-export const TAKEOFF_SEC = 15;
-/** Seconds to descend and land at home at the end of each flight. */
-export const LANDING_SEC = 15;
-/** Seconds hovering low over a spot to release one device. */
-export const DROP_HOVER_SEC = 8;
 
 /** The spray tank liquid is treated as water-like: 1 liter weighs 1 kg. */
 export const KG_PER_LITER = 1;
@@ -129,13 +129,18 @@ export class Drone {
     return (usable * enduranceSec(this.settings, this.payloadFraction(devicesMassKg))) / 60;
   }
 
+  /** Seconds to take off (and, separately, to land). */
+  private get landingSec(): number {
+    return this.settings.takeoffLandingSec ?? TAKEOFF_LANDING_SEC;
+  }
+
   get busy(): boolean {
     return this.mode !== 'parked' || this.tasks.length > 0;
   }
 
   /** Battery fraction needed to fly home from here, plus the reserve. */
   private batteryNeededToReturn(devicesMassKg: number): number {
-    const t = dist(this.x, this.y, this.home.x, this.home.y) / this.settings.speed + LANDING_SEC;
+    const t = dist(this.x, this.y, this.home.x, this.home.y) / this.settings.speed + this.landingSec;
     const endurance = enduranceSec(this.settings, this.payloadFraction(devicesMassKg));
     return this.settings.reservePct / 100 + (t / endurance) * 1.15 + 0.005;
   }
@@ -195,7 +200,7 @@ export class Drone {
     this.mode = 'flying';
     this.flights++;
     this.progressThisFlight = false;
-    this.hover('takeoff', TAKEOFF_SEC);
+    this.hover('takeoff', this.landingSec);
   }
 
   private hover(kind: 'takeoff' | 'landing' | 'drop', sec: number): void {
@@ -295,7 +300,7 @@ export class Drone {
 
     if (this.mode === 'returning') {
       if (this.moveToward(this.home.x, this.home.y, stepLen)) {
-        if (LANDING_SEC > 0) this.hover('landing', LANDING_SEC);
+        if (this.landingSec > 0) this.hover('landing', this.landingSec);
         else this.landed();
       }
       return;
@@ -319,7 +324,7 @@ export class Drone {
         this.goHome('reload devices');
         return;
       }
-      if (this.moveToward(task.at.x, task.at.y, stepLen)) this.hover('drop', DROP_HOVER_SEC);
+      if (this.moveToward(task.at.x, task.at.y, stepLen)) this.hover('drop', this.settings.dropLoiterSec ?? DROP_LOITER_SEC);
       return;
     }
 
