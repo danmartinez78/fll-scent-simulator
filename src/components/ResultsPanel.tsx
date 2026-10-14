@@ -43,7 +43,7 @@ export function ResultsPanel({ sim, onSave, saved }: { sim: Simulation; onSave: 
           label="Estimated cost"
           info="cost"
           value={formatMoney(m.cost.total)}
-          sub={`application ${formatMoney(m.cost.application)} · product ${formatMoney(m.cost.material)} · devices ${formatMoney(m.cost.devices)}`}
+          sub={`drone flying ${formatMoney(m.cost.application)} · product ${formatMoney(m.cost.material)} · devices ${formatMoney(m.cost.devices)}`}
         />
       </div>
       <button className="link-btn" aria-expanded={more} onClick={() => setMore((x) => !x)}>

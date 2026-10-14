@@ -157,7 +157,7 @@ export const HELP: Record<string, HelpTopic> = {
   },
   cost: {
     title: 'Estimated cost',
-    text: 'Application cost uses a benchmark of about $12 to $16 per acre for drone spraying (product not included). This simulator does not know the actual cost of the team\'s scent product, so material and device prices are guesses you can change.'
+    text: 'Every drone mission costs about $5 for each minute in the air (pilot, equipment and batteries), whether it sprays or drops devices. For spraying that works out to about $12 to $16 per acre, a common benchmark. This simulator does not know the actual cost of the team\'s scent product, so product and device prices are guesses you can change.'
   }
 };
 

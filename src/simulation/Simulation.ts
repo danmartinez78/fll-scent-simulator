@@ -418,16 +418,23 @@ export class Simulation {
   }
 
   /**
-   * Pests feeding right now: on the crop, not trapped, and not bothered by
-   * repellent above the threshold.
+   * Pests feeding right now: on the crop, not trapped, not flying off after
+   * giving up, and not bothered by repellent above the threshold. Pests that
+   * ignore the scent keep feeding inside it, the same rule crop damage uses.
    */
   feedingCount(): number {
     const p = this.pests;
     const th = this.settings.scent.threshold;
+    const effectiveness = (this.settings.scent.effectivenessPct ?? 100) / 100;
     let k = 0;
     for (let i = 0; i < p.n; i++) {
-      if (p.trapped[i] || !inRect(p.x[i], p.y[i], this.crop)) continue;
-      if (this.settings.pests.sensitivity > 0 && this.repellent.sample(p.x[i], p.y[i]) > th) continue;
+      if (p.trapped[i] || p.leaving[i] > 0 || !inRect(p.x[i], p.y[i], this.crop)) continue;
+      if (
+        this.settings.pests.sensitivity > 0 &&
+        p.reacts(i, effectiveness) &&
+        this.repellent.sample(p.x[i], p.y[i]) > th
+      )
+        continue;
       k++;
     }
     return k;
@@ -475,7 +482,7 @@ export class Simulation {
     const d = this.drone;
     const devicesUsed = this.devices.filter((e) => e.activatedAt !== null).length;
     const cost = computeCost(
-      { sprayedAreaM2: d.sprayedAreaM2, litersUsed: d.litersSprayed, devicesUsed },
+      { sprayedAreaM2: d.sprayedAreaM2, litersUsed: d.litersSprayed, devicesUsed, flightMin: d.airborneSec / 60 },
       this.settings.cost
     );
     return {

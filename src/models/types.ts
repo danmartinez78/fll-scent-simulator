@@ -114,7 +114,8 @@ export interface SurveySettings {
 }
 
 export interface CostSettings {
-  appCostPerAcre: number;
+  /** Drone operating cost per minute in the air (pilot, equipment, batteries), for every mission. */
+  flightCostPerMin: number;
   materialCostPerGal: number;
   deviceCost: number;
 }
