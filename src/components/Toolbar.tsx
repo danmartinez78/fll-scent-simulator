@@ -18,6 +18,10 @@ interface Props {
   onView: (v: ViewOptions) => void;
   /** Show the Fly survey button (Guided mode hides it outside survey missions). */
   showSurvey?: boolean;
+  /** Show Run, Reset and speed (Guided mode shows them only in the Run step). */
+  controls?: boolean;
+  /** Shown in place of the run buttons while they are locked. */
+  lockedNote?: string;
 }
 
 const SPEEDS = [1, 5, 20];
@@ -34,6 +38,9 @@ export function Toolbar(p: Props) {
   const pct = Math.min(100, (p.time / Math.max(1, p.duration)) * 100);
   return (
     <div className="toolbar">
+      {p.controls === false ? (
+        <div className="toolbar-locked">{p.lockedNote}</div>
+      ) : (
       <div className="toolbar-group">
         <button className={`btn big ${p.running ? 'pause' : 'run'}`} onClick={p.onRun}>
           {p.running ? '⏸ Pause' : p.time > 0 ? '▶ Resume' : '▶ Run'}
@@ -49,6 +56,7 @@ export function Toolbar(p: Props) {
           ))}
         </div>
       </div>
+      )}
       <div className="clock" title="Simulated time (minutes:seconds)">
         <span className="clock-time">⏱ {formatClock(p.time)}</span>
         <span className="clock-of">of {formatClock(p.duration)}</span>
@@ -56,7 +64,7 @@ export function Toolbar(p: Props) {
           <span style={{ width: `${pct}%` }} />
         </span>
       </div>
-      {p.showSurvey !== false && (
+      {p.showSurvey !== false && p.controls !== false && (
         <button className="btn survey-btn" onClick={p.onSurvey} disabled={p.surveying}>
           {p.surveying ? `🛰️ Scanning ${Math.round(p.surveyProgress * 100)}%` : '🛰️ Fly survey'}
         </button>

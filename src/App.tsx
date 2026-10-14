@@ -41,6 +41,31 @@ type Tab = 'results' | 'survey' | 'computer' | 'notebook' | 'learn';
 type Mode = 'guided' | 'playground';
 
 const MODE_KEY = 'scent-sim-mode';
+const PHONE_NOTE_KEY = 'scent-sim-phone-note';
+/** Screens this narrow get the phone layout: Guided only, steps first. */
+const PHONE_QUERY = '(max-width: 760px)';
+
+/** True while the screen is phone-sized. */
+function usePhone(): boolean {
+  const query = () => typeof window !== 'undefined' && !!window.matchMedia?.(PHONE_QUERY).matches;
+  const [phone, setPhone] = useState(query);
+  useEffect(() => {
+    const mq = window.matchMedia?.(PHONE_QUERY);
+    if (!mq) return;
+    const onChange = () => setPhone(mq.matches);
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  }, []);
+  return phone;
+}
+
+function loadPhoneNoteHidden(): boolean {
+  try {
+    return sessionStorage.getItem(PHONE_NOTE_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
 
 /** A small JPEG of the map for the notebook report, or nothing if it can't be drawn. */
 function mapSnapshot(): string | undefined {
@@ -86,8 +111,12 @@ export default function App() {
   const [tab, setTab] = useState<Tab>('results');
   const [entries, setEntries] = useState<NotebookEntry[]>(() => loadNotebook());
   const [activeEntryId, setActiveEntryId] = useState<string | null>(null);
-  const [mode, setModeState] = useState<Mode>(loadMode);
-  const [step, setStep] = useState<GuidedStep>('mission');
+  const [savedMode, setModeState] = useState<Mode>(loadMode);
+  const phone = usePhone();
+  // Phones always get Guided mode; the saved choice comes back on a bigger screen.
+  const mode: Mode = phone ? 'guided' : savedMode;
+  const [phoneNoteHidden, setPhoneNoteHidden] = useState(loadPhoneNoteHidden);
+  const [step, setStepState] = useState<GuidedStep>('mission');
   const [prediction, setPrediction] = useState('');
   const [savedTo, setSavedTo] = useState<string | null>(null);
   const [loopOpen, setLoopOpen] = useState(false);
@@ -183,6 +212,22 @@ export default function App() {
     [plan, resetSim]
   );
 
+  /**
+   * Move to a Guided step. Only the Run step runs the simulation, so leaving it
+   * pauses, and going back to Plan after a run starts the run over.
+   */
+  const setStep = useCallback(
+    (next: GuidedStep) => {
+      const sim = simRef.current;
+      if (next !== 'run' && !sim.surveying) setRunning(false);
+      if (next === 'plan' && sim.time > 0 && !sim.treatmentWaiting) resetSim(settings, plan);
+      setStepState(next);
+      // On a phone the page scrolls, so start each step at the top.
+      if (phone) window.scrollTo(0, 0);
+    },
+    [resetSim, settings, plan, phone]
+  );
+
   const setPlan = useCallback((p: TreatmentPlan) => {
     setPlanState(p);
     simRef.current.setPlan(p);
@@ -262,6 +307,19 @@ export default function App() {
 
   const activeEntry = entries.find((e) => e.id === activeEntryId) ?? null;
 
+  // Guided mode unlocks one thing at a time: drawing in Plan, running in Run.
+  const guided = mode === 'guided';
+  const canDraw = !guided || step === 'plan';
+  const canRun = !guided || step === 'run';
+  const mapTool: Tool = canDraw ? tool : 'none';
+  const lockedNote = !guided
+    ? undefined
+    : step === 'mission' || step === 'predict'
+      ? 'Preview of the field. You plan on it in step 3.'
+      : step === 'plan'
+        ? 'Draw your plan on the map. Run unlocks in the next step.'
+        : 'Run finished. Pick what to do next on the left.';
+
   return (
     <div className="app">
       <header className="topbar">
@@ -279,6 +337,7 @@ export default function App() {
           </div>
         </div>
         <ScenarioSelector scenario={scenario} onLoad={loadScenario} pickable={mode === 'playground'} />
+        {!phone && (
         <div className="mode-switch" role="tablist" aria-label="Mode">
           <button role="tab" aria-selected={mode === 'guided'} className={mode === 'guided' ? 'active' : ''} onClick={() => setMode('guided')}>
             🧭 Guided
@@ -287,9 +346,29 @@ export default function App() {
             🛝 Playground
           </button>
         </div>
+        )}
       </header>
+      {phone && !phoneNoteHidden && (
+        <div className="phone-note" role="note">
+          <span>📱 You can try the guided missions here. The full simulator works best on a tablet or computer.</span>
+          <button
+            className="link-btn"
+            aria-label="Hide this note"
+            onClick={() => {
+              setPhoneNoteHidden(true);
+              try {
+                sessionStorage.setItem(PHONE_NOTE_KEY, '1');
+              } catch {
+                // Storage can be blocked; the note just comes back next time.
+              }
+            }}
+          >
+            ✕
+          </button>
+        </div>
+      )}
 
-      <main className={`layout ${mode}`}>
+      <main className={`layout ${mode}${guided ? ` step-${step}` : ''}${phone ? ' phone' : ''}`}>
         <aside className="panel left" aria-label={mode === 'guided' ? 'Steps' : 'Controls'}>
           {mode === 'guided' ? (
             <GuidedPanel
@@ -357,6 +436,8 @@ export default function App() {
             onSurvey={startSurvey}
             onView={setView}
             showSurvey={mode === 'playground' || scenario.id === 'survey'}
+            controls={canRun}
+            lockedNote={lockedNote}
           />
           <div className="canvas-wrap">
             <SimulationCanvas
@@ -364,11 +445,16 @@ export default function App() {
               view={view}
               surveyLayer={instructor ? surveyLayer : surveyLayer === 'truth' ? 'camera' : surveyLayer}
               survey={shownSurvey}
-              tool={tool}
+              tool={mapTool}
               plan={plan}
               settings={settings}
               onPlan={setPlan}
             />
+            {guided && (step === 'mission' || step === 'predict') && sim.time === 0 && (
+              <div className="preview-tag" aria-hidden="true">
+                👀 Preview
+              </div>
+            )}
             {notice === 'finished' && mode === 'playground' && (
               <div className="notice" role="status">
                 <strong>Run finished.</strong> What happened? Did it match your prediction?
@@ -392,14 +478,16 @@ export default function App() {
                   <button className="btn primary" onClick={() => { setNotice(null); if (mode === 'guided') setStep('plan'); }}>
                     Plan a treatment
                   </button>
-                  <button className="btn" onClick={() => { setNotice(null); simRef.current.startTreatment(); setRunning(true); }}>
-                    Keep running
-                  </button>
+                  {!guided && (
+                    <button className="btn" onClick={() => { setNotice(null); simRef.current.startTreatment(); setRunning(true); }}>
+                      Keep running
+                    </button>
+                  )}
                 </div>
               </div>
             )}
           </div>
-          <ExperimentPanel settings={settings} sim={sim} tool={tool} running={running} />
+          <ExperimentPanel settings={settings} sim={sim} tool={mapTool} running={running} />
         </section>
 
         {mode === 'playground' && (

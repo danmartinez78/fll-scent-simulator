@@ -1467,3 +1467,60 @@ textarea {
 .guided-report .tool-row {
   margin: 0;
 }
+
+/* Guided: controls unlock one step at a time */
+.toolbar-locked {
+  font-size: 13.5px;
+  color: var(--muted);
+  padding: 6px 2px;
+}
+.preview-tag {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  background: rgba(15, 23, 42, 0.78);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 999px;
+  pointer-events: none;
+}
+
+/* Phones: Guided only, steps first, the map only once there is something to do on it */
+.phone-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 8px 12px 0;
+  padding: 8px 10px;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 10px;
+  font-size: 13.5px;
+}
+.phone-note span {
+  flex: 1;
+}
+.phone-note .link-btn {
+  font-size: 16px;
+  line-height: 1;
+  padding: 2px 4px;
+}
+.layout.phone.step-mission .center,
+.layout.phone.step-predict .center {
+  display: none;
+}
+.layout.phone.step-compare .center {
+  order: 0;
+}
+.layout.phone .canvas-wrap {
+  height: min(58vh, 80vw);
+  min-height: 240px;
+}
+@media (max-width: 760px) {
+  .tagline,
+  .scenario-text .purpose {
+    display: none;
+  }
+}
