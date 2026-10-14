@@ -41,8 +41,8 @@ const DISTRIBUTIONS: Array<{ value: PestDistribution; label: string }> = [
 
 const RESPRAY_OPTIONS: Array<[number, string]> = [
   [0, 'Once'],
-  [2, 'Every 2 days'],
-  [1, 'Every day']
+  [7, 'Every week'],
+  [3, 'Every 3 days']
 ];
 
 export function ControlPanel({ settings: s, plan, tool, simStarted, scenario, onSettings, onPlan, onTool, onLoadScenario, only }: Props) {
@@ -260,7 +260,7 @@ export function ControlPanel({ settings: s, plan, tool, simStarted, scenario, on
             onChange={(v) => set('scent', { effectivenessPct: v })}
           />
           <Slider label="Scent strength" info="scentStrength" value={s.scent.strength} min={0.2} max={3} step={0.1} onChange={(v) => set('scent', { strength: v })} />
-          <Slider label="Scent lifetime" info="scentLifetime" value={s.scent.lifetimeMin} min={1} max={30} format={formatModelMin} onChange={(v) => set('scent', { lifetimeMin: v })} />
+          <Slider label="Spray lasts on plants" info="scentLifetime" value={s.scent.lifetimeMin} min={1} max={30} format={formatModelMin} onChange={(v) => set('scent', { lifetimeMin: v })} />
           <Slider label="Effective range (devices)" info="scentRange" value={s.scent.rangeM} min={4} max={30} unit="m" onChange={(v) => set('scent', { rangeM: v })} />
           <Slider label="Noticing threshold" info="threshold" value={s.scent.threshold} min={0.05} max={0.6} step={0.05} onChange={(v) => set('scent', { threshold: v })} />
         </Section>
@@ -309,7 +309,7 @@ export function ControlPanel({ settings: s, plan, tool, simStarted, scenario, on
         <Section title="Slow-release devices" icon="⏳" open={isOpen('devices')}>
           <Slider label="Devices available" value={s.devices.maxDevices} min={1} max={40} onChange={(v) => set('devices', { maxDevices: v })} />
           <Slider label="Release rate" value={s.devices.releaseRate} min={0.25} max={3} step={0.25} format={(v) => `${v}x standard`} onChange={(v) => set('devices', { releaseRate: v })} />
-          <Slider label="Device lifetime" value={s.devices.lifetimeMin} min={2} max={120} format={formatModelMin} onChange={(v) => set('devices', { lifetimeMin: v })} />
+          <Slider label="Device lifetime" value={s.devices.lifetimeMin} min={7} max={120} format={formatModelMin} onChange={(v) => set('devices', { lifetimeMin: v })} />
           <Slider label="Mass per device" info="payload" value={s.devices.massKg} min={0.1} max={5} step={0.1} unit="kg" onChange={(v) => set('devices', { massKg: v })} />
           <Slider label="Devices per trip (drop rack)" info="perTrip" value={s.devices.perTrip ?? 20} min={1} max={20} onChange={(v) => set('devices', { perTrip: v })} />
           <p className="hint small">
@@ -342,7 +342,7 @@ export function ControlPanel({ settings: s, plan, tool, simStarted, scenario, on
 
       {shows('run') && (
         <Section title="Experiment run" icon="🎲" open={isOpen('run')}>
-          <Slider label="Run length" value={s.run.durationMin} min={4} max={88} step={4} format={formatModelMin} onChange={(v) => set('run', { durationMin: v })} />
+          <Slider label="Run length" value={s.run.durationMin} min={7} max={84} step={7} format={formatModelMin} onChange={(v) => set('run', { durationMin: v })} />
           <NumberField label="Random seed" info="seed" value={s.run.seed} min={0} step={1} onChange={(v) => set('run', { seed: Math.round(v) })} />
           <button className="btn small" onClick={() => set('run', { seed: Math.floor(Math.random() * 100000) })}>
             🎲 New random seed

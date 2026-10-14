@@ -89,9 +89,11 @@ Everything is deliberately simple and visible. Constants live in the files named
 **Two clocks** (`src/utils/fieldTime.ts`). Drones work in minutes but pests, crop damage and scent work over days, so the simulator runs two clocks:
 
 - *While a drone is flying* (treatment or survey, including takeoff, landing and refills), the farm clock runs in real time. Flight times are real minutes. Pests, damage, scent fading and device emission run at `1 / TIME_LAPSE` speed, so the field barely changes during a flight. Wind still carries and spreads scent in real time.
-- *Otherwise* the field runs as a time-lapse: one model second is `TIME_LAPSE = 360` farm seconds (6 farm minutes). At "1x" (10 model seconds per real second) one real second is about one hour on the farm.
+- *Otherwise* the field runs as a time-lapse: one model second is `TIME_LAPSE = 1440` farm seconds (24 farm minutes), so one model minute is one farm day. At "1x" (10 model seconds per real second) one real second is about four hours on the farm.
 
-Settings are stored in model minutes and shown as farm time: run length 20 → 5 days, spray scent lifetime 8 → 48 hours, device lifetime 30 → 7.5 days, pest roaming 0.8 m/s → 8 m per hour. Untreated, about half the crop is affected after roughly 2 days (a heavy infestation). Saved setups and notebook entries keep working because the stored numbers did not change.
+Settings are stored in model minutes and shown as farm time (1 model minute = 1 day): run length 21 days, spray residue lifetime 7 days, device lifetime 60 days, pest roaming 0.8 m/s → 2 m per hour. Untreated, about half the crop is affected after roughly 9 days.
+
+**Spray vs. device scent.** Sprayed repellent goes into a *residue* grid that stays on the plants (no wind drift or spreading) and fades over the spray lifetime (default 7 days; real repellent sprays typically last 5 to 14). Device repellent goes into an *air* grid that drifts and spreads with the wind and fades over a fixed plume lifetime (`DEVICE_PLUME_LIFETIME_MIN`), which sets the size of a device's steady scent patch. Pests sense the sum. Defaults were picked so the comparison is fair: a 3-week run, repeat spraying of Once / Every week / Every 3 days, and $12 per device (about $100 per acre at the ~9 devices per acre a 12 m range needs, in line with commercial dispenser programs). Saved setups and notebook entries keep working because the stored numbers did not change.
 
 **Repeat spraying.** In the spray method, "How often to spray" can be Once, Every 2 days or Every day. On schedule (farm clock), once the drone is free, it flies every spray zone again; each round uses product, flight time and cost like the first. The plan summary multiplies the product estimate by the number of sprays in the run.
 

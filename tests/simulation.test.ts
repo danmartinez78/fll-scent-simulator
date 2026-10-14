@@ -86,7 +86,7 @@ describe('simulation', () => {
   it('sprays again on schedule when repeat spraying is on', () => {
     const once = new Simulation(settingsWith({ treatment: 'spray' }), { sprayZones: [crop], devices: [] });
     once.runToEnd();
-    const daily = new Simulation(settingsWith({ treatment: 'spray', drone: { resprayEveryDays: 2, productAvailableGal: 40 } }), { sprayZones: [crop], devices: [] });
+    const daily = new Simulation(settingsWith({ treatment: 'spray', drone: { resprayEveryDays: 7, productAvailableGal: 40 } }), { sprayZones: [crop], devices: [] });
     daily.runToEnd();
     expect(once.resprays).toBe(0);
     expect(daily.resprays).toBe(2);

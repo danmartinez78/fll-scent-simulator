@@ -8,8 +8,8 @@
 // While a drone flies, the model clock slows down by the same factor, so the
 // field barely changes during a flight.
 
-/** Farm seconds per model second during the time-lapse (1 model minute = 6 hours). */
-export const TIME_LAPSE = 360;
+/** Farm seconds per model second during the time-lapse (1 model minute = 1 day). */
+export const TIME_LAPSE = 1440;
 
 export const SECONDS_PER_DAY = 86400;
 

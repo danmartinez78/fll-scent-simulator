@@ -68,16 +68,16 @@ export const HELP: Record<string, HelpTopic> = {
     text: 'How powerful the scent product is. Stronger scent stays above the "noticing" level for longer and farther away.'
   },
   scentLifetime: {
-    title: 'Scent lifetime',
-    text: 'How long scent lingers before it fades. After one lifetime, about a third of it is left. Real repellent sprays last from a few hours to a few days.'
+    title: 'Spray lasts on plants',
+    text: 'Sprayed repellent coats the leaves and slowly wears off. After this long, about a third of it is left. Real repellent sprays usually work for about 5 to 14 days.'
   },
   respray: {
     title: 'How often to spray',
-    text: 'Sprayed scent fades after a day or two, so farmers often spray again. Each repeat spray is a whole new drone mission: it uses more product, more flight time and costs more.'
+    text: 'Sprayed repellent wears off after about a week, so farmers often spray again. Each repeat spray is a whole new drone mission: it uses more product, more flight time and costs more.'
   },
   timeLapse: {
     title: 'Two clocks',
-    text: 'While a drone is flying, the clock runs in real time, so flight times are real minutes. When the drone is on the ground, the field runs as a time-lapse: at 1x, one second on screen is about one hour on the farm. Pests, crop damage and fading scent take days, just like on a real farm.'
+    text: 'While a drone is flying, the clock runs in real time, so flight times are real minutes. When the drone is on the ground, the field runs as a time-lapse: at 1x, one second on screen is about four hours on the farm. Pests, crop damage and fading scent take days, just like on a real farm.'
   },
   scentRange: {
     title: 'Effective range',

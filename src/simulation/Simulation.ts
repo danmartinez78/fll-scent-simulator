@@ -28,6 +28,13 @@ import {
 import { diffusionFor, scentDrift } from './Wind';
 import { SECONDS_PER_DAY, TIME_LAPSE } from '../utils/fieldTime';
 
+/**
+ * How long scent from a slow-release device lingers in the air, in model
+ * minutes. It sets how big a device's steady scent patch grows; the wind
+ * carries the rest away.
+ */
+export const DEVICE_PLUME_LIFETIME_MIN = 8;
+
 /** Simulated seconds per step. */
 export const DEFAULT_DT = 0.5;
 /** How often (simulated seconds) the charts record a point. */
@@ -81,7 +88,12 @@ export class Simulation {
   time = 0;
   /** Farm clock in seconds: real time while a drone flies, time-lapse otherwise. */
   fieldTime = 0;
+  /** All repellent pests can sense: device plumes plus spray residue. */
   repellent: ScentField;
+  /** Repellent in the air from slow-release devices (drifts with the wind). */
+  repellentAir: ScentField;
+  /** Sprayed repellent left on the plants (stays put and slowly wears off). */
+  sprayResidue: ScentField;
   attractant: ScentField;
   /** Feeding so far in each grid square (pest-seconds per square meter). */
   damage: Float32Array;
@@ -124,6 +136,8 @@ export class Simulation {
     this.home = homePoint(f);
     const cell = opts.cellSize ?? gridCellSize(f);
     this.repellent = new ScentField(f.width, f.height, cell);
+    this.repellentAir = new ScentField(f.width, f.height, cell);
+    this.sprayResidue = new ScentField(f.width, f.height, cell);
     this.attractant = new ScentField(f.width, f.height, cell);
     const n = this.repellent.cols * this.repellent.rows;
     this.damage = new Float32Array(n);
@@ -329,7 +343,7 @@ export class Simulation {
       devicesPerTrip: s.devices.perTrip,
       spray: (x, y, liters, swath) => {
         const amount = (liters / REFERENCE_RATE_L_PER_M2) * s.scent.strength;
-        this.repellent.addGaussian(x, y, amount, swath / 2.5);
+        this.sprayResidue.addGaussian(x, y, amount, swath / 2.5);
         const half = swath / 2;
         for (let yy = y - half; yy <= y + half; yy += cell / 2) {
           for (let xx = x - half; xx <= x + half; xx += cell / 2) {
@@ -349,16 +363,19 @@ export class Simulation {
     const emit = DEVICE_BASE_EMISSION * s.scent.strength * s.devices.releaseRate * bioDt;
     for (const d of this.devices) {
       if (!treating || !deviceActive(d, this.time, s.devices.lifetimeMin)) continue;
-      const field = d.kind === 'repellent' ? this.repellent : this.attractant;
+      const field = d.kind === 'repellent' ? this.repellentAir : this.attractant;
       field.addGaussian(d.x, d.y, emit, s.scent.rangeM / 2);
     }
 
     // Scent drifts, spreads and fades.
     const drift = scentDrift(s.wind, this.time);
     const diff = diffusionFor(s.wind);
-    const life = s.scent.lifetimeMin * 60;
-    this.repellent.step(dt, drift.x, drift.y, diff, life, bioDt);
-    this.attractant.step(dt, drift.x, drift.y, diff, life, bioDt);
+    const plumeLife = DEVICE_PLUME_LIFETIME_MIN * 60;
+    this.repellentAir.step(dt, drift.x, drift.y, diff, plumeLife, bioDt);
+    this.attractant.step(dt, drift.x, drift.y, diff, plumeLife, bioDt);
+    // Spray residue sits on the plants and wears off over the spray's lifetime.
+    this.sprayResidue.fade(bioDt, s.scent.lifetimeMin * 60);
+    this.repellent.sumOf(this.repellentAir, this.sprayResidue);
 
     // Pests move and feed.
     this.pests.step(bioDt, this.pestEnvironment(), this.rngMotion);
