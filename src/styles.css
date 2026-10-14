@@ -584,11 +584,8 @@ textarea {
   background: #e0f2fe;
 }
 .info-pop {
-  position: absolute;
-  z-index: 30;
-  top: 22px;
-  left: -10px;
-  width: 250px;
+  position: fixed;
+  z-index: 60;
   background: #0f172a;
   color: #f8fafc;
   border-radius: 10px;
