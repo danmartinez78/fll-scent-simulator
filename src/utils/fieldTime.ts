@@ -11,6 +11,8 @@
 /** Farm seconds per model second during the time-lapse (1 model minute = 6 hours). */
 export const TIME_LAPSE = 360;
 
+export const SECONDS_PER_DAY = 86400;
+
 /** Hour of day the run starts on Day 1. */
 export const START_HOUR = 8;
 

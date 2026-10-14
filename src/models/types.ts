@@ -85,6 +85,8 @@ export interface DroneSettings {
   takeoffLandingSec?: number;
   /** Seconds loitering over each drop spot to release a device. */
   dropLoiterSec?: number;
+  /** Spray the zones again every this many farm days (0 or missing = spray once). */
+  resprayEveryDays?: number;
 }
 
 export interface DeviceSettings {

@@ -93,6 +93,8 @@ Everything is deliberately simple and visible. Constants live in the files named
 
 Settings are stored in model minutes and shown as farm time: run length 20 → 5 days, spray scent lifetime 8 → 48 hours, device lifetime 30 → 7.5 days, pest roaming 0.8 m/s → 8 m per hour. Untreated, about half the crop is affected after roughly 2 days (a heavy infestation). Saved setups and notebook entries keep working because the stored numbers did not change.
 
+**Repeat spraying.** In the spray method, "How often to spray" can be Once, Every 2 days or Every day. On schedule (farm clock), once the drone is free, it flies every spray zone again; each round uses product, flight time and cost like the first. The plan summary multiplies the product estimate by the number of sprays in the run.
+
 **Scent** (`src/simulation/ScentField.ts`, `Wind.ts`). Repellent and attractant are two separate grids of concentration `C` (about 64 squares across). Every step:
 
 1. *Sources add scent.* Spray adds `C × area = (liters / L_ref) × strength`, spread as a Gaussian across the swath, where `L_ref` is 2 gal/acre (so a fresh 2 gal/acre spray reaches about `C = strength`). A slow-release device adds `3 × strength × releaseRate × dt` per step as a Gaussian with σ = range / 2, while it is active (from drop until its lifetime ends).
@@ -230,7 +232,7 @@ Then open `http://<host>:8095`. To update, pull the new `:latest` (on Unraid: Do
 - Scent drift is a grid shift plus blur; there is no terrain, canopy, rain, temperature or 3D movement. Strong wind blows most scent off a small field quickly.
 - Spraying deposits scent directly into the air layer; there is no residue on leaves.
 - Repellent pushes pests into untreated crop, where they keep feeding. A spray front can still herd some pests ahead of it, and after a whole-field spray more of them collect near the crop's edges, where the scent is weakest. The "giving up" rule reduces this but does not remove it. It is a property of the simple rules, worth discussing rather than trusting.
-- The drone flies straight lines at constant speed with no turn costs. Each flight adds takeoff and landing time (default 30 s each) and each device drop adds loiter time (default 30 s to descend, steady, release and climb). Both are fixed in `src/simulation/Drone.ts`. The battery model is a straight line between two hover times.
+- The drone flies straight lines at constant speed. It spends 6 s slowing down and turning at the end of each spray pass. Each flight adds takeoff and landing time (default 30 s each) and each device drop adds loiter time (default 30 s to descend, steady, release and climb). Both are fixed in `src/simulation/Drone.ts`. The battery model is a straight line between two hover times.
 - The time-lapse uses one speed-up for everything biological. Real pests, products and crops each have their own timescales.
 - The survey's computer vision is simulated from the true pest positions plus noise. It is not a real vision model.
 - The optimizer's quick test uses fewer pests and a coarser grid, so its own score can differ from the full-simulation result shown at the end.

@@ -4,6 +4,8 @@ import { galPerAcreToLPerM2, galToL } from '../utils/units';
 
 /** Default seconds to take off and climb, and again to descend and land, on each flight. */
 export const TAKEOFF_LANDING_SEC = 30;
+/** Seconds to slow down, turn and speed back up at the end of each spray pass. */
+export const PASS_TURN_SEC = 6;
 /** Default seconds loitering over a spot to descend, steady, release one device and climb back. */
 export const DROP_LOITER_SEC = 30;
 
@@ -102,7 +104,7 @@ export class Drone {
 
   /** Seconds left hovering in place (taking off, landing or dropping a device). */
   hoverLeft = 0;
-  hoverFor: 'takeoff' | 'landing' | 'drop' | null = null;
+  hoverFor: 'takeoff' | 'landing' | 'drop' | 'turn' | null = null;
 
   private progressThisFlight = false;
   private idleFlights = 0;
@@ -203,7 +205,7 @@ export class Drone {
     this.hover('takeoff', this.landingSec);
   }
 
-  private hover(kind: 'takeoff' | 'landing' | 'drop', sec: number): void {
+  private hover(kind: 'takeoff' | 'landing' | 'drop' | 'turn', sec: number): void {
     this.hoverFor = sec > 0 ? kind : null;
     this.hoverLeft = sec;
   }
@@ -364,6 +366,8 @@ export class Drone {
     if (dist(this.x, this.y, task.to.x, task.to.y) < 0.5) {
       this.tasks.shift();
       this.spraying = false;
+      // Slow down and turn around before the next pass.
+      if (this.tasks[0]?.kind === 'spray') this.hover('turn', PASS_TURN_SEC);
     } else if (ranOut || this.payloadL <= 0.01) {
       // Pick up later from here.
       task.from = { x: this.x, y: this.y };

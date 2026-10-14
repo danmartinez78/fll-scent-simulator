@@ -26,7 +26,7 @@ import {
   type DeviceState
 } from './Treatment';
 import { diffusionFor, scentDrift } from './Wind';
-import { TIME_LAPSE } from '../utils/fieldTime';
+import { SECONDS_PER_DAY, TIME_LAPSE } from '../utils/fieldTime';
 
 /** Simulated seconds per step. */
 export const DEFAULT_DT = 0.5;
@@ -103,6 +103,10 @@ export class Simulation {
    */
   treatmentStarted = false;
   private holdTreatment = false;
+  /** Farm time of the next repeat spray (see DroneSettings.resprayEveryDays). */
+  private nextRespray = 0;
+  /** Repeat sprays started so far. */
+  resprays = 0;
   private awaySum = 0;
   private awayN = 0;
   private nextHistory = 0;
@@ -286,6 +290,21 @@ export class Simulation {
     };
   }
 
+  private maybeRespray(): void {
+    const s = this.settings;
+    const every = s.drone.resprayEveryDays ?? 0;
+    if (s.treatment !== 'spray' || every <= 0 || !this.treatmentStarted || this.finished) return;
+    if (this.nextRespray === 0) this.nextRespray = this.fieldTime + every * SECONDS_PER_DAY;
+    // Wait for the drone to finish its current work before starting the next round.
+    if (this.fieldTime < this.nextRespray || this.drone.busy) return;
+    const zones = this.effectivePlan.sprayZones;
+    if (zones.length && this.drone.stockL > 0.01) {
+      for (const z of zones) this.drone.tasks.push(...sprayTasksForZone(z, this.map, s.drone));
+      this.resprays++;
+    }
+    this.nextRespray += every * SECONDS_PER_DAY;
+  }
+
   /** Advance one time step. */
   step(): void {
     const dt = this.dt;
@@ -298,6 +317,9 @@ export class Simulation {
     // itself barely changes; otherwise it runs as a time-lapse.
     const flying = this.droneFlying;
     const bioDt = flying ? dt / TIME_LAPSE : dt;
+
+    // Repeat sprays: send the drone over every spray zone again on schedule.
+    this.maybeRespray();
 
     // Drone: flies its jobs, sprays and drops devices.
     const sprayed = this.sprayed;
