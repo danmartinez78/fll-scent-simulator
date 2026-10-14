@@ -8,6 +8,42 @@ import { mphToMps } from '../utils/units';
  */
 export const SCENT_DRIFT_FACTOR = 0.3;
 
+/**
+ * Spray drift while it falls. Drops take about this long (seconds) to fall
+ * from the drone to the crop, pushed down by the rotor wash, so the spray
+ * lands about wind speed x this time downwind: about 2 m at 6 mph.
+ */
+export const SPRAY_FALL_SEC = 0.75;
+/** Share of the spray made of fine drops that drift much farther, per mph of wind. */
+export const SPRAY_FINE_SHARE_PER_MPH = 0.015;
+/** Most of the spray that can be fine, drifting drops. */
+export const SPRAY_FINE_SHARE_MAX = 0.3;
+/** Fine drops travel this many times farther than the main spray. */
+export const SPRAY_FINE_REACH = 5;
+
+/**
+ * Where spray released at a point lands: the main part shifted a little
+ * downwind and a small share of fine drops carried farther. Shares add up to 1.
+ */
+export function sprayLanding(w: WindSettings, timeSec: number): Array<{ dx: number; dy: number; share: number; spread: number }> {
+  const v = windVector(w, timeSec);
+  const dx = v.x * SPRAY_FALL_SEC;
+  const dy = v.y * SPRAY_FALL_SEC;
+  const off = Math.hypot(dx, dy);
+  const fine = Math.min(SPRAY_FINE_SHARE_MAX, SPRAY_FINE_SHARE_PER_MPH * w.speedMph);
+  const parts = [{ dx, dy, share: 1 - fine, spread: 0.3 * off }];
+  if (fine > 0) parts.push({ dx: dx * SPRAY_FINE_REACH, dy: dy * SPRAY_FINE_REACH, share: fine, spread: 1.5 * off });
+  return parts;
+}
+
+/**
+ * Spray residue stuck to the plants doesn't move, but the smell it gives off
+ * does. This share of what pests sense from residue is that smell, carried
+ * downwind; it lingers about this many seconds in the air.
+ */
+export const RESIDUE_VAPOR_SHARE = 0.5;
+export const RESIDUE_VAPOR_LIFETIME_SEC = 6;
+
 /** How far (degrees) a "changing" wind swings either side of its setting. */
 export const CHANGING_SWING_DEG = 40;
 /** Seconds for one full swing of a changing wind. */
