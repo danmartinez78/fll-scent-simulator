@@ -18,6 +18,7 @@ import { GuidedPanel, type GuidedStep } from './components/GuidedPanel';
 import { MODEL_NOTE } from './content/help';
 import { SimToRealDialog } from './components/SimToReal';
 import { WelcomeDialog } from './components/WelcomeDialog';
+import { MapKey } from './components/MapKey';
 import { captureRun, loadNotebook, newEntry, nextName, saveNotebook, type EntrySetup, type NotebookEntry } from './notebook/notebook';
 
 /** Simulated seconds per real second at "1x". */
@@ -514,6 +515,7 @@ export default function App() {
               </div>
             )}
           </div>
+          <MapKey settings={settings} view={view} survey={!!shownSurvey} />
           <ExperimentPanel settings={settings} sim={sim} tool={mapTool} running={running} canRun={canRun} detailed={!guided} />
         </section>
 
