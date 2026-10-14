@@ -82,12 +82,18 @@ export function ResultsPanel({ sim, onSave, saved }: { sim: Simulation; onSave: 
           yLabel="%"
           marker={treatStartDay > 0 ? { x: treatStartDay, label: 'treatment starts' } : undefined}
           series={[
-            { label: 'Pests in the field', color: '#94a3b8', values: sim.history.map((h) => h.pestsPresentPct ?? 100) },
+            { label: 'Pests that have arrived', color: '#94a3b8', values: sim.history.map((h) => h.pestsPresentPct ?? 100) },
             // Share of all pests, so the gap to the line above is the pests kept off the crop.
-            { label: 'Pests feeding on crop', color: '#b45309', values: sim.history.map((h) => (h.pestsFeedingPct * (h.pestsPresentPct ?? 100)) / 100) },
-            { label: 'Crop affected', color: '#7c2d12', values: sim.history.map((h) => h.cropAffectedPct) }
+            { label: 'Pests eating the crop', color: '#b45309', values: sim.history.map((h) => (h.pestsFeedingPct * (h.pestsPresentPct ?? 100)) / 100) },
+            { label: 'Crop damaged', color: '#7c2d12', values: sim.history.map((h) => h.cropAffectedPct) }
           ]}
         />
+      )}
+      {chart === 'pests' && (
+        <p className="hint small chart-note">
+          Pests don't all show up on Day 1. They fly in over the first days. The gray line is how many have arrived so far, out of all the
+          pests in this run. The gap between gray and orange is pests that are in the field but kept off the crop.
+        </p>
       )}
       {chart === 'scent' && (
         <LineChart xs={xs} xLabel="days" yMax={100} yLabel="%" series={[{ label: 'Crop with noticeable repellent', color: '#7c3aed', values: sim.history.map((h) => h.scentCoveragePct) }]} />

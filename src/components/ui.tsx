@@ -1,9 +1,10 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type MouseEvent as ReactMouseEvent, type ReactNode } from 'react';
 import { HELP } from '../content/help';
 
 /** Small "i" button that shows a one- or two-sentence explanation. */
 export function InfoButton({ topic }: { topic: string }) {
   const [open, setOpen] = useState(false);
+  const [pos, setPos] = useState<{ left: number; top?: number; bottom?: number; width: number }>({ left: 0, top: 0, width: 250 });
   const ref = useRef<HTMLSpanElement>(null);
   const help = HELP[topic];
   useEffect(() => {
@@ -11,9 +12,29 @@ export function InfoButton({ topic }: { topic: string }) {
     const close = (e: MouseEvent) => {
       if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
     };
+    // The popup is pinned to the screen, so close it when anything scrolls.
+    const closeNow = () => setOpen(false);
     document.addEventListener('mousedown', close);
-    return () => document.removeEventListener('mousedown', close);
+    window.addEventListener('scroll', closeNow, true);
+    window.addEventListener('resize', closeNow);
+    return () => {
+      document.removeEventListener('mousedown', close);
+      window.removeEventListener('scroll', closeNow, true);
+      window.removeEventListener('resize', closeNow);
+    };
   }, [open]);
+
+  /** Place the popup next to the button but always inside the window, so panel edges never cut it off. */
+  const toggle = (e: ReactMouseEvent<HTMLButtonElement>) => {
+    if (open) return setOpen(false);
+    const r = e.currentTarget.getBoundingClientRect();
+    const width = Math.min(260, window.innerWidth - 16);
+    const left = Math.max(8, Math.min(r.left - 10, window.innerWidth - width - 8));
+    // Open upward when the button is in the bottom part of the window.
+    const below = r.bottom + 180 < window.innerHeight;
+    setPos(below ? { left, top: r.bottom + 6, width } : { left, bottom: window.innerHeight - r.top + 6, width });
+    setOpen(true);
+  };
   if (!help) return null;
   return (
     <span className="info" ref={ref}>
@@ -22,12 +43,12 @@ export function InfoButton({ topic }: { topic: string }) {
         className="info-btn"
         aria-label={`What is ${help.title}?`}
         aria-expanded={open}
-        onClick={() => setOpen((o) => !o)}
+        onClick={toggle}
       >
         i
       </button>
       {open && (
-        <span className="info-pop" role="tooltip">
+        <span className="info-pop" role="tooltip" style={pos}>
           <strong>{help.title}</strong>
           <span>{help.text}</span>
         </span>

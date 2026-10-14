@@ -157,7 +157,7 @@ export const HELP: Record<string, HelpTopic> = {
   },
   pestsDeterred: {
     title: 'Pests kept off the crop',
-    text: 'Percent of pests that are not feeding on the crop right now: they are off the crop, caught in a trap, or bothered by repellent.'
+    text: 'Percent of the pests that have arrived that are not eating the crop: they are off the crop, caught in a trap, or bothered by repellent. During a run it shows right now; after the run it shows the average over the whole run.'
   },
   scentCoverage: {
     title: 'Scent coverage',
