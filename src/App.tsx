@@ -17,6 +17,7 @@ import { ExperimentPanel } from './components/ExperimentPanel';
 import { GuidedPanel, type GuidedStep } from './components/GuidedPanel';
 import { MODEL_NOTE } from './content/help';
 import { SimToRealDialog } from './components/SimToReal';
+import { WelcomeDialog } from './components/WelcomeDialog';
 import { captureRun, loadNotebook, newEntry, nextName, saveNotebook, type EntrySetup, type NotebookEntry } from './notebook/notebook';
 
 /** Simulated seconds per real second at "1x". */
@@ -42,6 +43,7 @@ type Mode = 'guided' | 'playground';
 
 const MODE_KEY = 'scent-sim-mode';
 const PHONE_NOTE_KEY = 'scent-sim-phone-note';
+const WELCOME_KEY = 'scent-sim-welcome-seen';
 /** Screens this narrow get the phone layout: Guided only, steps first. */
 const PHONE_QUERY = '(max-width: 760px)';
 
@@ -57,6 +59,14 @@ function usePhone(): boolean {
     return () => mq.removeEventListener('change', onChange);
   }, []);
   return phone;
+}
+
+function loadWelcomeSeen(): boolean {
+  try {
+    return localStorage.getItem(WELCOME_KEY) === '1';
+  } catch {
+    return false;
+  }
 }
 
 function loadPhoneNoteHidden(): boolean {
@@ -120,6 +130,7 @@ export default function App() {
   const [prediction, setPrediction] = useState('');
   const [savedTo, setSavedTo] = useState<string | null>(null);
   const [loopOpen, setLoopOpen] = useState(false);
+  const [welcomeOpen, setWelcomeOpen] = useState(() => !loadWelcomeSeen());
   const [, setTick] = useState(0);
 
   const simRef = useRef<Simulation>(new Simulation(settings, plan));
@@ -348,7 +359,7 @@ export default function App() {
         </div>
         )}
       </header>
-      {phone && !phoneNoteHidden && (
+      {phone && !phoneNoteHidden && !welcomeOpen && (
         <div className="phone-note" role="note">
           <span>📱 You can try the guided missions here. The full simulator works best on a tablet or computer.</span>
           <button
@@ -567,10 +578,27 @@ export default function App() {
           ⚠️ {MODEL_NOTE}{' '}
           <button className="link-btn inline" onClick={() => setLoopOpen(true)}>
             Why trust a simulator that isn't perfect? →
+          </button>{' '}
+          <button className="link-btn inline" onClick={() => setWelcomeOpen(true)}>
+            👋 How this works
           </button>
         </span>
       </footer>
       <SimToRealDialog open={loopOpen} onClose={() => setLoopOpen(false)} />
+      <WelcomeDialog
+        open={welcomeOpen}
+        phone={phone}
+        onClose={() => {
+          setWelcomeOpen(false);
+          // The welcome already told phone users about bigger screens.
+          if (phone) setPhoneNoteHidden(true);
+          try {
+            localStorage.setItem(WELCOME_KEY, '1');
+          } catch {
+            // Storage can be blocked; the welcome just shows again next visit.
+          }
+        }}
+      />
     </div>
   );
 }
