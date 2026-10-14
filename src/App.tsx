@@ -128,6 +128,7 @@ export default function App() {
   const [phoneNoteHidden, setPhoneNoteHidden] = useState(loadPhoneNoteHidden);
   const [step, setStepState] = useState<GuidedStep>('mission');
   const [prediction, setPrediction] = useState('');
+  const [guess, setGuess] = useState<number | null>(null);
   const [savedTo, setSavedTo] = useState<string | null>(null);
   const [loopOpen, setLoopOpen] = useState(false);
   const [welcomeOpen, setWelcomeOpen] = useState(() => !loadWelcomeSeen());
@@ -282,7 +283,9 @@ export default function App() {
       const wanted = targetId ?? activeEntryId;
       const target = entries.find((e) => e.id === wanted && (targetId !== undefined || !e.captured));
       // Guided mode carries the mission's question and the student's prediction into the notebook.
-      const guided = mode === 'guided' ? { question: scenario.question, prediction: prediction.trim() } : null;
+      const guessText = guess === null ? '' : `My guess: ${guess}% of the crop protected.`;
+      const guided =
+        mode === 'guided' ? { question: scenario.question, prediction: [prediction.trim(), guessText].filter(Boolean).join(' ') } : null;
       if (target) {
         setEntries(
           entries.map((e) =>
@@ -301,7 +304,7 @@ export default function App() {
       if (mode === 'playground') setTab('notebook');
       setNotice(null);
     },
-    [scenario.name, scenario.question, activeEntryId, entries, mode, prediction]
+    [scenario.name, scenario.question, activeEntryId, entries, mode, prediction, guess]
   );
 
   const sim = simRef.current;
@@ -311,9 +314,13 @@ export default function App() {
     return surveys.find((s) => s.id === selectedSurveyId) ?? surveys[surveys.length - 1];
   }, [surveys.length, selectedSurveyId, surveys]);
 
-  // Guided mode moves to the Compare step when a run finishes.
+  // Guided mode saves a finished run to the notebook and moves to the Compare step,
+  // so students never lose a run by forgetting to press Save.
   useEffect(() => {
-    if (notice === 'finished' && mode === 'guided') setStep('compare');
+    if (notice === 'finished' && mode === 'guided') {
+      saveRunToNotebook();
+      setStep('compare');
+    }
   }, [notice, mode]);
 
   const activeEntry = entries.find((e) => e.id === activeEntryId) ?? null;
@@ -329,7 +336,9 @@ export default function App() {
       ? 'Preview of the field. You plan on it in step 3.'
       : step === 'plan'
         ? 'Draw your plan on the map. Run unlocks in the next step.'
-        : 'Run finished. Pick what to do next on the left.';
+        : step === 'compare'
+          ? 'Run finished. Your results are in step 5, Compare.'
+          : 'Run the experiment with the buttons here.';
 
   return (
     <div className="app">
@@ -387,11 +396,16 @@ export default function App() {
               onStep={setStep}
               scenario={scenario}
               onLoadScenario={(sc) => {
-                if (sc.id !== scenario.id) setPrediction('');
+                if (sc.id !== scenario.id) {
+                  setPrediction('');
+                  setGuess(null);
+                }
                 loadScenario(sc);
               }}
               prediction={prediction}
               onPrediction={setPrediction}
+              guess={guess}
+              onGuess={setGuess}
               settings={settings}
               plan={plan}
               tool={tool}
@@ -500,7 +514,7 @@ export default function App() {
               </div>
             )}
           </div>
-          <ExperimentPanel settings={settings} sim={sim} tool={mapTool} running={running} />
+          <ExperimentPanel settings={settings} sim={sim} tool={mapTool} running={running} canRun={canRun} detailed={!guided} />
         </section>
 
         {mode === 'playground' && (

@@ -25,11 +25,11 @@ interface Props {
 
 export type SectionKey = 'plan' | 'wind' | 'pests' | 'scent' | 'drone' | 'devices' | 'survey' | 'cost' | 'run' | 'editor';
 
-const METHODS: Array<{ value: TreatmentMethod; label: string; icon: string; info?: string }> = [
-  { value: 'none', label: 'No treatment', icon: '🚫' },
-  { value: 'spray', label: 'Spray', icon: '💧', info: 'spray' },
-  { value: 'slowRelease', label: 'Slow-release', icon: '⏳', info: 'slowRelease' },
-  { value: 'pushPull', label: 'Push-pull', icon: '↔️', info: 'pushPull' }
+const METHODS: Array<{ value: TreatmentMethod; label: string; icon: string; sub: string; info?: string }> = [
+  { value: 'none', label: 'No treatment', icon: '🚫', sub: 'Do nothing, to compare' },
+  { value: 'spray', label: 'Spray', icon: '💧', sub: 'Drone sprays scent on areas', info: 'spray' },
+  { value: 'slowRelease', label: 'Slow-release', icon: '⏳', sub: 'Drop scent devices that last', info: 'slowRelease' },
+  { value: 'pushPull', label: 'Push-pull', icon: '↔️', sub: 'Push pests away, pull them to a trap', info: 'pushPull' }
 ];
 
 const DISTRIBUTIONS: Array<{ value: PestDistribution; label: string }> = [
@@ -102,8 +102,11 @@ export function ControlPanel({ settings: s, plan, tool, simStarted, scenario, on
                 className={s.treatment === m.value ? 'method active' : 'method'}
                 onClick={() => chooseMethod(m.value)}
               >
-                <span className="method-icon">{m.icon}</span>
-                {m.label}
+                <span className="method-icon" aria-hidden="true">{m.icon}</span>
+                <span className="method-text">
+                  {m.label}
+                  <span className="method-sub">{m.sub}</span>
+                </span>
               </button>
             ))}
           </div>

@@ -64,8 +64,14 @@ export function Toolbar(p: Props) {
       </div>
       )}
       <div className="clock" title="Time on the farm">
-        <span className="clock-time">⏱ {formatFieldClock(p.fieldTime)}</span>
-        <span className="clock-of">of {formatFieldSpan(modelToFieldSec(p.duration))}</span>
+        {!p.running && p.time >= p.duration ? (
+          <span className="clock-time">✓ All {formatFieldSpan(modelToFieldSec(p.duration))} done</span>
+        ) : (
+          <>
+            <span className="clock-time">⏱ {formatFieldClock(p.fieldTime)}</span>
+            <span className="clock-of">of {formatFieldSpan(modelToFieldSec(p.duration))}</span>
+          </>
+        )}
         <span className="clock-bar">
           <span style={{ width: `${pct}%` }} />
         </span>

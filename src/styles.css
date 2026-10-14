@@ -532,8 +532,21 @@ textarea {
   border-color: var(--accent);
   background: var(--accent-soft);
 }
+.method {
+  text-align: left;
+}
 .method-icon {
   font-size: 18px;
+}
+.method-text {
+  display: flex;
+  flex-direction: column;
+}
+.method-sub {
+  font-size: 11.5px;
+  font-weight: 400;
+  color: var(--muted);
+  line-height: 1.25;
 }
 .tool-row {
   display: flex;
@@ -553,8 +566,8 @@ textarea {
   display: inline-flex;
 }
 .info-btn {
-  width: 17px;
-  height: 17px;
+  width: 20px;
+  height: 20px;
   border-radius: 50%;
   border: 1px solid #94a3b8;
   background: #fff;
@@ -1300,9 +1313,27 @@ textarea {
   flex-direction: column;
   gap: 2px;
 }
-.mission span {
-  font-size: 12.5px;
+.mission .mission-text {
+  font-size: 13.5px;
   color: var(--muted);
+}
+.mission-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 15px;
+}
+.level {
+  flex: none;
+  font-size: 12px;
+  font-weight: 700;
+  color: #b45309;
+  white-space: nowrap;
+}
+.level-name {
+  color: var(--muted);
+  font-weight: 600;
 }
 .mission:hover {
   border-color: #cbd5e1;
@@ -1599,4 +1630,118 @@ textarea {
   .welcome-steps span {
     display: none;
   }
+}
+
+/* Guided mode is for students: a little larger, easier-to-read text. */
+.layout.guided .guided-panel .hint {
+  font-size: 14.5px;
+}
+.layout.guided .guided-panel .hint.small {
+  font-size: 13px;
+}
+.layout.guided .guided-panel .control-label,
+.layout.guided .guided-panel .plan-summary {
+  font-size: 14px;
+}
+.layout.guided .guided-panel .chip {
+  font-size: 13.5px;
+  padding: 5px 12px;
+}
+.layout.guided .guided-panel .method {
+  font-size: 14px;
+}
+.layout.guided .guided-panel .method-sub {
+  font-size: 12px;
+}
+.layout.guided .guided-panel .real-check {
+  font-size: 14px;
+}
+.layout.guided .big-label {
+  font-size: 13px;
+}
+.layout.guided .explain {
+  font-size: 14px;
+}
+.big-hint {
+  color: var(--ink);
+  font-weight: 600;
+}
+.guess {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  margin-top: 12px;
+  padding: 10px;
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  border-radius: 10px;
+}
+.guess-label {
+  font-weight: 600;
+}
+.guess input[type='range'] {
+  width: 100%;
+}
+.guess-value {
+  font-weight: 700;
+  font-size: 15px;
+}
+.guess-value .link-btn {
+  font-weight: 400;
+  font-size: 13px;
+}
+.guess-result {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  border-radius: 10px;
+  padding: 8px 10px;
+  margin-bottom: 10px;
+  font-size: 14px;
+}
+.runs {
+  margin-top: 14px;
+}
+.runs-title {
+  font-size: 15px;
+  margin: 0 0 6px;
+}
+.runs-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13.5px;
+}
+.runs-table th,
+.runs-table td {
+  padding: 5px 4px;
+  border-bottom: 1px solid var(--line);
+  text-align: right;
+  vertical-align: top;
+}
+.runs-table thead th {
+  font-size: 12px;
+  color: var(--muted);
+  font-weight: 600;
+}
+.runs-table th:first-child {
+  text-align: left;
+}
+.runs-table tbody th {
+  font-weight: 600;
+}
+.runs-method {
+  display: block;
+  font-weight: 400;
+  font-size: 12px;
+  color: var(--muted);
+}
+.runs-table tr.current {
+  background: var(--accent-soft);
+}
+.runs-table td.best {
+  font-weight: 700;
+  color: var(--accent);
 }

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import type { Settings } from '../models/types';
 import type { Simulation } from '../simulation/Simulation';
 import type { Tool } from './SimulationCanvas';
+import { lToGal } from '../utils/units';
 
 const TOOL_HINTS: Record<Tool, string> = {
   none: '',
@@ -12,17 +13,21 @@ const TOOL_HINTS: Record<Tool, string> = {
   erase: 'Click a device or zone to remove it.'
 };
 
-/** One-line explanation of what the drone is doing right now. */
-export function droneStatus(sim: Simulation): string {
+/**
+ * One-line explanation of what the drone is doing right now. `detailed` adds
+ * the minutes of flying left before the battery reserve (Playground).
+ */
+export function droneStatus(sim: Simulation, detailed = true): string {
   const d = sim.drone;
   const mass = sim.settings.devices.massKg;
   const load =
     sim.settings.treatment === 'spray'
-      ? `tank ${d.payloadL.toFixed(1)} L`
+      ? `tank ${lToGal(d.payloadL).toFixed(1)} gal`
       : d.devicesOnboard > 0
         ? `${d.devicesOnboard} device${d.devicesOnboard === 1 ? '' : 's'} on board`
         : 'empty';
-  const battery = `battery ${Math.round(Math.max(0, d.battery) * 100)}% (${d.minutesLeft(mass).toFixed(1)} min before reserve)`;
+  const battery =
+    `battery ${Math.round(Math.max(0, d.battery) * 100)}%` + (detailed ? ` (${d.minutesLeft(mass).toFixed(1)} min before reserve)` : '');
   if (d.hoverFor === 'takeoff') return `Drone is taking off and climbing to working height · ${load} · ${battery}.`;
   if (d.hoverFor === 'landing') return `Drone is landing at home (H) · ${battery}.`;
   if (d.hoverFor === 'turn') return `Drone is turning around at the end of a pass · ${load} · ${battery}.`;
@@ -39,7 +44,7 @@ export function droneStatus(sim: Simulation): string {
       return `Drone is on the ground: refilling and swapping the battery (${Math.ceil(d.turnaroundLeft)} s left).`;
     case 'returning':
       return d.lastReturnReason === 'battery'
-        ? `Drone is flying home: the battery reached the reserve. ${battery}.`
+        ? `Drone is flying home: the battery reached the reserve (${battery}).`
         : d.lastReturnReason === 'refill'
           ? 'Drone is flying home to refill the tank.'
           : d.lastReturnReason === 'reload devices'
@@ -70,7 +75,18 @@ function tipsFor(s: Settings, sim: Simulation): string[] {
   return tips;
 }
 
-export function ExperimentPanel({ settings, sim, tool, running }: { settings: Settings; sim: Simulation; tool: Tool; running: boolean }) {
+interface PanelProps {
+  settings: Settings;
+  sim: Simulation;
+  tool: Tool;
+  running: boolean;
+  /** False while Guided mode keeps Run locked, so "Press Run" would confuse. */
+  canRun?: boolean;
+  /** Show extra drone numbers (Playground). */
+  detailed?: boolean;
+}
+
+export function ExperimentPanel({ settings, sim, tool, running, canRun = true, detailed = true }: PanelProps) {
   const [i, setI] = useState(0);
   useEffect(() => {
     const t = setInterval(() => setI((x) => x + 1), 9000);
@@ -82,9 +98,9 @@ export function ExperimentPanel({ settings, sim, tool, running }: { settings: Se
   // One line: the most useful thing to know right now.
   let line: { icon: string; text: string; tone: string };
   if (sim.surveying) line = { icon: '🛰️', text: 'Survey drone is scanning the field…', tone: 'status-line' };
-  else if (running && settings.treatment !== 'none') line = { icon: '🚁', text: droneStatus(sim), tone: 'status-line' };
+  else if (running && settings.treatment !== 'none') line = { icon: '🚁', text: droneStatus(sim, detailed), tone: 'status-line' };
   else if (!running && toolHint && !sim.finished) line = { icon: '✏️', text: toolHint, tone: 'tool-hint' };
-  else if (!running && sim.time === 0) line = { icon: '▶', text: 'Press Run to start.', tone: 'hint-strong' };
+  else if (!running && sim.time === 0 && canRun) line = { icon: '▶', text: 'Press Run to start.', tone: 'hint-strong' };
   else line = { icon: '💡', text: tip, tone: 'tip' };
   return (
     <div className="explain" role="status">

@@ -2,6 +2,8 @@ import type { Scenario, Settings, TreatmentPlan } from '../models/types';
 import type { Simulation } from '../simulation/Simulation';
 import type { NotebookEntry } from '../notebook/notebook';
 import { activePlan } from '../simulation/Treatment';
+import { methodName } from '../notebook/notebook';
+import { formatFieldClock } from '../utils/fieldTime';
 import { ReportButtons } from './ReportButtons';
 import { SCENARIOS } from '../simulation/scenarios';
 import { formatMoney } from '../utils/units';
@@ -26,6 +28,9 @@ interface Props {
   onLoadScenario: (s: Scenario) => void;
   prediction: string;
   onPrediction: (text: string) => void;
+  /** The student's number guess for crop protected, or null if they skipped it. */
+  guess: number | null;
+  onGuess: (pct: number | null) => void;
   settings: Settings;
   plan: TreatmentPlan;
   tool: Tool;
@@ -82,28 +87,57 @@ export function GuidedPanel(p: Props) {
   );
 }
 
+/** Icon and level for each built-in mission, easiest first. */
+const MISSION_INFO: Record<string, { icon: string; level: number }> = {
+  basic: { icon: '🌱', level: 1 },
+  baseline: { icon: '📏', level: 1 },
+  windy: { icon: '🌬️', level: 2 },
+  hotspots: { icon: '🎯', level: 2 },
+  limited: { icon: '🧴', level: 2 },
+  pushpull: { icon: '↔️', level: 3 },
+  survey: { icon: '🛰️', level: 3 },
+  flighttime: { icon: '🔋', level: 3 }
+};
+const LEVEL_NAMES = ['', 'Starter', 'Next step', 'Challenge'];
+
 function MissionStep({ scenario, onLoadScenario }: Props) {
+  const missions = [...SCENARIOS].sort((a, b) => (MISSION_INFO[a.id]?.level ?? 9) - (MISSION_INFO[b.id]?.level ?? 9));
   return (
     <>
       <h2 className="guided-title">Pick a mission</h2>
+      <p className="hint">New here? Start with <strong>Basic Field</strong>. Missions get harder as you go down.</p>
       <div className="missions">
-        {SCENARIOS.map((s) => (
-          <button
-            key={s.id}
-            className={s.id === scenario.id ? 'mission active' : 'mission'}
-            aria-pressed={s.id === scenario.id}
-            onClick={() => onLoadScenario(s)}
-          >
-            <strong>{s.name}</strong>
-            <span>{s.purpose}</span>
-          </button>
-        ))}
+        {missions.map((s) => {
+          const info = MISSION_INFO[s.id];
+          return (
+            <button
+              key={s.id}
+              className={s.id === scenario.id ? 'mission active' : 'mission'}
+              aria-pressed={s.id === scenario.id}
+              onClick={() => onLoadScenario(s)}
+            >
+              <span className="mission-head">
+                <strong>
+                  {info && <span aria-hidden="true">{info.icon} </span>}
+                  {s.name}
+                </strong>
+                {info && (
+                  <span className={`level level-${info.level}`} title={`Level ${info.level}`}>
+                    {'★'.repeat(info.level)}
+                    <span className="level-name"> {LEVEL_NAMES[info.level]}</span>
+                  </span>
+                )}
+              </span>
+              <span className="mission-text">{s.purpose}</span>
+            </button>
+          );
+        })}
       </div>
     </>
   );
 }
 
-function PredictStep({ scenario, prediction, onPrediction }: Props) {
+function PredictStep({ scenario, prediction, onPrediction, guess, onGuess }: Props) {
   return (
     <>
       <h2 className="guided-title">What do you think will happen?</h2>
@@ -111,12 +145,38 @@ function PredictStep({ scenario, prediction, onPrediction }: Props) {
       <label className="predict">
         <span>My prediction</span>
         <textarea
-          rows={5}
+          rows={4}
           value={prediction}
           placeholder="I think that... because..."
           onChange={(e) => onPrediction(e.target.value)}
         />
       </label>
+      <div className="guess">
+        <span className="guess-label">🎯 Make a guess: how much of the crop will be safe at the end?</span>
+        {guess === null ? (
+          <button className="btn" onClick={() => onGuess(50)}>
+            I want to guess
+          </button>
+        ) : (
+          <>
+            <input
+              type="range"
+              min={0}
+              max={100}
+              step={5}
+              value={guess}
+              aria-label="My guess for crop protected, in percent"
+              onChange={(e) => onGuess(Number(e.target.value))}
+            />
+            <span className="guess-value">
+              {guess}% of the crop protected{' '}
+              <button className="link-btn inline" onClick={() => onGuess(null)}>
+                skip
+              </button>
+            </span>
+          </>
+        )}
+      </div>
       <p className="hint small">Your prediction is saved in the notebook with this run's results.</p>
     </>
   );
@@ -195,31 +255,146 @@ function RunStep({ sim, running, onStep, settings, plan }: Props) {
           </button>
         </div>
       )}
-      <p className="hint">
+      <p className="hint big-hint">
         {sim.time === 0
-          ? 'Press ▶ Run above the map. Use 5x or 20x to speed it up.'
+          ? 'Press ▶ Run above the map to start.'
           : running
             ? 'Watch the pests. Orange pests are bothered by repellent. Blue pests ignore the scent.'
-            : 'Paused. Press Resume to keep going.'}
+            : 'Paused. Press ▶ Resume to keep going.'}
       </p>
+      {sim.time === 0 && <p className="hint">Tip: 5x and 20x make the days go by faster.</p>}
+      {sim.time > 0 && !sim.finished && (
+        <p className="hint">When all the days are done, your results open by themselves.</p>
+      )}
       <BigNumbers sim={sim} />
-      <button className="btn primary wide" disabled={sim.time === 0} onClick={() => onStep('compare')}>
-        {sim.finished ? 'See the results →' : 'Stop here and see the results →'}
-      </button>
+      {sim.finished ? (
+        <button className="btn primary wide" onClick={() => onStep('compare')}>
+          See the results →
+        </button>
+      ) : (
+        sim.time > 0 && (
+          <button className="btn wide" onClick={() => onStep('compare')}>
+            ⏹ Stop early and see the results
+          </button>
+        )
+      )}
     </>
   );
 }
 
+/** How close the guess came, in words a student can enjoy. */
+/**
+ * This mission's saved runs side by side, plus the current run if it isn't
+ * saved yet, so the Compare step has something to compare against.
+ */
+function RunsTable({ scenario, entries, sim, saved, settings }: Props) {
+  const rows: Array<{ key: string; name: string; method: string; crop: number; kept: number; cost: number; current: boolean }> = entries
+    .filter((e) => e.captured && e.captured.scenarioName === scenario.name)
+    .slice(-6)
+    .map((e) => {
+      const c = e.captured!;
+      return {
+        key: e.id,
+        name: e.name,
+        method: methodName(c.settings.treatment),
+        crop: c.metrics.cropProtectedPct,
+        kept: c.metrics.pestsDeterredAvgPct,
+        cost: c.metrics.cost.total,
+        current: !!saved && e.name === saved
+      };
+    });
+  if (!saved) {
+    const m = sim.metrics();
+    rows.push({
+      key: 'now',
+      name: 'This run',
+      method: methodName(settings.treatment),
+      crop: m.cropProtectedPct,
+      kept: m.pestsDeterredAvgPct,
+      cost: m.cost.total,
+      current: true
+    });
+  }
+  const best = Math.max(...rows.map((r) => r.crop));
+  const hasBaseline = rows.some((r) => r.method === methodName('none'));
+  return (
+    <div className="runs">
+      <h3 className="runs-title">📊 Compare your runs on this mission</h3>
+      <table className="runs-table">
+        <thead>
+          <tr>
+            <th scope="col">Run</th>
+            <th scope="col">🌱 Crop safe</th>
+            <th scope="col">🐞 Pests kept off (avg)</th>
+            <th scope="col">💲 Cost</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((r) => (
+            <tr key={r.key} className={r.current ? 'current' : ''}>
+              <th scope="row">
+                {r.name}
+                <span className="runs-method">{r.method}</span>
+              </th>
+              <td className={rows.length > 1 && r.crop === best ? 'best' : ''}>
+                {r.crop.toFixed(0)}%{rows.length > 1 && r.crop === best ? ' 🏆' : ''}
+              </td>
+              <td>{r.kept.toFixed(0)}%</td>
+              <td>{formatMoney(r.cost)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      {rows.length === 1 && <p className="hint small">Run this mission again with one change, and the runs will line up here.</p>}
+      {!hasBaseline && (
+        <p className="hint small">
+          💡 Also try <strong>No treatment</strong> on this mission. Then you can see how much your plan really helped.
+        </p>
+      )}
+    </div>
+  );
+}
+
+function guessVerdict(guess: number, actual: number): string {
+  const off = Math.abs(guess - actual);
+  if (off <= 5) return '🎯 Right on!';
+  if (off <= 15) return '👍 Close!';
+  return actual > guess ? 'The plan did better than you guessed.' : 'The plan did worse than you guessed.';
+}
+
 function CompareStep(p: Props) {
+  const ran = p.sim.time > 0;
+  const actual = p.sim.metrics().cropProtectedPct;
+  // With two or more runs to line up, the comparison table is the main thing, so it goes first.
+  const runCount = p.entries.filter((e) => e.captured?.scenarioName === p.scenario.name).length + (p.saved ? 0 : 1);
+  const tableFirst = ran && runCount >= 2;
   return (
     <>
-      <h2 className="guided-title">What happened?</h2>
+      <h2 className="guided-title">
+        {!ran ? 'What happened?' : p.sim.finished ? '🎉 Run done! What happened?' : 'You stopped early. Here is what happened so far.'}
+      </h2>
+      {ran && !p.sim.finished && (
+        <p className="hint">Stopped at {formatFieldClock(p.sim.fieldTime)}. Results can change a lot later in the run.</p>
+      )}
       {p.prediction.trim() && <p className="guided-question">You predicted: “{p.prediction.trim()}”</p>}
-      {p.sim.time === 0 ? (
+      {ran && p.guess !== null && (
+        <div className="guess-result">
+          <span>
+            You guessed <strong>{p.guess}%</strong> of the crop would be protected. The simulator says <strong>{actual.toFixed(0)}%</strong>.
+          </span>
+          <strong>{guessVerdict(p.guess, actual)}</strong>
+        </div>
+      )}
+      {!ran ? (
         <p className="hint">Run the experiment first, then come back here.</p>
       ) : (
-        <ResultsPanel sim={p.sim} onSave={p.onSave} saved={p.saved} />
+        <>
+          {tableFirst && <RunsTable {...p} />}
+          {tableFirst && <h3 className="runs-title">This run in detail</h3>}
+          <ResultsPanel sim={p.sim} onSave={p.onSave} saved={p.saved} />
+        </>
       )}
+      {ran && !tableFirst && <RunsTable {...p} />}
       {p.entries.length > 0 && (
         <div className="guided-report">
           <span className="hint small">
@@ -235,8 +410,8 @@ function CompareStep(p: Props) {
         <span>How could you test this plan for real? If a real test came out different, which setting would you change to make the model match?</span>
       </div>
       <div className="guided-again">
-        <button className="btn wide" onClick={p.onTryAgain}>
-          🔁 Try another change
+        <button className="btn primary wide" onClick={p.onTryAgain}>
+          🔁 Change one thing and run again
         </button>
         <button className="btn wide" onClick={() => p.onStep('mission')}>
           🗺️ Pick a new mission
