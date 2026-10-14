@@ -17,7 +17,7 @@ import { litersForLength, type DroneTask } from './Drone';
  * rate. Chosen so a device in still air builds a patch roughly its
  * "effective range" across that pests notice.
  */
-export const DEVICE_BASE_EMISSION = 3;
+export const DEVICE_BASE_EMISSION = 8;
 
 /** A device placed on the map and whether it is working yet. */
 export interface DeviceState extends DevicePlan {
