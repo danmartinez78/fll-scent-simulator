@@ -2,6 +2,7 @@ import { useState } from 'react';
 import type { Simulation } from '../simulation/Simulation';
 import { formatMoney } from '../utils/units';
 import { LineChart } from './Chart';
+import { modelToFieldSec } from '../utils/fieldTime';
 import { InfoButton } from './ui';
 
 function Card({ icon, label, value, sub, info, tone }: { icon: string; label: string; value: string; sub?: string; info?: string; tone?: string }) {
@@ -24,7 +25,7 @@ export function ResultsPanel({ sim, onSave, saved }: { sim: Simulation; onSave: 
   const m = sim.metrics();
   const [chart, setChart] = useState<ChartKind>('pests');
   const [more, setMore] = useState(false);
-  const xs = sim.history.map((h) => h.t / 60);
+  const xs = sim.history.map((h) => modelToFieldSec(h.t) / 86400);
   const treat = sim.settings.treatment;
   return (
     <div className="results">
@@ -74,6 +75,7 @@ export function ResultsPanel({ sim, onSave, saved }: { sim: Simulation; onSave: 
       {chart === 'pests' && (
         <LineChart
           xs={xs}
+          xLabel="days"
           yMax={100}
           yLabel="%"
           series={[
@@ -83,10 +85,10 @@ export function ResultsPanel({ sim, onSave, saved }: { sim: Simulation; onSave: 
         />
       )}
       {chart === 'scent' && (
-        <LineChart xs={xs} yMax={100} yLabel="%" series={[{ label: 'Crop with noticeable repellent', color: '#7c3aed', values: sim.history.map((h) => h.scentCoveragePct) }]} />
+        <LineChart xs={xs} xLabel="days" yMax={100} yLabel="%" series={[{ label: 'Crop with noticeable repellent', color: '#7c3aed', values: sim.history.map((h) => h.scentCoveragePct) }]} />
       )}
       {chart === 'product' && (
-        <LineChart xs={xs} yLabel="gal" series={[{ label: 'Product used (gal)', color: '#2563eb', values: sim.history.map((h) => h.productUsedGal) }]} />
+        <LineChart xs={xs} xLabel="days" yLabel="gal" series={[{ label: 'Product used (gal)', color: '#2563eb', values: sim.history.map((h) => h.productUsedGal) }]} />
       )}
 
       <button className="btn primary wide" onClick={onSave} disabled={sim.time === 0}>

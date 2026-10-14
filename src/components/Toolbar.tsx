@@ -1,12 +1,18 @@
 import { useState } from 'react';
 import type { ViewOptions } from '../models/types';
-import { formatClock } from '../utils/units';
+import { formatFieldClock, formatFieldSpan, modelToFieldSec } from '../utils/fieldTime';
+import { InfoButton } from './ui';
 
 interface Props {
   running: boolean;
   speed: number;
+  /** Model clock and run length, in model seconds (for the progress bar). */
   time: number;
   duration: number;
+  /** Farm clock in seconds. */
+  fieldTime: number;
+  /** A drone is flying, so the clock runs in real time. */
+  flying: boolean;
   surveying: boolean;
   surveyProgress: number;
   pendingReset: boolean;
@@ -57,13 +63,17 @@ export function Toolbar(p: Props) {
         </div>
       </div>
       )}
-      <div className="clock" title="Simulated time (minutes:seconds)">
-        <span className="clock-time">⏱ {formatClock(p.time)}</span>
-        <span className="clock-of">of {formatClock(p.duration)}</span>
+      <div className="clock" title="Time on the farm">
+        <span className="clock-time">⏱ {formatFieldClock(p.fieldTime)}</span>
+        <span className="clock-of">of {formatFieldSpan(modelToFieldSec(p.duration))}</span>
         <span className="clock-bar">
           <span style={{ width: `${pct}%` }} />
         </span>
       </div>
+      <span className={`clock-mode ${p.flying ? 'real' : 'lapse'}`}>
+        {p.flying ? '🚁 Real time' : '⏩ Time-lapse'}
+        <InfoButton topic="timeLapse" />
+      </span>
       {p.showSurvey !== false && p.controls !== false && (
         <button className="btn survey-btn" onClick={p.onSurvey} disabled={p.surveying}>
           {p.surveying ? `🛰️ Scanning ${Math.round(p.surveyProgress * 100)}%` : '🛰️ Fly survey'}

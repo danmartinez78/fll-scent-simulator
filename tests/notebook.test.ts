@@ -17,7 +17,8 @@ describe('experiment notebook', () => {
     sim.advance(60);
     const e = { ...newEntry('Experiment 1'), question: 'Q', prediction: 'P', captured: captureRun(sim, sc.name) };
     expect(e.captured.settings.wind.speedMph).toBe(sc.settings.wind.speedMph);
-    expect(e.captured.metrics.timeSec).toBeCloseTo(60);
+    expect(e.captured.metrics.timeSec).toBeCloseTo(sim.time);
+    expect(e.captured.fieldTimeSec).toBeCloseTo(sim.fieldTime);
     const d = duplicateEntry(e, [e]);
     expect(d.captured).toBeNull();
     expect(d.setup?.settings.wind.speedMph).toBe(sc.settings.wind.speedMph);

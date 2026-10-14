@@ -69,7 +69,11 @@ export const HELP: Record<string, HelpTopic> = {
   },
   scentLifetime: {
     title: 'Scent lifetime',
-    text: 'How long scent lingers in the air before it fades. After one lifetime, about a third of it is left.'
+    text: 'How long scent lingers before it fades. After one lifetime, about a third of it is left. Real repellent sprays last from a few hours to a few days.'
+  },
+  timeLapse: {
+    title: 'Two clocks',
+    text: 'While a drone is flying, the clock runs in real time, so flight times are real minutes. When the drone is on the ground, the field runs as a time-lapse: at 1x, one second on screen is about one hour on the farm. Pests, crop damage and fading scent take days, just like on a real farm.'
   },
   scentRange: {
     title: 'Effective range',

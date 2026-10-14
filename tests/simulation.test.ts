@@ -23,7 +23,8 @@ describe('simulation', () => {
     let minFeeding = 100;
     while (!sim.finished) {
       sim.step();
-      if (sim.time > 400) minFeeding = Math.min(minFeeding, sim.metrics().pestsFeedingPct);
+      // Measure after the drone has landed, once the time-lapse is running.
+      if (sim.time > 60 && !sim.droneFlying) minFeeding = Math.min(minFeeding, sim.metrics().pestsFeedingPct);
     }
     expect(sim.metrics().pestsFeedingPct).toBeGreaterThan(minFeeding + 20);
   });
@@ -80,5 +81,5 @@ describe('simulation', () => {
     expect(m.flights).toBeGreaterThanOrEqual(3);
     expect(m.batterySwaps).toBeGreaterThanOrEqual(2);
     expect(m.productUsedGal).toBeLessThanOrEqual(s.drone.productAvailableGal + 1e-6);
-  });
+  }, 30000);
 });

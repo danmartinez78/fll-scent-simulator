@@ -83,14 +83,21 @@ Tips:
 
 Everything is deliberately simple and visible. Constants live in the files named below.
 
-**Map and time.** The map is a rectangle (default 220 × 140 m) with the crop inside a grass border (default 20 m, so the crop is 180 × 100 m ≈ 4.4 acres). Time advances in steps of `dt = 0.5` s of simulated time. At "1x", 10 simulated seconds pass per real second.
+**Map and time.** The map is a rectangle (default 220 × 140 m) with the crop inside a grass border (default 20 m, so the crop is 180 × 100 m ≈ 4.4 acres, a small field). Time advances in steps of `dt = 0.5` s.
+
+**Two clocks** (`src/utils/fieldTime.ts`). Drones work in minutes but pests, crop damage and scent work over days, so the simulator runs two clocks:
+
+- *While a drone is flying* (treatment or survey, including takeoff, landing and refills), the farm clock runs in real time. Flight times are real minutes. Pests, damage, scent fading and device emission run at `1 / TIME_LAPSE` speed, so the field barely changes during a flight. Wind still carries and spreads scent in real time.
+- *Otherwise* the field runs as a time-lapse: one model second is `TIME_LAPSE = 360` farm seconds (6 farm minutes). At "1x" (10 model seconds per real second) one real second is about one hour on the farm.
+
+Settings are stored in model minutes and shown as farm time: run length 20 → 5 days, spray scent lifetime 8 → 48 hours, device lifetime 30 → 7.5 days, pest roaming 0.8 m/s → 8 m per hour. Untreated, about half the crop is affected after roughly 2 days (a heavy infestation). Saved setups and notebook entries keep working because the stored numbers did not change.
 
 **Scent** (`src/simulation/ScentField.ts`, `Wind.ts`). Repellent and attractant are two separate grids of concentration `C` (about 64 squares across). Every step:
 
 1. *Sources add scent.* Spray adds `C × area = (liters / L_ref) × strength`, spread as a Gaussian across the swath, where `L_ref` is 2 gal/acre (so a fresh 2 gal/acre spray reaches about `C = strength`). A slow-release device adds `3 × strength × releaseRate × dt` per step as a Gaussian with σ = range / 2, while it is active (from drop until its lifetime ends).
 2. *Wind carries it* (semi-Lagrangian shift): `C_new(x) = C(x − v·dt)`, with `v = 0.3 × wind speed` in the wind direction. The 0.3 stands for slower air near the canopy and keeps plumes on screen.
 3. *It spreads* (diffusion): `C += k (sum of 4 neighbors − 4C)` with `k = D·dt / cell²` capped at 0.24 for stability, and `D = 0.5 + 0.15 × wind speed (m/s)` m²/s.
-4. *It fades:* `C ×= exp(−dt / lifetime)`.
+4. *It fades:* `C ×= exp(−dt / lifetime)`, using the model clock (so scent hardly fades while a drone flies).
 
 Scent leaving the map edge is lost. A steady source in wind makes an elongated plume downwind.
 
@@ -222,7 +229,8 @@ Then open `http://<host>:8095`. To update, pull the new `:latest` (on Unraid: Do
 - Scent drift is a grid shift plus blur; there is no terrain, canopy, rain, temperature or 3D movement. Strong wind blows most scent off a small field quickly.
 - Spraying deposits scent directly into the air layer; there is no residue on leaves.
 - Repellent pushes pests into untreated crop, where they keep feeding. A spray front can still herd some pests ahead of it, and after a whole-field spray more of them collect near the crop's edges, where the scent is weakest. The "giving up" rule reduces this but does not remove it. It is a property of the simple rules, worth discussing rather than trusting.
-- The drone flies straight lines at constant speed; there are no takeoff, turn or climb costs, and the battery model is a straight line between two hover times.
+- The drone flies straight lines at constant speed with no turn costs. Each flight adds 15 s to take off and 15 s to land, and each device drop adds 8 s of hovering (`src/simulation/Drone.ts`). The battery model is a straight line between two hover times.
+- The time-lapse uses one speed-up for everything biological. Real pests, products and crops each have their own timescales.
 - The survey's computer vision is simulated from the true pest positions plus noise. It is not a real vision model.
 - The optimizer's quick test uses fewer pests and a coarser grid, so its own score can differ from the full-simulation result shown at the end.
 - The notebook lives in this browser's local storage. Export it to move it between computers.

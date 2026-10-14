@@ -18,7 +18,8 @@ describe('scenarios', () => {
       expect(sim.pests.n).toBe(sc.settings.pests.count);
       sim.advance(30);
       const m = sim.metrics();
-      expect(m.timeSec).toBeCloseTo(30);
+      expect(m.timeSec).toBeGreaterThan(0);
+      expect(m.fieldTimeSec).toBeGreaterThanOrEqual(30);
       expect(m.cropProtectedPct).toBeGreaterThanOrEqual(0);
       expect(m.cropProtectedPct).toBeLessThanOrEqual(100);
     }

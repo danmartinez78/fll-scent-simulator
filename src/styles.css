@@ -172,7 +172,25 @@ textarea {
   grid-template-columns: auto auto;
   column-gap: 6px;
   align-items: baseline;
-  min-width: 140px;
+  min-width: 210px;
+}
+.clock-mode {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12.5px;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+.clock-mode.real {
+  background: #fef3c7;
+  color: #92400e;
+}
+.clock-mode.lapse {
+  background: #e0f2fe;
+  color: #075985;
 }
 .clock-time {
   font-weight: 700;
