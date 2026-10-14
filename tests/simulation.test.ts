@@ -82,4 +82,15 @@ describe('simulation', () => {
     expect(m.batterySwaps).toBeGreaterThanOrEqual(2);
     expect(m.productUsedGal).toBeLessThanOrEqual(s.drone.productAvailableGal + 1e-6);
   }, 30000);
+
+  it('sprays again on schedule when repeat spraying is on', () => {
+    const once = new Simulation(settingsWith({ treatment: 'spray' }), { sprayZones: [crop], devices: [] });
+    once.runToEnd();
+    const daily = new Simulation(settingsWith({ treatment: 'spray', drone: { resprayEveryDays: 2, productAvailableGal: 40 } }), { sprayZones: [crop], devices: [] });
+    daily.runToEnd();
+    expect(once.resprays).toBe(0);
+    expect(daily.resprays).toBe(2);
+    expect(daily.metrics().productUsedGal).toBeGreaterThan(once.metrics().productUsedGal * 2.5);
+    expect(daily.metrics().pestsDeterredAvgPct).toBeGreaterThan(once.metrics().pestsDeterredAvgPct);
+  }, 30000);
 });

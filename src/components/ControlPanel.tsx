@@ -1,5 +1,5 @@
 import type { PestDistribution, Scenario, Settings, TreatmentMethod, TreatmentPlan } from '../models/types';
-import { formatModelMin, TIME_LAPSE } from '../utils/fieldTime';
+import { formatModelMin, modelMinToDays, TIME_LAPSE } from '../utils/fieldTime';
 import { cropRect } from '../simulation/Simulation';
 import { devicesPerTrip } from '../simulation/Drone';
 import { activePlan, estimateSprayLiters } from '../simulation/Treatment';
@@ -39,6 +39,12 @@ const DISTRIBUTIONS: Array<{ value: PestDistribution; label: string }> = [
   { value: 'scattered', label: 'Scattered everywhere' }
 ];
 
+const RESPRAY_OPTIONS: Array<[number, string]> = [
+  [0, 'Once'],
+  [2, 'Every 2 days'],
+  [1, 'Every day']
+];
+
 export function ControlPanel({ settings: s, plan, tool, simStarted, scenario, onSettings, onPlan, onTool, onLoadScenario, only }: Props) {
   const shows = (k: SectionKey) => !only || only.includes(k);
   // In the full panel only the treatment plan starts open.
@@ -55,6 +61,11 @@ export function ControlPanel({ settings: s, plan, tool, simStarted, scenario, on
   const map = { x: 0, y: 0, w: s.field.width, h: s.field.height };
   const planLiters = estimateSprayLiters(eff.sprayZones, map, s.drone);
   const stockL = galToL(s.drone.productAvailableGal);
+  // Repeat sprays: one at the start, then one every N days until the run ends.
+  const every = s.drone.resprayEveryDays ?? 0;
+  const runDays = modelMinToDays(s.run.durationMin);
+  const sprays = every > 0 ? 1 + Math.floor((runDays - 1e-6) / every) : 1;
+  const totalLiters = planLiters * sprays;
 
   const chooseMethod = (m: TreatmentMethod) => {
     onSettings({ ...s, treatment: m });
@@ -127,10 +138,28 @@ export function ControlPanel({ settings: s, plan, tool, simStarted, scenario, on
                   Clear zones
                 </button>
               </div>
-              <p className={`plan-summary ${planLiters > stockL ? 'warn' : ''}`}>
-                {eff.sprayZones.length} zone{eff.sprayZones.length === 1 ? '' : 's'} · needs about {lToGal(planLiters).toFixed(1)} gal of{' '}
+              <div className="control">
+                <span className="control-label">
+                  How often to spray <InfoButton topic="respray" />
+                </span>
+                <div className="tool-row">
+                  {RESPRAY_OPTIONS.map(([days, label]) => (
+                    <button
+                      key={days}
+                      className={(s.drone.resprayEveryDays ?? 0) === days ? 'chip active' : 'chip'}
+                      aria-pressed={(s.drone.resprayEveryDays ?? 0) === days}
+                      onClick={() => set('drone', { resprayEveryDays: days })}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <p className={`plan-summary ${totalLiters > stockL ? 'warn' : ''}`}>
+                {eff.sprayZones.length} zone{eff.sprayZones.length === 1 ? '' : 's'}
+                {sprays > 1 ? ` × ${sprays} sprays` : ''} · needs about {lToGal(totalLiters).toFixed(1)} gal of{' '}
                 {s.drone.productAvailableGal} gal available
-                {planLiters > stockL && ' — not enough product for all of it!'}
+                {totalLiters > stockL && ' — not enough product for all of it!'}
               </p>
             </>
           )}
