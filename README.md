@@ -131,7 +131,9 @@ Speed is `speed × 0.2` while feeding (on the crop, repellent below threshold, n
 
 **Survey** (`src/simulation/Survey.ts`). A generic camera drone (12 m/s, 24 m wide view) flies back and forth over the map. Each 10 m square is looked at once, when the drone passes. Each pest in it is detected with the chosen probability and reported at its position plus Gaussian noise; fake detections are added at the chosen rate per 1000 m². The pretend computer-vision labels are: *uncertain* (random, at the chosen rate), *high pest activity* (≥ 4.5 estimated pests per 100 m²), *possible damage* (≥ 1.5 per 100 m², or visible damage), otherwise *healthy*.
 
-**Cost** (`src/simulation/CostModel.ts`). `application = acres sprayed × $/acre` (default $14, from a $12 to $16 benchmark for conventional drone application, product not included), `material = gallons used × $/gal` (placeholder), `devices = devices used × $/device` (placeholder). The simulator does not know the actual cost of the team's product.
+**Pests kept off** counts pests on the crop that are not feeding: trapped, flying off after giving up, or bothered by repellent. Pests that ignore the scent keep feeding inside it, the same rule crop damage uses.
+
+**Cost** (`src/simulation/CostModel.ts`). `drone flying = minutes in the air × $/min` for every mission, spraying or dropping devices (default $5/min, about $300 an hour, which matches the $12 to $16 per acre benchmark for drone spraying at the simulator's ~22 acres an hour), `material = gallons used × $/gal` (placeholder), `devices = devices used × $/device` (placeholder). The simulator does not know the actual cost of the team's product.
 
 **Optimizer** (`src/simulation/Optimizer.ts`). Random search followed by hill climbing:
 

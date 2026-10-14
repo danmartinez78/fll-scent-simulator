@@ -334,7 +334,7 @@ export function ControlPanel({ settings: s, plan, tool, simStarted, scenario, on
           <p className="hint small">
             This simulator does not know the actual cost of the team's scent product. Change these to try different guesses. <InfoButton topic="cost" />
           </p>
-          <NumberField label="Drone application" value={s.cost.appCostPerAcre} min={0} step={1} unit="$/acre" onChange={(v) => set('cost', { appCostPerAcre: v })} />
+          <NumberField label="Drone operating cost" value={s.cost.flightCostPerMin ?? 5} min={0} step={0.5} unit="$/min in the air" onChange={(v) => set('cost', { flightCostPerMin: v })} />
           <NumberField label="Scent product" value={s.cost.materialCostPerGal} min={0} step={1} unit="$/gal" onChange={(v) => set('cost', { materialCostPerGal: v })} />
           <NumberField label="Slow-release device" value={s.cost.deviceCost} min={0} step={0.5} unit="$ each" onChange={(v) => set('cost', { deviceCost: v })} />
         </Section>
