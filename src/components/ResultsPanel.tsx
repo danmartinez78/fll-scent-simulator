@@ -27,6 +27,7 @@ export function ResultsPanel({ sim, onSave, saved }: { sim: Simulation; onSave: 
   const [more, setMore] = useState(false);
   const xs = sim.history.map((h) => modelToFieldSec(h.t) / 86400);
   const treat = sim.settings.treatment;
+  const treatStartDay = treat === 'none' ? 0 : sim.treatStartFieldSec / 86400;
   return (
     <div className="results">
       <div className="metrics">
@@ -78,8 +79,11 @@ export function ResultsPanel({ sim, onSave, saved }: { sim: Simulation; onSave: 
           xLabel="days"
           yMax={100}
           yLabel="%"
+          marker={treatStartDay > 0 ? { x: treatStartDay, label: 'treatment starts' } : undefined}
           series={[
-            { label: 'Pests feeding on crop', color: '#b45309', values: sim.history.map((h) => h.pestsFeedingPct) },
+            { label: 'Pests in the field', color: '#94a3b8', values: sim.history.map((h) => h.pestsPresentPct ?? 100) },
+            // Share of all pests, so the gap to the line above is the pests kept off the crop.
+            { label: 'Pests feeding on crop', color: '#b45309', values: sim.history.map((h) => (h.pestsFeedingPct * (h.pestsPresentPct ?? 100)) / 100) },
             { label: 'Crop affected', color: '#7c2d12', values: sim.history.map((h) => h.cropAffectedPct) }
           ]}
         />

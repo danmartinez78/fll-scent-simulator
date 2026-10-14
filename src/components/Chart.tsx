@@ -11,10 +11,12 @@ interface Props {
   yLabel?: string;
   xLabel?: string;
   height?: number;
+  /** A dashed vertical line at this x value, with a short label. */
+  marker?: { x: number; label: string };
 }
 
 /** A small, plain line chart (no library needed). */
-export function LineChart({ xs, series, yMax, yLabel, xLabel = 'minutes', height = 150 }: Props) {
+export function LineChart({ xs, series, yMax, yLabel, xLabel = 'minutes', height = 150, marker }: Props) {
   const W = 320;
   const H = height;
   const pad = { l: 34, r: 8, t: 8, b: 24 };
@@ -44,6 +46,14 @@ export function LineChart({ xs, series, yMax, yLabel, xLabel = 'minutes', height
           <text x={10} y={pad.t + 4} className="axis" transform={`rotate(-90 10 ${pad.t + 4})`} textAnchor="end">
             {yLabel}
           </text>
+        )}
+        {marker && marker.x > 0 && marker.x <= xMax && (
+          <g className="marker">
+            <line x1={x(marker.x)} x2={x(marker.x)} y1={pad.t} y2={H - pad.b} stroke="#475569" strokeDasharray="4 3" />
+            <text x={x(marker.x) + 3} y={pad.t + 9} className="axis">
+              {marker.label}
+            </text>
+          </g>
         )}
         {series.map((s) =>
           s.values.length > 1 ? (

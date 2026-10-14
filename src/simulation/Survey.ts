@@ -131,7 +131,7 @@ export class SurveyRun {
     const s = this.settings;
     const p = clamp(s.detectionPct / 100, 0, 1);
     for (let k = 0; k < pests.n; k++) {
-      if (pests.trapped[k]) continue;
+      if (pests.trapped[k] || !pests.present(k)) continue;
       const i = this.cellIndex(pests.x[k], pests.y[k]);
       if (!fresh.has(i)) continue;
       this.truth[i]++;
