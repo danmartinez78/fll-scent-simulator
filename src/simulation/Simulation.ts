@@ -20,7 +20,7 @@ import {
   activePlan,
   buildDroneTasks,
   deviceActive,
-  DEVICE_BASE_EMISSION,
+  deviceEmissionRate,
   sprayTasksForZone,
   zoneKey,
   type DeviceState
@@ -404,7 +404,7 @@ export class Simulation {
     });
 
     // Slow-release devices: steady scent while they last.
-    const emit = DEVICE_BASE_EMISSION * s.scent.strength * s.devices.releaseRate * bioDt;
+    const emit = deviceEmissionRate(s.scent.strength, s.devices.releaseRate, s.scent.rangeM) * bioDt;
     for (const d of this.devices) {
       if (!treating || !deviceActive(d, this.time, s.devices.lifetimeMin)) continue;
       const field = d.kind === 'repellent' ? this.repellentAir : this.attractant;

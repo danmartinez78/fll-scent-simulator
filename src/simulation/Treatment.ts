@@ -12,12 +12,26 @@ import { dist, intersectRect, lawnmower } from '../utils/geometry';
 import { litersForLength, type DroneTask } from './Drone';
 
 /**
- * Scent released by one standard slow-release device, in scent units x
- * square meters per second, before multiplying by scent strength and release
- * rate. Chosen so a device in still air builds a patch roughly its
- * "effective range" across that pests notice.
+ * Scent released by one standard slow-release device with a
+ * DEVICE_REFERENCE_RANGE_M range, in scent units x square meters per second,
+ * before multiplying by scent strength and release rate. Chosen so a device in
+ * still air builds a patch pests notice that reaches about its "effective
+ * range" from the device.
  */
 export const DEVICE_BASE_EMISSION = 8;
+/** Effective range (meters) that DEVICE_BASE_EMISSION is calibrated for. */
+export const DEVICE_REFERENCE_RANGE_M = 12;
+
+/**
+ * Scent one device releases per model second. A longer range spreads the
+ * scent over a bigger circle, so the release grows with that circle's area
+ * (twice the range, four times the scent). Without this, a longer range would
+ * spread the same scent thinner and the patch pests notice would shrink.
+ */
+export function deviceEmissionRate(strength: number, releaseRate: number, rangeM: number): number {
+  const areaScale = (rangeM / DEVICE_REFERENCE_RANGE_M) ** 2;
+  return DEVICE_BASE_EMISSION * strength * releaseRate * areaScale;
+}
 
 /** A device placed on the map and whether it is working yet. */
 export interface DeviceState extends DevicePlan {

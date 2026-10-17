@@ -89,7 +89,7 @@ export const HELP: Record<string, HelpTopic> = {
   },
   scentRange: {
     title: 'Effective range',
-    text: 'How far a slow-release device spreads its scent around itself before the wind carries it away.'
+    text: 'How far from a slow-release device pests can notice its scent. A longer range means each device gives off more scent to fill a bigger circle, so fewer devices can cover the field.'
   },
   threshold: {
     title: 'Noticing threshold',
