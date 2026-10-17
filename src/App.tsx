@@ -21,7 +21,19 @@ import { SimToRealDialog } from './components/SimToReal';
 import { WelcomeDialog } from './components/WelcomeDialog';
 import { NotebookDialog } from './components/NotebookDialog';
 import { MapKey } from './components/MapKey';
-import { captureRun, loadNotebook, newEntry, nextName, saveNotebook, type EntrySetup, type NotebookEntry } from './notebook/notebook';
+import {
+  captureRun,
+  describeChanges,
+  loadNotebook,
+  newEntry,
+  newSessionRun,
+  nextName,
+  saveNotebook,
+  type EntrySetup,
+  type NotebookEntry,
+  type SessionRun
+} from './notebook/notebook';
+import { SaveExperimentDialog, type ExperimentNotes } from './components/SaveExperimentDialog';
 
 /** Simulated seconds per real second at "1x". */
 export const BASE_SIM_SPEED = 10;
@@ -129,6 +141,10 @@ export default function App() {
   const [tab, setTab] = useState<Tab>('results');
   const [entries, setEntries] = useState<NotebookEntry[]>(() => loadNotebook());
   const [activeEntryId, setActiveEntryId] = useState<string | null>(null);
+  // Runs from this visit (for Compare), and which one the map is showing now.
+  const [sessionRuns, setSessionRuns] = useState<SessionRun[]>([]);
+  const [currentRunId, setCurrentRunId] = useState<string | null>(null);
+  const [saveOpen, setSaveOpen] = useState(false);
   const [savedMode, setModeState] = useState<Mode>(loadMode);
   const phone = usePhone();
   // Phones always get Guided mode; the saved choice comes back on a bigger screen.
@@ -177,6 +193,7 @@ export default function App() {
     setPendingReset(false);
     setNotice(null);
     setSavedTo(null);
+    setCurrentRunId(null);
     setTick((t) => t + 1);
   }, []);
 
@@ -316,6 +333,70 @@ export default function App() {
     setRunning(true);
   }, []);
 
+  /** Remember the run on the map in this visit's runs (not the notebook), once. */
+  const recordRun = useCallback((): SessionRun => {
+    const existing = sessionRuns.find((r) => r.id === currentRunId);
+    if (existing) return existing;
+    const run = newSessionRun(captureRun(simRef.current, scenario.name, mapSnapshot()), sessionRuns.length);
+    setSessionRuns((list) => [...list, run]);
+    setCurrentRunId(run.id);
+    return run;
+  }, [sessionRuns, currentRunId, scenario.name]);
+
+  /** Open the notebook page for the run on the map. */
+  const openSave = useCallback(() => {
+    if (!simRef.current.runStarted) return;
+    recordRun();
+    setNotice(null);
+    setSaveOpen(true);
+  }, [recordRun]);
+
+  const currentRun = sessionRuns.find((r) => r.id === currentRunId) ?? null;
+  // An experiment the student started in the notebook but has no results yet: the save fills it in.
+  const startedEntry = entries.find((e) => e.id === activeEntryId && !e.captured) ?? null;
+  const saveInitial: ExperimentNotes = {
+    name: startedEntry?.name ?? nextName(entries),
+    question: startedEntry?.question || (mode === 'guided' ? scenario.question : ''),
+    prediction:
+      startedEntry?.prediction ||
+      (mode === 'guided' ? [prediction.trim(), guess === null ? '' : `My guess: ${guess}% of the crop protected.`].filter(Boolean).join(' ') : ''),
+    variablesChanged: startedEntry?.variablesChanged ?? '',
+    variablesSame: startedEntry?.variablesSame ?? '',
+    result: '',
+    surprise: '',
+    next: '',
+    realWorld: ''
+  };
+  // What changed since the previous run on this mission, as a hint for "Variables changed".
+  const missionRuns = sessionRuns.filter((r) => r.captured.scenarioName === scenario.name);
+  const previousRun = currentRun ? missionRuns[missionRuns.indexOf(currentRun) - 1] : missionRuns[missionRuns.length - 1];
+  const changeHint =
+    currentRun && previousRun ? describeChanges(previousRun.captured, currentRun.captured).join('; ') : '';
+
+  /** Save the run as a notebook experiment with the student's notes. */
+  const saveExperiment = useCallback(
+    (notes: ExperimentNotes) => {
+      const run = sessionRuns.find((r) => r.id === currentRunId);
+      if (!run) return;
+      const target = entries.find((e) => e.id === activeEntryId && !e.captured);
+      let id: string;
+      if (target) {
+        id = target.id;
+        setEntries(entries.map((e) => (e.id === target.id ? { ...e, ...notes, captured: run.captured } : e)));
+      } else {
+        const e = { ...newEntry(notes.name), ...notes, captured: run.captured };
+        id = e.id;
+        setEntries([...entries, e]);
+      }
+      setSessionRuns((list) => list.map((r) => (r.id === run.id ? { ...r, entryId: id } : r)));
+      setActiveEntryId(id);
+      setSavedTo(notes.name);
+      setSaveOpen(false);
+    },
+    [sessionRuns, currentRunId, entries, activeEntryId]
+  );
+
+  /** Put the run on the map into an experiment the student picked in the notebook. */
   const saveRunToNotebook = useCallback(
     (targetId?: string) => {
       const captured = captureRun(simRef.current, scenario.name, mapSnapshot());
@@ -360,13 +441,12 @@ export default function App() {
     return surveys.find((s) => s.id === selectedSurveyId) ?? surveys[surveys.length - 1];
   }, [surveys.length, selectedSurveyId, surveys]);
 
-  // Guided mode saves a finished run to the notebook and moves to the Compare step,
-  // so students never lose a run by forgetting to press Save.
+  // A finished run is remembered for Compare (not saved to the notebook: the
+  // student decides that). Guided mode then moves to the Compare step.
   useEffect(() => {
-    if (notice === 'finished' && mode === 'guided') {
-      saveRunToNotebook();
-      setStep('compare');
-    }
+    if (notice !== 'finished') return;
+    recordRun();
+    if (mode === 'guided') setStep('compare');
   }, [notice, mode]);
 
   const activeEntry = entries.find((e) => e.id === activeEntryId) ?? null;
@@ -461,8 +541,10 @@ export default function App() {
               onPlan={setPlan}
               onTool={setTool}
               onSurvey={startSurvey}
-              onSave={() => saveRunToNotebook()}
+              onSave={openSave}
               saved={savedTo}
+              sessionRuns={sessionRuns}
+              currentRunId={currentRunId}
               entries={entries}
               activeEntryId={activeEntryId}
               onUpdateEntry={(id, patch) => setEntries((list) => list.map((e) => (e.id === id ? { ...e, ...patch } : e)))}
@@ -541,8 +623,8 @@ export default function App() {
               <div className="notice" role="status">
                 <strong>Run finished.</strong> What happened? Did it match your prediction?
                 <div className="notice-actions">
-                  <button className="btn primary" onClick={() => saveRunToNotebook()}>
-                    📓 Save results to notebook
+                  <button className="btn primary" onClick={openSave}>
+                    📓 Save this experiment
                   </button>
                   <button className="btn" onClick={() => { setNotice(null); simRef.current.startTreatment(); setRunning(true); }}>
                     Keep going
@@ -592,7 +674,7 @@ export default function App() {
               ))}
             </nav>
             <div className="tab-body">
-              {tab === 'results' && <ResultsPanel sim={sim} onSave={() => saveRunToNotebook()} />}
+              {tab === 'results' && <ResultsPanel sim={sim} onSave={openSave} saved={currentRun?.entryId ? savedTo : null} />}
               {tab === 'survey' && (
                 <SurveyPanel
                   sim={sim}
@@ -655,6 +737,15 @@ export default function App() {
         </span>
       </footer>
       <SimToRealDialog open={loopOpen} onClose={() => setLoopOpen(false)} />
+      <SaveExperimentDialog
+        open={saveOpen}
+        run={currentRun?.captured ?? null}
+        initial={saveInitial}
+        changeHint={changeHint}
+        updating={!!startedEntry}
+        onSave={saveExperiment}
+        onClose={() => setSaveOpen(false)}
+      />
       {guided && (
         <NotebookDialog open={notebookOpen} onClose={() => setNotebookOpen(false)}>
           <NotebookPanel

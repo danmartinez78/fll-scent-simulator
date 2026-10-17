@@ -1,6 +1,6 @@
 import type { Scenario, Settings, TreatmentPlan } from '../models/types';
 import type { Simulation } from '../simulation/Simulation';
-import { describeChanges, ENTRY_FIELDS, methodName, type NotebookEntry } from '../notebook/notebook';
+import { describeChanges, methodName, type NotebookEntry, type SessionRun } from '../notebook/notebook';
 import { activePlan } from '../simulation/Treatment';
 import { formatFieldClock } from '../utils/fieldTime';
 import { ReportButtons } from './ReportButtons';
@@ -46,6 +46,10 @@ interface Props {
   /** The notebook experiment the current run was saved into (if any). */
   activeEntryId: string | null;
   onUpdateEntry: (id: string, patch: Partial<NotebookEntry>) => void;
+  /** Runs from this visit (all missions), for Compare; only saved ones are in the notebook. */
+  sessionRuns: SessionRun[];
+  /** The run on the map, once it has finished or been saved. */
+  currentRunId: string | null;
   /** Open the full notebook (all experiments, compare two, report, export). */
   onOpenNotebook: () => void;
   /** Reset the run with the current settings and go back to planning. */
@@ -432,29 +436,47 @@ function SurveyReveal({ sim, surveyLayer, onSurveyLayer }: Props) {
  * This mission's saved runs side by side, plus the current run if it isn't
  * saved yet, so the Compare step has something to compare against.
  */
-function RunsTable({ scenario, entries, sim, saved, settings }: Props) {
-  const rows: Array<{ key: string; name: string; method: string; crop: number; kept: number; cost: number; killed: number | null; helpers: number | null; current: boolean }> = entries
-    .filter((e) => e.captured && e.captured.scenarioName === scenario.name)
+/** This mission's runs from this visit, oldest first. */
+function missionRuns(p: Props): SessionRun[] {
+  return p.sessionRuns.filter((r) => r.captured.scenarioName === p.scenario.name);
+}
+
+/** The name a run goes by: its notebook name once saved, otherwise "Run 3". */
+function runName(p: Props, r: SessionRun): string {
+  return (r.entryId && p.entries.find((e) => e.id === r.entryId)?.name) || r.label;
+}
+
+/**
+ * This mission's runs from this visit side by side, plus the run on the map
+ * if it isn't recorded yet (stopped early), so Compare has something to
+ * compare against whether or not the runs were saved.
+ */
+function RunsTable(p: Props) {
+  const { sim, settings, currentRunId } = p;
+  const runs = missionRuns(p);
+  const rows: Array<{ key: string; name: string; saved: boolean; method: string; crop: number; kept: number; cost: number; killed: number | null; helpers: number | null; current: boolean }> = runs
     .slice(-6)
-    .map((e) => {
-      const c = e.captured!;
+    .map((r) => {
+      const c = r.captured;
       return {
-        key: e.id,
-        name: e.name,
+        key: r.id,
+        name: runName(p, r),
+        saved: !!r.entryId,
         method: methodName(c.settings.treatment),
         crop: c.metrics.cropProtectedPct,
         kept: c.metrics.pestsDeterredAvgPct,
         cost: c.metrics.cost.total,
         killed: c.metrics.pestsKilled === undefined ? null : c.metrics.pestsKilled + (c.metrics.helpersKilled ?? 0),
         helpers: c.metrics.helpersKilled ?? null,
-        current: !!saved && e.name === saved
+        current: r.id === currentRunId
       };
     });
-  if (!saved) {
+  if (!currentRunId && sim.runStarted) {
     const m = sim.metrics();
     rows.push({
       key: 'now',
       name: 'This run',
+      saved: false,
       method: methodName(settings.treatment),
       crop: m.cropProtectedPct,
       kept: m.pestsDeterredAvgPct,
@@ -484,6 +506,7 @@ function RunsTable({ scenario, entries, sim, saved, settings }: Props) {
             <tr key={r.key} className={r.current ? 'current' : ''}>
               <th scope="row">
                 {r.name}
+                {r.saved && <span title="Saved in the notebook"> 📓</span>}
                 <span className="runs-method">{r.method}</span>
               </th>
               <td className={rows.length > 1 && r.crop === best ? 'best' : ''}>
@@ -500,6 +523,7 @@ function RunsTable({ scenario, entries, sim, saved, settings }: Props) {
         </tbody>
       </table>
       {rows.length === 1 && <p className="hint small">Run this mission again with one change, and the runs will line up here.</p>}
+      <p className="hint small">📓 marks runs saved in your notebook. The others are kept only until you close the page.</p>
       {!hasBaseline && (
         <p className="hint small">
           💡 Also try <strong>No treatment</strong> on this mission. Then you can see how much your plan really helped.
@@ -513,12 +537,14 @@ function RunsTable({ scenario, entries, sim, saved, settings }: Props) {
  * What changed since the previous run on this mission, and how the results
  * moved, so students can check they changed one thing at a time.
  */
-function ChangeCheck({ scenario, entries, sim, saved, activeEntryId }: Props) {
-  const mine = entries.filter((e) => e.captured && e.captured.scenarioName === scenario.name);
-  const current = saved ? mine.find((e) => e.id === activeEntryId) : undefined;
-  const before = current ? mine.slice(0, mine.indexOf(current)) : mine;
-  const prev = before[before.length - 1];
-  if (!prev?.captured) return null;
+function ChangeCheck(p: Props) {
+  const { sim } = p;
+  const runs = missionRuns(p);
+  const current = runs.find((r) => r.id === p.currentRunId);
+  const before = current ? runs.slice(0, runs.indexOf(current)) : runs;
+  const prevRun = before[before.length - 1];
+  if (!prevRun) return null;
+  const prev = { name: runName(p, prevRun), captured: prevRun.captured };
   const now = current?.captured ?? { settings: sim.settings, plan: sim.plan, metrics: sim.metrics(), surveysDone: sim.surveys.length };
   const changes = describeChanges(prev.captured, now);
   const crop0 = prev.captured.metrics.cropProtectedPct;
@@ -568,7 +594,8 @@ function CompareStep(p: Props) {
   const nextMission = SCENARIOS.find((s) => s.id === 'basic');
   const actual = p.sim.metrics().cropProtectedPct;
   // With two or more runs to line up, the comparison table is the main thing, so it goes first.
-  const runCount = p.entries.filter((e) => e.captured?.scenarioName === p.scenario.name).length + (p.saved ? 0 : 1);
+  const current = p.sessionRuns.find((r) => r.id === p.currentRunId) ?? null;
+  const runCount = missionRuns(p).length + (current ? 0 : 1);
   const tableFirst = ran && runCount >= 2;
   return (
     <>
@@ -596,11 +623,11 @@ function CompareStep(p: Props) {
           {tableFirst && <RunsTable {...p} />}
           {tableFirst && <ChangeCheck {...p} />}
           {tableFirst && <h3 className="runs-title">This run in detail</h3>}
-          <ResultsPanel sim={p.sim} onSave={p.onSave} saved={p.saved} />
+          <ResultsPanel sim={p.sim} onSave={p.onSave} saved={null} showSave={false} />
         </>
       )}
       {ran && !tableFirst && <RunsTable {...p} />}
-      {ran && <WriteItDown {...p} />}
+      {ran && <SaveBox {...p} />}
       {p.entries.length > 0 && (
         <div className="guided-report">
           <span className="hint small">
@@ -630,6 +657,9 @@ function CompareStep(p: Props) {
             🔁 Change one thing and run again
           </button>
         )}
+        {ran && !current?.entryId && (
+          <p className="unsaved-note">This run isn't in your notebook yet. Save it first if you want to keep it.</p>
+        )}
         <button className="btn wide" onClick={() => p.onStep('mission')}>
           🗺️ Pick a new mission
         </button>
@@ -638,40 +668,29 @@ function CompareStep(p: Props) {
   );
 }
 
-/** The notebook fields students fill in after a run, right where the results are. */
-const WRITE_UP_KEYS: Array<keyof NotebookEntry> = ['variablesChanged', 'variablesSame', 'result', 'surprise', 'next', 'realWorld'];
-
-function WriteItDown({ entries, activeEntryId, saved, onUpdateEntry, onSave }: Props) {
-  const entry = entries.find((e) => e.id === activeEntryId && e.captured) ?? null;
-  if (!entry || !saved) {
+/**
+ * Save the run to the notebook, or say where it was saved. Saving opens a
+ * notebook page where the student writes the experiment up.
+ */
+function SaveBox(p: Props) {
+  const current = p.sessionRuns.find((r) => r.id === p.currentRunId) ?? null;
+  const entry = current?.entryId ? p.entries.find((e) => e.id === current.entryId) : null;
+  if (entry)
     return (
       <div className="write-up">
-        <h3 className="runs-title">✍️ Write it down</h3>
-        <p className="hint small">Save this run to the notebook, then write what happened here.</p>
-        <button className="btn small primary" onClick={onSave}>
-          📓 Save this run
+        <h3 className="runs-title">✅ Saved in your notebook as {entry.name}</h3>
+        <button className="btn small" onClick={p.onOpenNotebook}>
+          📓 Open notebook
         </button>
       </div>
     );
-  }
-  const fields = ENTRY_FIELDS.filter((f) => WRITE_UP_KEYS.includes(f.key));
   return (
     <div className="write-up">
-      <h3 className="runs-title">✍️ Write it down</h3>
-      <p className="hint small">
-        Notes for <strong>{entry.name}</strong>. They are saved as you type.
-      </p>
-      {fields.map((f) => (
-        <label key={f.key} className="control">
-          <span className="control-label">{f.key === 'realWorld' ? '🌱 ' : ''}{f.label}</span>
-          <textarea
-            rows={2}
-            placeholder={f.hint}
-            value={entry[f.key] as string}
-            onChange={(ev) => onUpdateEntry(entry.id, { [f.key]: ev.target.value } as Partial<NotebookEntry>)}
-          />
-        </label>
-      ))}
+      <h3 className="runs-title">✍️ Worth keeping?</h3>
+      <p className="hint small">Save this run as an experiment in your notebook, and write down what you changed and what you learned.</p>
+      <button className="btn primary" onClick={p.onSave}>
+        📓 Save this experiment
+      </button>
     </div>
   );
 }
