@@ -47,6 +47,15 @@ export const PEST_RULES = {
   warySec: 60,
   /** Crop pull while wary, as a fraction of the normal pull. */
   waryCropPull: 0.25,
+  /** A pest this close to an attractant with no trap has reached it. */
+  lureArriveM: 6,
+  /**
+   * Seconds a pest lingers at an attractant with no trap before losing
+   * interest (nothing kills it there), and then how long it ignores
+   * attractant while it goes back to feeding. A trap catches it instead.
+   */
+  lureStaySec: 60,
+  lureIgnoreSec: 180,
   /** Fraction of pests already in the field on Day 1 when pests build up over time. */
   startingFraction: 0.1
 };
@@ -70,6 +79,10 @@ export interface PestEnvironment {
    * to where it comes from. Missing = follow the smell's slope instead.
    */
   lures?: Vec[];
+  /** The attractants among `lures` with no trap (pests lose interest in them after a while). */
+  plainLures?: Vec[];
+  /** True where the crop is eaten bare (no food left), so pests move on. */
+  bareAt?: (x: number, y: number) => boolean;
 }
 
 /**
@@ -118,6 +131,10 @@ export class PestSwarm {
    * crop, so it lands somewhere else instead of settling at the cloud's edge.
    */
   wary: Float32Array;
+  /** Seconds spent at attractants with no trap (see PEST_RULES.lureStaySec). */
+  lureStay: Float32Array;
+  /** Seconds left ignoring attractant after losing interest in one. */
+  lureIgnore: Float32Array;
   /**
    * A fixed random number (0 to 1) per pest. Pests whose toughness is at or
    * above the scent effectiveness ignore scent completely.
@@ -139,6 +156,8 @@ export class PestSwarm {
     this.fleeLeft = new Float32Array(n);
     this.fleeStartRep = new Float32Array(n);
     this.wary = new Float32Array(n);
+    this.lureStay = new Float32Array(n);
+    this.lureIgnore = new Float32Array(n);
     this.toughness = new Float32Array(n);
     this.arriveAt = new Float32Array(n);
   }
@@ -255,9 +274,12 @@ export class PestSwarm {
       const sens = this.reacts(i, env.effectiveness) ? env.sensitivity : 0;
       const px = this.x[i];
       const py = this.y[i];
-      const onCrop = inRect(px, py, env.crop);
+      // A square eaten bare has no food left: it no longer counts as crop to this pest.
+      const onCrop = inRect(px, py, env.crop) && !(env.bareAt && env.bareAt(px, py));
       const rep = env.repellent.sample(px, py);
-      const att = env.attractant.sample(px, py);
+      // A pest that lost interest in a lure ignores attractant for a while.
+      if (this.lureIgnore[i] > 0) this.lureIgnore[i] = Math.max(0, this.lureIgnore[i] - dt);
+      const att = this.lureIgnore[i] > 0 ? 0 : env.attractant.sample(px, py);
       const repelled = sens > 0 && rep > th;
       const wasRepelled = this.repelled[i] === 1;
       let h: number;
@@ -361,6 +383,18 @@ export class PestSwarm {
       const speed = env.speed * (feeding ? R.feedingSpeed : repelled ? R.agitatedSpeed : 1);
       this.x[i] = clamp(px + Math.cos(h) * speed * dt, 0.1, env.width - 0.1);
       this.y[i] = clamp(py + Math.sin(h) * speed * dt, 0.1, env.height - 0.1);
+
+      // At an attractant with no trap: linger, then lose interest for a while.
+      if (env.plainLures && sens > 0 && this.lureIgnore[i] <= 0) {
+        const r2 = R.lureArriveM * R.lureArriveM;
+        if (env.plainLures.some((l) => (l.x - this.x[i]) ** 2 + (l.y - this.y[i]) ** 2 < r2)) {
+          this.lureStay[i] += dt;
+          if (this.lureStay[i] >= R.lureStaySec) {
+            this.lureStay[i] = 0;
+            this.lureIgnore[i] = R.lureIgnoreSec;
+          }
+        }
+      }
 
       for (const t of env.traps) {
         const ddx = this.x[i] - t.x;

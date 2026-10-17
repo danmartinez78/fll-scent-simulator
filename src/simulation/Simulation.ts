@@ -48,6 +48,13 @@ export const HISTORY_EVERY_SEC = 10;
  */
 export const AFFECTED_DAMAGE = 12;
 /**
+ * A crop square with this many times the "affected" amount of feeding is
+ * eaten bare: no food is left, so pests there move on to find more. Without
+ * this, pests piled onto a few squares (around a lure, or in a hotspot) could
+ * feed there for weeks without harming the rest of the crop.
+ */
+export const BARE_DAMAGE_FACTOR = 6;
+/**
  * Application rate that makes a fresh spray reach concentration equal to the
  * scent strength. Twice the rate gives twice the concentration.
  */
@@ -349,6 +356,14 @@ export class Simulation {
     return rainingAt(this.rains, this.fieldTime);
   }
 
+  /** Is the crop square at this point eaten bare (see BARE_DAMAGE_FACTOR)? */
+  isBare(x: number, y: number): boolean {
+    const cell = this.repellent.cell;
+    const c = Math.min(this.repellent.cols - 1, Math.max(0, Math.floor(x / cell)));
+    const r = Math.min(this.repellent.rows - 1, Math.max(0, Math.floor(y / cell)));
+    return this.damage[r * this.repellent.cols + c] >= BARE_DAMAGE_FACTOR * AFFECTED_DAMAGE;
+  }
+
   /** Spray again when a rain ends, if the plan says so (see RESPRAY_AFTER_RAIN). */
   private maybeSprayAfterRain(raining: boolean): void {
     const ended = this.wasRaining && !raining;
@@ -374,10 +389,12 @@ export class Simulation {
     const s = this.settings;
     const traps: Vec[] = [];
     const lures: Vec[] = [];
+    const plainLures: Vec[] = [];
     for (const d of this.devices) {
       if (d.kind !== 'attractant' || !this.treatmentStarted || !deviceActive(d, this.time, s.devices.lifetimeMin)) continue;
       lures.push({ x: d.x, y: d.y });
       if (d.trap) traps.push({ x: d.x, y: d.y });
+      else plainLures.push({ x: d.x, y: d.y });
     }
     return {
       width: s.field.width,
@@ -392,7 +409,9 @@ export class Simulation {
       cropAttraction: s.pests.cropAttraction,
       speed: s.pests.speed,
       traps,
-      lures
+      lures,
+      plainLures,
+      bareAt: (x, y) => this.isBare(x, y)
     };
   }
 
@@ -604,7 +623,7 @@ export class Simulation {
     const effectiveness = (this.settings.scent.effectivenessPct ?? 100) / 100;
     let k = 0;
     for (let i = 0; i < p.n; i++) {
-      if (p.trapped[i] || !p.present(i) || p.wary[i] > 0 || !inRect(p.x[i], p.y[i], this.crop)) continue;
+      if (p.trapped[i] || !p.present(i) || p.wary[i] > 0 || !inRect(p.x[i], p.y[i], this.crop) || this.isBare(p.x[i], p.y[i])) continue;
       if (
         this.settings.pests.sensitivity > 0 &&
         p.reacts(i, effectiveness) &&
