@@ -121,8 +121,8 @@ function tipsFor(s: Settings, sim: Simulation): string[] {
   if (s.scent.lifetimeMin <= 1) tips.push('This scent only lasts a short time. What happens when it fades?');
   if (sim.surveys.length) tips.push('Survey results may not show every pest.');
   else tips.push('Do you know where the pests are? A survey drone could help you find out.');
-  tips.push('Pests are the small bugs with feelers. Orange ones are being pushed away by repellent; dark ones are feeding or flying normally. Tap an insect in the map key to see just that kind.');
-  if (s.treatment !== 'none' && (s.scent.effectivenessPct ?? 100) < 100) tips.push('Blue pests ignore the scent completely. No scent works on every pest.');
+  tips.push('Pests are the small dark ovals. Orange ones are being pushed away by repellent; dark ones are feeding or flying normally. Tap Pests or Helpful insects in the map key to see just those.');
+  if (s.treatment !== 'none' && (s.scent.effectivenessPct ?? 100) < 100) tips.push('Blue pests are sitting in repellent but ignore it. No scent works on every pest.');
   tips.push('Change one thing at a time so you know what caused the difference.');
   return tips;
 }
