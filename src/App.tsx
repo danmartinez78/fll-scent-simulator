@@ -654,7 +654,7 @@ export default function App() {
               </div>
             )}
           </div>
-          <MapKey settings={settings} view={mapView} survey={!!shownSurvey} />
+          <MapKey settings={settings} view={mapView} survey={!!shownSurvey} onSpotlight={(g) => setView((v) => ({ ...v, spotlight: g }))} />
           <ExperimentPanel settings={settings} sim={sim} tool={mapTool} running={running} canRun={canRun} detailed={!guided} />
         </section>
 

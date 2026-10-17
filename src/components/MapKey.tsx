@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from 'react';
-import type { Settings, ViewOptions } from '../models/types';
+import type { InsectGroup, Settings, ViewOptions } from '../models/types';
 import { COLORS } from '../render/drawScene';
 import { deviceReachM } from '../simulation/Treatment';
 import { usesGroomba } from '../simulation/Groomba';
@@ -12,6 +12,29 @@ const rgb = (c: readonly number[], a = 1) => `rgba(${c[0]},${c[1]},${c[2]},${a})
 const Dot = ({ color }: { color: string }) => (
   <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true">
     <circle cx="9" cy="9" r="4" fill={color} />
+  </svg>
+);
+/** A pest as the map draws it: an oval body with two feelers. */
+const Bug = ({ color }: { color: string }) => (
+  <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true">
+    <ellipse cx="9" cy="10.5" rx="3.2" ry="4.8" fill={color} />
+    <path d="M8 7 L5.6 2.8 M10 7 L12.4 2.8" stroke={color} strokeWidth="1.3" strokeLinecap="round" />
+  </svg>
+);
+/** A bee: yellow with a black stripe. */
+const Bee = () => (
+  <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true">
+    <ellipse cx="9" cy="9" rx="6.5" ry="4.5" fill={COLORS.bee} stroke="#111827" strokeWidth="1" />
+    <rect x="8" y="4.6" width="2" height="8.8" fill="#111827" />
+  </svg>
+);
+/** A ladybug: red with two spots and a line down its back. */
+const Ladybug = () => (
+  <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true">
+    <circle cx="9" cy="9" r="5.5" fill={COLORS.ladybug} stroke="#111827" strokeWidth="1" />
+    <path d="M9 3.5 V14.5" stroke="#111827" strokeWidth="1" />
+    <circle cx="6.6" cy="9.6" r="1.2" fill="#111827" />
+    <circle cx="11.4" cy="9.6" r="1.2" fill="#111827" />
   </svg>
 );
 /** The groomba as the map draws it: a white rover with a spray bar. */
@@ -93,7 +116,11 @@ interface Props {
   view: ViewOptions;
   /** A survey map is on screen. */
   survey: boolean;
+  /** Tapping an insect in the key shows that group and fades the other one; tapping it again shows all. */
+  onSpotlight?: (group: InsectGroup | null) => void;
 }
+
+const GROUP_NAME: Record<InsectGroup, string> = { pests: 'pests', helpers: 'bees and ladybugs' };
 
 function loadOpen(): boolean {
   try {
@@ -106,7 +133,7 @@ function loadOpen(): boolean {
 }
 
 /** Map key: says what each color and mark on the map means, showing only what this setup can draw. */
-export function MapKey({ settings: s, view, survey }: Props) {
+export function MapKey({ settings: s, view, survey, onSpotlight }: Props) {
   const [open, setOpenState] = useState(loadOpen);
   const setOpen = (o: boolean) => {
     setOpenState(o);
@@ -121,16 +148,18 @@ export function MapKey({ settings: s, view, survey }: Props) {
   const devices = t === 'slowRelease' || t === 'pushPull';
   const ignorers = treated && (s.scent.effectivenessPct ?? 100) < 100;
 
-  const rows: Array<[ReactNode, string]> = [];
+  // The third item marks an insect row that can be tapped to put its group in the spotlight.
+  const rows: Array<[ReactNode, string, InsectGroup?]> = [];
   if (view.showPests) {
-    rows.push([<Dot color={COLORS.pest} />, 'Pest (flying or eating)']);
-    if (treated) rows.push([<Dot color={COLORS.pestAgitated} />, 'Pest bothered by repellent']);
-    if (ignorers) rows.push([<Dot color={COLORS.pestIgnores} />, 'Pest that ignores the scent']);
+    rows.push([<Bug color={COLORS.pest} />, 'Pest (flying or eating)', 'pests']);
+    if (treated) rows.push([<Bug color={COLORS.pestAgitated} />, 'Pest pushed away by repellent', 'pests']);
+    if (ignorers) rows.push([<Bug color={COLORS.pestIgnores} />, 'Pest that ignores the scent', 'pests']);
   }
   if (s.helpers?.count) {
-    rows.push([<Dot color={COLORS.bee} />, 'Bee (helpful insect)']);
-    rows.push([<Dot color={COLORS.ladybug} />, 'Ladybug (helpful, eats pests)']);
+    rows.push([<Bee />, 'Bee (helpful insect)', 'helpers']);
+    rows.push([<Ladybug />, 'Ladybug (helpful, eats pests)', 'helpers']);
   }
+  const spot = view.spotlight ?? null;
   if (treated) rows.push([<Cross color={COLORS.ladybug} />, 'Red ×: a bee or ladybug was killed here']);
   if (t === 'pesticide') {
     rows.push([<Cross color="rgba(17,24,39,0.7)" />, 'Black ×: a pest was killed by pesticide']);
@@ -178,14 +207,44 @@ export function MapKey({ settings: s, view, survey }: Props) {
         {open ? '▾' : '▸'} Map key
       </button>
       {open && (
-        <ul className="map-key-list">
-          {rows.map(([icon, label]) => (
-            <li key={label}>
-              {icon}
-              <span>{label}</span>
-            </li>
-          ))}
-        </ul>
+        <div className="map-key-body">
+          <ul className="map-key-list">
+            {rows.map(([icon, label, group]) =>
+              group && onSpotlight ? (
+                <li key={label}>
+                  <button
+                    className={`key-spot ${spot === group ? 'on' : ''} ${spot && spot !== group ? 'faded' : ''}`}
+                    aria-pressed={spot === group}
+                    title={spot === group ? 'Tap to show all insects again' : `Tap to show only the ${GROUP_NAME[group]}`}
+                    onClick={() => onSpotlight(spot === group ? null : group)}
+                  >
+                    {icon}
+                    <span>{label}</span>
+                  </button>
+                </li>
+              ) : (
+                <li key={label}>
+                  {icon}
+                  <span>{label}</span>
+                </li>
+              )
+            )}
+          </ul>
+          {onSpotlight && rows.some((r) => r[2]) && (
+            <p className="key-hint">
+              {spot ? (
+                <>
+                  Showing only the {GROUP_NAME[spot]}.{' '}
+                  <button className="link-btn" onClick={() => onSpotlight(null)}>
+                    Show all insects
+                  </button>
+                </>
+              ) : (
+                'Tip: tap an insect in the key to see just that kind on the map.'
+              )}
+            </p>
+          )}
+        </div>
       )}
     </div>
   );

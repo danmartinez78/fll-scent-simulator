@@ -1987,3 +1987,40 @@ textarea {
   font-size: 12px;
   color: var(--ink);
 }
+
+/* Map key: tap an insect to put its kind in the spotlight. */
+.map-key-body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.key-spot {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: none;
+  padding: 0 6px 0 2px;
+  margin-left: -3px;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+.key-spot:hover {
+  border-color: var(--line);
+  background: #f8fafc;
+}
+.key-spot.on {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  font-weight: 600;
+}
+.key-spot.faded {
+  opacity: 0.45;
+}
+.key-hint {
+  margin: 0;
+  font-size: 12px;
+  color: var(--muted);
+}
