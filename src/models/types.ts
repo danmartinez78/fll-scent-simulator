@@ -106,6 +106,11 @@ export interface DeviceSettings {
   perTrip: number;
   /** Drone flies each device to its spot; otherwise devices are placed by hand at the start. */
   deployByDrone: boolean;
+  /**
+   * How far pests notice an attractant lure, as a multiple of the scent's
+   * effective range. Missing = ATTRACTANT_REACH_FACTOR (3).
+   */
+  lureReach?: number;
 }
 
 export interface SurveySettings {
@@ -198,6 +203,8 @@ export interface Scenario {
   settings: Settings;
   plan: TreatmentPlan;
   view?: Partial<ViewOptions>;
+  /** Map tool selected when the mission loads (default: the method's usual tool). */
+  startTool?: 'zone' | 'repellent' | 'attractant' | 'trap';
 }
 
 /** The handful of numbers students see. Percentages are 0 to 100. */
@@ -264,4 +271,6 @@ export interface SurveyResult {
   trueTotal: number;
   estimatedOnCrop: number;
   hotspotSquares: number;
+  /** Flown before the run started (it can be kept when the run is started over). */
+  beforeRun?: boolean;
 }

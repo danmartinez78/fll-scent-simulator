@@ -9,6 +9,7 @@ import { formatMoney } from '../utils/units';
 import { ControlPanel } from './ControlPanel';
 import { ResultsPanel } from './ResultsPanel';
 import type { Tool } from './SimulationCanvas';
+import type { SurveyLayer } from '../render/drawScene';
 
 export type GuidedStep = 'mission' | 'predict' | 'plan' | 'run' | 'compare';
 
@@ -49,6 +50,9 @@ interface Props {
   onOpenNotebook: () => void;
   /** Reset the run with the current settings and go back to planning. */
   onTryAgain: () => void;
+  /** Which survey map the map shows (Compare can switch to where the pests really were). */
+  surveyLayer: SurveyLayer;
+  onSurveyLayer: (l: SurveyLayer) => void;
 }
 
 /** Step-by-step version of the simulator: one small task at a time. */
@@ -97,10 +101,10 @@ export function GuidedPanel(p: Props) {
   );
 }
 
-/** Icon and level for each built-in mission, easiest first. */
+/** Icon and level for each built-in mission, easiest first (listed in this order within a level). */
 const MISSION_INFO: Record<string, { icon: string; level: number }> = {
-  basic: { icon: '🌱', level: 1 },
   baseline: { icon: '📏', level: 1 },
+  basic: { icon: '🌱', level: 1 },
   sprayVsDevices: { icon: '⚖️', level: 2 },
   windy: { icon: '🌬️', level: 2 },
   hotspots: { icon: '🎯', level: 2 },
@@ -112,11 +116,16 @@ const MISSION_INFO: Record<string, { icon: string; level: number }> = {
 const LEVEL_NAMES = ['', 'Starter', 'Next step', 'Challenge'];
 
 function MissionStep({ scenario, onLoadScenario }: Props) {
-  const missions = [...SCENARIOS].sort((a, b) => (MISSION_INFO[a.id]?.level ?? 9) - (MISSION_INFO[b.id]?.level ?? 9));
+  const order = Object.keys(MISSION_INFO);
+  const rank = (id: string) => (MISSION_INFO[id]?.level ?? 9) * 100 + (order.includes(id) ? order.indexOf(id) : 99);
+  const missions = [...SCENARIOS].sort((a, b) => rank(a.id) - rank(b.id));
   return (
     <>
       <h2 className="guided-title">Pick a mission</h2>
-      <p className="hint">New here? Start with <strong>Basic Field</strong>. Missions get harder as you go down.</p>
+      <p className="hint">
+        New here? Start with <strong>No Treatment</strong> to see what the pests do on their own, then try <strong>Basic Field</strong>.
+        Missions get harder as you go down.
+      </p>
       <div className="missions">
         {missions.map((s) => {
           const info = MISSION_INFO[s.id];
@@ -193,25 +202,70 @@ function PredictStep({ scenario, prediction, onPrediction, guess, onGuess }: Pro
   );
 }
 
+/** A mission where nothing is treated: the baseline every other run is compared to. */
+const isBaseline = (sc: Scenario) => sc.settings.treatment === 'none';
+
+/** The survey mission's first job: fly the survey, then use its map to place traps. */
+function SurveyBox(p: Props) {
+  const done = p.sim.surveys.length > 0;
+  if (p.sim.surveying)
+    return (
+      <div className="guided-extra">
+        <p className="hint">🛰️ The survey drone is scanning the field. Watch the colored squares appear.</p>
+      </div>
+    );
+  if (!done)
+    return (
+      <div className="guided-extra">
+        <p className="hint">
+          <strong>Step 1:</strong> You can't see the pests here. Fly the survey drone to find where they gather.
+        </p>
+        <button className="btn survey-btn" onClick={p.onSurvey}>
+          🛰️ Fly survey
+        </button>
+        <p className="hint small">Or skip it and place your traps without a map, to see how much the survey helps.</p>
+      </div>
+    );
+  return (
+    <div className="guided-extra">
+      <p className="hint">
+        ✅ <strong>Survey done.</strong> <strong>Step 2:</strong> put your {p.settings.devices.maxDevices} traps (🪤) where the camera saw lots
+        of pests (red squares). The camera can be wrong: gray squares it couldn't judge, and some colors are mistakes.
+      </p>
+      <p className="hint small">The survey map stays when you try again. To test without it, pick this mission again and skip the survey.</p>
+    </div>
+  );
+}
+
 function PlanStep(p: Props) {
   const survey = p.scenario.id === 'survey';
+  if (isBaseline(p.scenario)) {
+    return (
+      <>
+        <h2 className="guided-title">Nothing to plan this time</h2>
+        <div className="guided-extra">
+          <p className="hint">
+            📏 This run is the <strong>baseline</strong>. The drone stays home and no scent is used, so you can see what the pests do on
+            their own.
+          </p>
+          <p className="hint">
+            Every treatment you try later gets compared to this. A plan only helps if it protects <strong>more</strong> crop than doing
+            nothing.
+          </p>
+        </div>
+      </>
+    );
+  }
   return (
     <>
       <h2 className="guided-title">Plan your treatment</h2>
       <p className="hint">Pick a method, then use the map to place it. Change one thing at a time so you know what made the difference.</p>
-      {survey && (
-        <div className="guided-extra">
-          <p className="hint">You can't see the pests here. Fly the survey drone first to find them.</p>
-          <button className="btn survey-btn" onClick={p.onSurvey} disabled={p.sim.surveying}>
-            {p.sim.surveying ? '🛰️ Scanning…' : '🛰️ Fly survey'}
-          </button>
-        </div>
-      )}
+      {survey && <SurveyBox {...p} />}
       <ControlPanel
         settings={p.settings}
         plan={p.plan}
         tool={p.tool}
-        simStarted={p.sim.time > 0}
+        simStarted={p.sim.runStarted}
         scenario={p.scenario}
         onSettings={p.onSettings}
         onPlan={p.onPlan}
@@ -252,7 +306,7 @@ function missingPlan(settings: Settings, plan: TreatmentPlan): string | null {
 }
 
 function RunStep({ sim, running, onStep, settings, plan }: Props) {
-  const missing = sim.time === 0 ? missingPlan(settings, plan) : null;
+  const missing = !sim.runStarted ? missingPlan(settings, plan) : null;
   return (
     <>
       <h2 className="guided-title">Run the experiment</h2>
@@ -267,14 +321,14 @@ function RunStep({ sim, running, onStep, settings, plan }: Props) {
         </div>
       )}
       <p className="hint big-hint">
-        {sim.time === 0
+        {!sim.runStarted
           ? 'Press ▶ Run above the map to start.'
           : running
             ? 'Watch the pests. Orange pests are bothered by repellent. Blue pests ignore the scent.'
             : 'Paused. Press ▶ Resume to keep going.'}
       </p>
-      {sim.time === 0 && <p className="hint">Tip: 5x and 20x make the days go by faster.</p>}
-      {sim.time > 0 && !sim.finished && (
+      {!sim.runStarted && <p className="hint">Tip: 5x and 20x make the days go by faster.</p>}
+      {sim.runStarted && !sim.finished && (
         <p className="hint">When all the days are done, your results open by themselves.</p>
       )}
       <BigNumbers sim={sim} />
@@ -283,13 +337,43 @@ function RunStep({ sim, running, onStep, settings, plan }: Props) {
           See the results →
         </button>
       ) : (
-        sim.time > 0 && (
+        sim.runStarted && (
           <button className="btn wide" onClick={() => onStep('compare')}>
             ⏹ Stop early and see the results
           </button>
         )
       )}
     </>
+  );
+}
+
+/** On a mission that hid the pests: show where they really were, next to what the survey said. */
+function SurveyReveal({ sim, surveyLayer, onSurveyLayer }: Props) {
+  const sv = sim.surveys[0];
+  return (
+    <div className="change-check">
+      <h3 className="runs-title">🔍 Where were the pests really?</h3>
+      {sv ? (
+        <>
+          <p className="hint small">
+            The camera counted about <strong>{Math.round(sv.detectedTotal)}</strong> pests. There were really{' '}
+            <strong>{Math.round(sv.trueTotal)}</strong>. Switch the map between the two. Did your traps land where the pests really were?
+          </p>
+          <div className="tool-row">
+            <button className={surveyLayer === 'camera' ? 'chip active' : 'chip'} onClick={() => onSurveyLayer('camera')}>
+              📷 What the camera saw
+            </button>
+            <button className={surveyLayer === 'truth' ? 'chip active' : 'chip'} onClick={() => onSurveyLayer('truth')}>
+              🐞 Where the pests really were
+            </button>
+          </div>
+        </>
+      ) : (
+        <p className="hint small">
+          You placed your traps without a survey. The pests left on the field are now shown on the map. Try again with a survey and compare.
+        </p>
+      )}
+    </div>
   );
 }
 
@@ -376,7 +460,7 @@ function ChangeCheck({ scenario, entries, sim, saved, activeEntryId }: Props) {
   const before = current ? mine.slice(0, mine.indexOf(current)) : mine;
   const prev = before[before.length - 1];
   if (!prev?.captured) return null;
-  const now = current?.captured ?? { settings: sim.settings, plan: sim.plan, metrics: sim.metrics() };
+  const now = current?.captured ?? { settings: sim.settings, plan: sim.plan, metrics: sim.metrics(), surveysDone: sim.surveys.length };
   const changes = describeChanges(prev.captured, now);
   const crop0 = prev.captured.metrics.cropProtectedPct;
   const crop1 = now.metrics.cropProtectedPct;
@@ -420,7 +504,9 @@ function guessVerdict(guess: number, actual: number): string {
 }
 
 function CompareStep(p: Props) {
-  const ran = p.sim.time > 0;
+  const ran = p.sim.runStarted;
+  // After the baseline, the next step is a mission with a treatment to compare against it.
+  const nextMission = SCENARIOS.find((s) => s.id === 'basic');
   const actual = p.sim.metrics().cropProtectedPct;
   // With two or more runs to line up, the comparison table is the main thing, so it goes first.
   const runCount = p.entries.filter((e) => e.captured?.scenarioName === p.scenario.name).length + (p.saved ? 0 : 1);
@@ -434,6 +520,7 @@ function CompareStep(p: Props) {
         <p className="hint">Stopped at {formatFieldClock(p.sim.fieldTime)}. Results can change a lot later in the run.</p>
       )}
       {p.prediction.trim() && <p className="guided-question">You predicted: “{p.prediction.trim()}”</p>}
+      {ran && p.scenario.view?.showPests === false && <SurveyReveal {...p} />}
       {ran && p.guess !== null && (
         <div className="guess-result">
           <span>
@@ -468,9 +555,21 @@ function CompareStep(p: Props) {
         </div>
       )}
       <div className="guided-again">
-        <button className="btn primary wide" onClick={p.onTryAgain}>
-          🔁 Change one thing and run again
-        </button>
+        {isBaseline(p.scenario) && nextMission ? (
+          <button
+            className="btn primary wide"
+            onClick={() => {
+              p.onLoadScenario(nextMission);
+              p.onStep('mission');
+            }}
+          >
+            ➡️ Now try a treatment: {nextMission.name}
+          </button>
+        ) : (
+          <button className="btn primary wide" onClick={p.onTryAgain}>
+            🔁 Change one thing and run again
+          </button>
+        )}
         <button className="btn wide" onClick={() => p.onStep('mission')}>
           🗺️ Pick a new mission
         </button>

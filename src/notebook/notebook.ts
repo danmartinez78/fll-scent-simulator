@@ -257,6 +257,8 @@ export function parseNotebook(json: string): NotebookEntry[] {
 export interface RunSetup {
   settings: Settings;
   plan: TreatmentPlan;
+  /** Surveys flown before or during the run (left out when unknown). */
+  surveysDone?: number;
 }
 
 const RESPRAY_NAMES: Record<number, string> = { 0: 'once', 3: 'every 3 days', 7: 'every week' };
@@ -286,6 +288,7 @@ export function describeChanges(before: RunSetup, after: RunSetup): string[] {
     if (x !== y) out.push(`${label}: ${x} → ${y}`);
   };
   add('Method', methodName(a.treatment), methodName(b.treatment));
+  if (before.surveysDone !== undefined && after.surveysDone !== undefined) add('Surveys flown', before.surveysDone, after.surveysDone);
   add('Treatment starts', `Day ${a.run.treatStartDay ?? 1}`, `Day ${b.run.treatStartDay ?? 1}`);
 
   const pa = activePlan(before.plan, a.treatment);
@@ -318,6 +321,7 @@ export function describeChanges(before: RunSetup, after: RunSetup): string[] {
   add('Noticing threshold', a.scent.threshold, b.scent.threshold);
   add('Device release rate', `${a.devices.releaseRate}x`, `${b.devices.releaseRate}x`);
   add('Device lifetime', formatModelMin(a.devices.lifetimeMin), formatModelMin(b.devices.lifetimeMin));
+  add('Lure reach', `${a.devices.lureReach ?? 3}x`, `${b.devices.lureReach ?? 3}x`);
   add('Number of pests', a.pests.count, b.pests.count);
   add('Where pests start', a.pests.distribution, b.pests.distribution);
   add('Pest sensitivity', a.pests.sensitivity, b.pests.sensitivity);

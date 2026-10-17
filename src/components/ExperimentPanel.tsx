@@ -113,7 +113,7 @@ export function ExperimentPanel({ settings, sim, tool, running, canRun = true, d
   if (sim.surveying) line = { icon: '🛰️', text: 'Survey drone is scanning the field…', tone: 'status-line' };
   else if (running && settings.treatment !== 'none') line = { icon: '🚁', text: droneStatus(sim, detailed), tone: 'status-line' };
   else if (!running && toolHint && !sim.finished) line = { icon: '✏️', text: toolHint, tone: 'tool-hint' };
-  else if (!running && sim.time === 0 && canRun) line = { icon: '▶', text: 'Press Run to start.', tone: 'hint-strong' };
+  else if (!running && !sim.runStarted && canRun) line = { icon: '▶', text: 'Press Run to start.', tone: 'hint-strong' };
   else line = { icon: '💡', text: tip, tone: 'tip' };
   return (
     <div className="explain" role="status">

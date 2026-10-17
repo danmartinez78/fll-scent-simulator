@@ -123,7 +123,7 @@ export function MapKey({ settings: s, view, survey }: Props) {
     rows.push([<Device color={COLORS.repellent} letter="R" waiting />, 'Device not dropped yet']);
     rows.push([<Ring color={COLORS.repellent} />, `Dashed circle: how far a repellent reaches (${s.scent.rangeM} m) with no wind`]);
     if (t === 'pushPull')
-      rows.push([<Ring color={COLORS.attractant} />, `Dashed circle: how far pests notice an attractant (${deviceReachM('attractant', s.scent.rangeM)} m)`]);
+      rows.push([<Ring color={COLORS.attractant} />, `Dashed circle: how far pests notice an attractant (${deviceReachM('attractant', s)} m)`]);
   }
   if (treated) rows.push([<Home />, "Drone's home pad"]);
   if (view.showPath && treated) {

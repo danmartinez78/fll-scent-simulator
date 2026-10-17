@@ -107,15 +107,20 @@ function loadMode(): Mode {
   }
 }
 
+/** Guided starts with the no-treatment baseline; the Playground starts with Basic Field. */
+function firstScenario(): Scenario {
+  return (loadMode() === 'guided' && SCENARIOS.find((s) => s.id === 'baseline')) || SCENARIOS[0];
+}
+
 export default function App() {
-  const [scenario, setScenario] = useState<Scenario>(SCENARIOS[0]);
-  const [settings, setSettings] = useState<Settings>(() => structuredClone(SCENARIOS[0].settings));
-  const [plan, setPlanState] = useState<TreatmentPlan>(() => structuredClone(SCENARIOS[0].plan));
-  const [view, setView] = useState<ViewOptions>({ ...DEFAULT_VIEW, ...SCENARIOS[0].view });
+  const [scenario, setScenario] = useState<Scenario>(firstScenario);
+  const [settings, setSettings] = useState<Settings>(() => structuredClone(scenario.settings));
+  const [plan, setPlanState] = useState<TreatmentPlan>(() => structuredClone(scenario.plan));
+  const [view, setView] = useState<ViewOptions>(() => ({ ...DEFAULT_VIEW, ...scenario.view }));
   const [surveyLayer, setSurveyLayer] = useState<SurveyLayer>('camera');
   const [selectedSurveyId, setSelectedSurveyId] = useState<number | null>(null);
   const [instructor, setInstructor] = useState(false);
-  const [tool, setTool] = useState<Tool>(() => defaultTool(SCENARIOS[0].settings.treatment));
+  const [tool, setTool] = useState<Tool>(() => scenario.startTool ?? defaultTool(scenario.settings.treatment));
   const [running, setRunning] = useState(false);
   const [speed, setSpeed] = useState(1);
   const [pendingReset, setPendingReset] = useState(false);
@@ -156,10 +161,16 @@ export default function App() {
     }
   }, []);
 
-  const resetSim = useCallback((s: Settings, p: TreatmentPlan) => {
-    simRef.current = new Simulation(s, p);
+  /**
+   * Start the run over. Surveys flown before the run are kept (unless
+   * `fresh`), so trying a new plan does not mean flying the survey again.
+   */
+  const resetSim = useCallback((s: Settings, p: TreatmentPlan, fresh = false) => {
+    const next = new Simulation(s, p);
+    const kept = fresh ? 0 : next.adoptSurveysFrom(simRef.current);
+    simRef.current = next;
     finishAck.current = false;
-    surveysSeen.current = 0;
+    surveysSeen.current = kept;
     setSelectedSurveyId(null);
     setRunning(false);
     setPendingReset(false);
@@ -217,7 +228,7 @@ export default function App() {
       const sim = simRef.current;
       setSettings(next);
       if (needsReset(sim.settings, next)) {
-        if (sim.time === 0) resetSim(next, plan);
+        if (!sim.runStarted) resetSim(next, plan);
         else {
           setPendingReset(true);
           sim.updateSettings(liveSettings(sim.settings, next));
@@ -235,12 +246,14 @@ export default function App() {
     (next: GuidedStep) => {
       const sim = simRef.current;
       if (next !== 'run' && !sim.surveying) setRunning(false);
-      if (next === 'plan' && sim.time > 0 && !sim.treatmentWaiting) resetSim(settings, plan);
+      if (next === 'plan' && sim.runStarted) resetSim(settings, plan);
       setStepState(next);
+      // Compare reveals where the pests really were on a mission that hides them.
+      if (scenario.view?.showPests === false) setSurveyLayer(next === 'compare' ? 'truth' : 'camera');
       // On a phone the page scrolls, so start each step at the top.
       if (phone) window.scrollTo(0, 0);
     },
-    [resetSim, settings, plan, phone]
+    [resetSim, settings, plan, phone, scenario]
   );
 
   const setPlan = useCallback((p: TreatmentPlan) => {
@@ -256,8 +269,8 @@ export default function App() {
       setSettings(s);
       setPlanState(p);
       setView({ ...DEFAULT_VIEW, ...sc.view });
-      setTool(defaultTool(s.treatment));
-      resetSim(s, p);
+      setTool(sc.startTool ?? defaultTool(s.treatment));
+      resetSim(s, p, true);
     },
     [resetSim]
   );
@@ -269,7 +282,7 @@ export default function App() {
       const known = SCENARIOS.find((s) => s.name === setup.scenarioName);
       if (known) setScenario(known);
       setTool(defaultTool(setup.settings.treatment));
-      resetSim(setup.settings, setup.plan);
+      resetSim(setup.settings, setup.plan, true);
     },
     [resetSim]
   );
@@ -335,6 +348,9 @@ export default function App() {
 
   const sim = simRef.current;
   const surveys = sim.surveys;
+  // Guided Compare on a mission that hides the pests: show them, and allow the "real pests" survey layer.
+  const revealing = mode === 'guided' && step === 'compare' && sim.runStarted && scenario.view?.showPests === false;
+  const mapView = revealing ? { ...view, showPests: true } : view;
   const shownSurvey: SurveyResult | null = useMemo(() => {
     if (!surveys.length) return null;
     return surveys.find((s) => s.id === selectedSurveyId) ?? surveys[surveys.length - 1];
@@ -447,6 +463,8 @@ export default function App() {
               activeEntryId={activeEntryId}
               onUpdateEntry={(id, patch) => setEntries((list) => list.map((e) => (e.id === id ? { ...e, ...patch } : e)))}
               onOpenNotebook={() => setNotebookOpen(true)}
+              surveyLayer={surveyLayer}
+              onSurveyLayer={setSurveyLayer}
               onTryAgain={() => {
                 resetSim(settings, plan);
                 setStep('plan');
@@ -457,7 +475,7 @@ export default function App() {
               settings={settings}
               plan={plan}
               tool={tool}
-              simStarted={sim.time > 0}
+              simStarted={sim.runStarted}
               onSettings={updateSettings}
               onPlan={setPlan}
               onTool={setTool}
@@ -491,22 +509,24 @@ export default function App() {
             onSpeed={setSpeed}
             onSurvey={startSurvey}
             onView={setView}
-            showSurvey={mode === 'playground' || scenario.id === 'survey'}
+            // In Guided the survey is flown from the Plan step: once the run starts the plan can't change.
+            showSurvey={mode === 'playground'}
+            started={sim.runStarted}
             controls={canRun}
             lockedNote={lockedNote}
           />
           <div className="canvas-wrap">
             <SimulationCanvas
               simRef={simRef}
-              view={view}
-              surveyLayer={instructor ? surveyLayer : surveyLayer === 'truth' ? 'camera' : surveyLayer}
+              view={mapView}
+              surveyLayer={instructor || revealing ? surveyLayer : surveyLayer === 'truth' ? 'camera' : surveyLayer}
               survey={shownSurvey}
               tool={mapTool}
               plan={plan}
               settings={settings}
               onPlan={setPlan}
             />
-            {guided && (step === 'mission' || step === 'predict') && sim.time === 0 && (
+            {guided && (step === 'mission' || step === 'predict') && !sim.runStarted && (
               <div className="preview-tag" aria-hidden="true">
                 👀 Preview
               </div>
@@ -529,10 +549,10 @@ export default function App() {
             )}
             {notice === 'survey' && (
               <div className="notice" role="status">
-                <strong>Survey finished.</strong> The colored squares are what the camera software thinks it saw. Is it right everywhere?
+                <strong>Survey finished.</strong> The colored squares are what the camera software thinks it saw. It may be wrong in places.
                 <div className="notice-actions">
                   <button className="btn primary" onClick={() => { setNotice(null); if (mode === 'guided') setStep('plan'); }}>
-                    Plan a treatment
+                    {guided ? 'Got it' : 'Plan a treatment'}
                   </button>
                   {!guided && (
                     <button className="btn" onClick={() => { setNotice(null); simRef.current.startTreatment(); setRunning(true); }}>
@@ -543,7 +563,7 @@ export default function App() {
               </div>
             )}
           </div>
-          <MapKey settings={settings} view={view} survey={!!shownSurvey} />
+          <MapKey settings={settings} view={mapView} survey={!!shownSurvey} />
           <ExperimentPanel settings={settings} sim={sim} tool={mapTool} running={running} canRun={canRun} detailed={!guided} />
         </section>
 

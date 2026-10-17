@@ -36,24 +36,22 @@ describe('optimizer', () => {
     expect(opt.bestMetrics!.devicesUsed).toBeLessThanOrEqual(4);
   });
 
-  it('keeps attractant traps in the grass border, never on the crop', () => {
+  it('tries traps both around the border and where the pests are', () => {
     const s = settingsWith({ treatment: 'pushPull', devices: { maxDevices: 12 }, run: { durationMin: 5 } });
     const crop = cropRect(s.field);
     const opt = new Optimizer(s, { kind: 'none' }, 1, 60);
-    const plans = [...opt.startingIdeas().map((i) => i.plan)];
-    let p = opt.randomPlan();
-    for (let i = 0; i < 300; i++) plans.push((p = opt.mutate(p)));
-    let traps = 0;
-    for (const plan of plans) {
-      for (const d of plan.devices) {
+    let inCrop = 0;
+    let outside = 0;
+    for (const idea of opt.startingIdeas()) {
+      for (const d of idea.plan.devices) {
         if (d.kind !== 'attractant') continue;
-        traps++;
         expect(d.trap).toBe(true);
-        const inside = d.x > crop.x && d.x < crop.x + crop.w && d.y > crop.y && d.y < crop.y + crop.h;
-        expect(inside).toBe(false);
+        if (d.x > crop.x && d.x < crop.x + crop.w && d.y > crop.y && d.y < crop.y + crop.h) inCrop++;
+        else outside++;
       }
     }
-    expect(traps).toBeGreaterThan(20);
+    expect(inCrop).toBeGreaterThan(5);
+    expect(outside).toBeGreaterThan(5);
   });
 
   it('tries push-pull ideas with different numbers of traps', () => {

@@ -131,17 +131,19 @@ export const SCENARIOS: Scenario[] = [
     id: 'survey',
     name: 'Survey Uncertainty',
     purpose:
-      'You cannot see the real pests here. Fly the survey drone to find them, but the camera is not perfect.',
-    question: 'Does knowing where pests are help you plan, even when the map has mistakes?',
+      'You cannot see the pests here, and you only have 3 traps. Fly the survey drone to find where the pests gather, then put the traps there. The camera is not perfect.',
+    question: 'Can a survey help you put a few traps in the right places, even when its map has mistakes?',
     settings: settingsWith({
-      treatment: 'spray',
+      treatment: 'pushPull',
       // The pests are already there, so the survey has something to find.
       pests: { distribution: 'hotspots', hotspotCount: 3, buildUpDays: 0 },
-      drone: { productAvailableGal: 6 },
+      // A short-range lure, so where each trap goes matters.
+      devices: { maxDevices: 3, lureReach: 2 },
       survey: { detectionPct: 75, falsePositivesPer1000m2: 1.5, positionNoiseM: 6, uncertainPct: 10 }
     }),
     plan: emptyPlan(),
-    view: { showPests: false, showSurvey: true }
+    view: { showPests: false, showSurvey: true },
+    startTool: 'trap'
   },
   {
     id: 'flighttime',

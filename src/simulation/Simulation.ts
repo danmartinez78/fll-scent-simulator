@@ -125,6 +125,11 @@ export class Simulation {
   history: HistoryPoint[] = [];
   finished = false;
   /**
+   * True once the run itself has begun. A survey flown before the run moves
+   * the clock a little but does not start the run.
+   */
+  runStarted = false;
+  /**
    * False until the treatment starts. A survey flown before the first Run
    * keeps the treatment drone and devices waiting until the run starts.
    */
@@ -296,6 +301,20 @@ export class Simulation {
     }
   }
 
+  /**
+   * Keep the surveys another run of the same field flew before it started, so
+   * starting over does not mean flying the survey again. Only used when the
+   * pests start the same way (same field, pests and seed), so the map still fits.
+   */
+  adoptSurveysFrom(old: Simulation): number {
+    const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
+    const s = this.settings;
+    const o = old.settings;
+    if (!same(s.field, o.field) || !same(s.pests, o.pests) || s.run.seed !== o.run.seed || !same(s.survey, o.survey)) return 0;
+    this.surveys = old.surveys.filter((r) => r.beforeRun).map((r) => ({ ...r }));
+    return this.surveys.length;
+  }
+
   /** True while a survey flown before the first Run is keeping the treatment waiting. */
   get treatmentWaiting(): boolean {
     return this.holdTreatment && !this.treatmentStarted;
@@ -327,8 +346,11 @@ export class Simulation {
   private pestEnvironment(): PestEnvironment {
     const s = this.settings;
     const traps: Vec[] = [];
+    const lures: Vec[] = [];
     for (const d of this.devices) {
-      if (d.kind === 'attractant' && d.trap && d.activatedAt !== null && this.treatmentStarted) traps.push({ x: d.x, y: d.y });
+      if (d.kind !== 'attractant' || !this.treatmentStarted || !deviceActive(d, this.time, s.devices.lifetimeMin)) continue;
+      lures.push({ x: d.x, y: d.y });
+      if (d.trap) traps.push({ x: d.x, y: d.y });
     }
     return {
       width: s.field.width,
@@ -342,7 +364,8 @@ export class Simulation {
       effectiveness: (s.scent.effectivenessPct ?? 100) / 100,
       cropAttraction: s.pests.cropAttraction,
       speed: s.pests.speed,
-      traps
+      traps,
+      lures
     };
   }
 
@@ -389,7 +412,10 @@ export class Simulation {
     const s = this.settings;
     const cell = this.repellent.cell;
     const cols = this.repellent.cols;
-    if (!this.holdTreatment) this.startTreatment();
+    if (!this.holdTreatment) {
+      this.runStarted = true;
+      this.startTreatment();
+    }
     const treating = this.treatmentStarted;
     // While a drone flies, the field clock runs in real time and the field
     // itself barely changes; otherwise it runs as a time-lapse.
@@ -428,7 +454,7 @@ export class Simulation {
     });
 
     // Slow-release devices: steady scent while they last.
-    const lureRange = deviceReachM('attractant', s.scent.rangeM);
+    const lureRange = deviceReachM('attractant', s);
     const emitRep = deviceEmissionRate(s.scent.strength, s.devices.releaseRate, s.scent.rangeM) * bioDt;
     const emitAtt = deviceEmissionRate(s.scent.strength, s.devices.releaseRate, lureRange) * bioDt;
     for (const d of this.devices) {
@@ -473,9 +499,8 @@ export class Simulation {
     if (this.survey && !this.survey.done) {
       this.survey.step(dt, this.pests, this.rngSurvey);
       if (this.survey.done) {
-        this.surveys.push(
-          this.survey.result(this.crop, (sq) => this.damageLevelIn(sq), this.rngSurvey, this.fieldTime + dt)
-        );
+        const result = this.survey.result(this.crop, (sq) => this.damageLevelIn(sq), this.rngSurvey, this.fieldTime + dt);
+        this.surveys.push(this.runStarted ? result : { ...result, beforeRun: true });
       }
     }
 
