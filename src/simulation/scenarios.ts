@@ -15,7 +15,7 @@ export function defaultSettings(): Settings {
       buildUpDays: 10
     },
     wind: { direction: 90, speedMph: 0, changing: false },
-    scent: { strength: 1, lifetimeMin: 7, rangeM: 18, threshold: 0.15, effectivenessPct: 80 },
+    scent: { strength: 1, lifetimeMin: 2, rangeM: 18, threshold: 0.15, effectivenessPct: 80 },
     treatment: 'spray',
     drone: { ...T50_REFERENCE },
     devices: { maxDevices: 12, releaseRate: 1, lifetimeMin: 60, massKg: 0.5, perTrip: 4, deployByDrone: true },

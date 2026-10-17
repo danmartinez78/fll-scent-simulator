@@ -62,7 +62,7 @@ function tipsFor(s: Settings, sim: Simulation): string[] {
   const tips: string[] = [];
   if (s.treatment === 'none') tips.push('No treatment is your baseline: it shows what happens naturally.');
   if (s.treatment === 'spray') {
-    tips.push('Spray coats the plants right away, then wears off over about a week. Watch the purple fade.');
+    tips.push('Spray coats the plants right away, but natural scents evaporate in a few days. Watch the purple fade.');
     tips.push('After the run, check the chart: when does scent coverage start to drop, and what do the pests do then?');
     if ((s.drone.resprayEveryDays ?? 0) === 0) tips.push('This plan sprays only once. What would spraying again every week change, and what would it cost?');
   }
@@ -70,13 +70,13 @@ function tipsFor(s: Settings, sim: Simulation): string[] {
     tips.push('Each device only protects the dashed circle around it. Where are the gaps between circles?');
     tips.push('Watch where the pests go. Do they leave the field, or just move to a spot with no scent?');
   }
-  if (s.treatment === 'slowRelease') tips.push('Devices keep giving off scent for weeks. A spray wears off in about a week. Which matters more here?');
+  if (s.treatment === 'slowRelease') tips.push('Devices keep giving off scent for weeks. A spray of natural scent fades in a few days. Which matters more here?');
   if ((s.treatment === 'slowRelease' || s.treatment === 'pushPull') && s.wind.speedMph > 0)
     tips.push('Wind pushes each device\'s scent downwind. Does a device protect more crop upwind or downwind of it?');
   if (s.treatment === 'pushPull') tips.push('Push-pull: the repellent pushes pests off the crop while the attractant pulls them somewhere else.');
   if (s.wind.speedMph > 0) tips.push('Wind can carry scent farther in one direction.');
   if (s.wind.speedMph >= 12) tips.push('Strong wind carries scent far, but it also spreads it thin.');
-  if (s.scent.lifetimeMin <= 3) tips.push('This scent only lasts a short time. What happens when it fades?');
+  if (s.scent.lifetimeMin <= 1) tips.push('This scent only lasts a short time. What happens when it fades?');
   if (sim.surveys.length) tips.push('Survey results may not show every pest.');
   else tips.push('Do you know where the pests are? A survey drone could help you find out.');
   tips.push('Pests shown in orange are being bothered by repellent; dark pests are feeding or flying normally.');

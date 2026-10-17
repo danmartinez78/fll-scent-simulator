@@ -61,7 +61,7 @@ export const HELP: Record<string, HelpTopic> = {
   },
   spray: {
     title: 'Spraying',
-    text: 'The drone flies back and forth and sprays scent over the zones you draw. Wind pushes the falling drops downwind, so in a breeze the spray lands a little downwind of the drone and some blows off the field. The spray stays on the plants and wears off over about a week, but its smell drifts downwind.'
+    text: 'The drone flies back and forth and sprays scent over the zones you draw. Wind pushes the falling drops downwind, so in a breeze the spray lands a little downwind of the drone and some blows off the field. The spray stays on the plants and wears off in a few days, but its smell drifts downwind.'
   },
   scentStrength: {
     title: 'Scent strength',
@@ -69,7 +69,7 @@ export const HELP: Record<string, HelpTopic> = {
   },
   scentLifetime: {
     title: 'Spray lasts on plants',
-    text: 'Sprayed repellent coats the leaves and slowly wears off. After this long, about a third of it is left. Real repellent sprays usually work for about 5 to 14 days.'
+    text: 'Sprayed repellent coats the leaves and wears off. After this long, about a third of it is left. Natural scents like plant oils evaporate and break down in sunlight, so sprays of them usually work for only a few days. Slow-release devices hold the scent inside, so they last for weeks.'
   },
   treatStart: {
     title: 'When to start treating',
@@ -81,7 +81,7 @@ export const HELP: Record<string, HelpTopic> = {
   },
   respray: {
     title: 'How often to spray',
-    text: 'Sprayed repellent wears off after about a week, so farmers often spray again. Each repeat spray is a whole new drone mission: it uses more product, more flight time and costs more.'
+    text: 'A sprayed natural scent wears off in a few days, so farmers often spray again. Each repeat spray is a whole new drone mission: it uses more product, more flight time and costs more.'
   },
   timeLapse: {
     title: 'Two clocks',
@@ -89,7 +89,7 @@ export const HELP: Record<string, HelpTopic> = {
   },
   sprayVsDevices: {
     title: 'Spray or devices?',
-    text: 'Spray covers every spot you draw, all at once, but it wears off over about a week, so you may need to spray again. A slow-release device keeps working for weeks, but only protects the circle around it, and you only have so many. Which one wins depends on how big the field is, where the pests are, the wind and your budget. Try both and compare!'
+    text: 'Spray covers every spot you draw, all at once, but a natural scent wears off in a few days, so you may need to spray again and again. A slow-release device keeps working for weeks, but only protects the circle around it, and you only have so many. Which one wins depends on how big the field is, where the pests are, the wind and your budget. Try both and compare!'
   },
   planCoverage: {
     title: 'How much crop your plan covers',
