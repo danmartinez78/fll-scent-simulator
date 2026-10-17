@@ -41,7 +41,8 @@ export const COLORS = {
   /** Marks where an insect was killed. */
   dead: '#111827',
   pest: '#2b2118',
-  pestAgitated: '#c2410c',
+  // Light orange, so a pest being pushed away never looks like a red ladybug.
+  pestAgitated: '#fb923c',
   /** Pests that ignore scent (shown only when a treatment is in use). */
   pestIgnores: '#1d4ed8',
   zone: '#2563eb',
@@ -496,12 +497,36 @@ function drawWindStreaks(ctx: CanvasRenderingContext2D, sim: Simulation, clock: 
   ctx.stroke();
 }
 
+/** × marks where insects were killed: helpful ones where they fell, and pests killed by pesticide. */
+function drawKilled(ctx: CanvasRenderingContext2D, sim: Simulation, s: number): void {
+  const h = sim.helpers;
+  // Killed insects: helpful ones where they fell, and pests killed by pesticide.
+  const m = Math.max(0.8, 2.2 / s);
+  const cross = (x: number, y: number) => {
+    ctx.moveTo(x - m, y - m);
+    ctx.lineTo(x + m, y + m);
+    ctx.moveTo(x + m, y - m);
+    ctx.lineTo(x - m, y + m);
+  };
+  ctx.lineWidth = 1.2 / s;
+  ctx.strokeStyle = COLORS.ladybug;
+  ctx.beginPath();
+  for (let i = 0; i < h.n; i++) if (h.died[i]) cross(h.x[i], h.y[i]);
+  ctx.stroke();
+  ctx.strokeStyle = 'rgba(17,24,39,0.6)';
+  ctx.beginPath();
+  const p = sim.pests;
+  for (let i = 0; i < p.n; i++) if (p.fate[i] === FATE_POISONED) cross(p.x[i], p.y[i]);
+  ctx.stroke();
+}
+
 /** How see-through the faded insects are while the other group is in the spotlight. */
 const FADED = 0.12;
 
 /** Pests matching `which`, in one color: a small oval body with two feelers, like an aphid. */
 function drawPests(ctx: CanvasRenderingContext2D, p: Simulation['pests'], s: number, color: string, which: (i: number) => boolean): void {
-  const pr = Math.max(0.7, 2 / s);
+  // About the size of the old dots; the feelers only show when the map is big enough to see them.
+  const pr = Math.max(0.6, 1.7 / s);
   const rx = pr * 0.75;
   const ry = pr * 1.15;
   ctx.fillStyle = color;
@@ -514,8 +539,9 @@ function drawPests(ctx: CanvasRenderingContext2D, p: Simulation['pests'], s: num
     ctx.ellipse(x, y, rx, ry, 0, 0, Math.PI * 2);
   }
   ctx.fill();
+  if (pr * s < 2.2) return;
   ctx.strokeStyle = color;
-  ctx.lineWidth = 0.7 / s;
+  ctx.lineWidth = 0.6 / s;
   ctx.beginPath();
   for (let i = 0; i < p.n; i++) {
     if (!which(i)) continue;
@@ -532,13 +558,14 @@ function drawPests(ctx: CanvasRenderingContext2D, p: Simulation['pests'], s: num
 /** Bees (yellow with a black stripe) and ladybugs (red with spots), plus × marks where insects were killed. */
 function drawHelpers(ctx: CanvasRenderingContext2D, sim: Simulation, s: number): void {
   const h = sim.helpers;
-  const r = Math.max(1.1, 3 / s);
+  // A little bigger than a pest, but not much, so they don't crowd the map.
+  const r = Math.max(0.8, 2.3 / s);
   const alive = (kind: number) => (i: number) => !h.died[i] && h.kind[i] === kind;
   const isBee = alive(BEE);
   const isLadybug = alive(LADYBUG);
-  // Bodies with a thin dark outline.
-  ctx.strokeStyle = '#111827';
-  ctx.lineWidth = 0.7 / s;
+  // Bodies with a thin outline.
+  ctx.strokeStyle = 'rgba(17,24,39,0.45)';
+  ctx.lineWidth = 0.5 / s;
   for (const [is, color, rx, ry] of [
     [isBee, COLORS.bee, r * 1.25, r * 0.85],
     [isLadybug, COLORS.ladybug, r, r]
@@ -553,7 +580,8 @@ function drawHelpers(ctx: CanvasRenderingContext2D, sim: Simulation, s: number):
     ctx.fill();
     ctx.stroke();
   }
-  // Markings: a stripe across each bee, two spots and a wing line on each ladybug.
+  // Markings, when the map is big enough to see them: a stripe across each bee, two spots and a wing line on each ladybug.
+  if (r * s < 2.8) return drawKilled(ctx, sim, s);
   ctx.fillStyle = '#111827';
   ctx.beginPath();
   for (let i = 0; i < h.n; i++) {
@@ -575,24 +603,7 @@ function drawHelpers(ctx: CanvasRenderingContext2D, sim: Simulation, s: number):
     ctx.lineTo(h.x[i], h.y[i] + r);
   }
   ctx.stroke();
-  // Killed insects: helpful ones where they fell, and pests killed by pesticide.
-  const m = Math.max(0.8, 2.2 / s);
-  const cross = (x: number, y: number) => {
-    ctx.moveTo(x - m, y - m);
-    ctx.lineTo(x + m, y + m);
-    ctx.moveTo(x + m, y - m);
-    ctx.lineTo(x - m, y + m);
-  };
-  ctx.lineWidth = 1.2 / s;
-  ctx.strokeStyle = COLORS.ladybug;
-  ctx.beginPath();
-  for (let i = 0; i < h.n; i++) if (h.died[i]) cross(h.x[i], h.y[i]);
-  ctx.stroke();
-  ctx.strokeStyle = 'rgba(17,24,39,0.6)';
-  ctx.beginPath();
-  const p = sim.pests;
-  for (let i = 0; i < p.n; i++) if (p.fate[i] === FATE_POISONED) cross(p.x[i], p.y[i]);
-  ctx.stroke();
+  drawKilled(ctx, sim, s);
 }
 
 /** Rain over the map: a dim wash and slanted streaks that move with the clock. */

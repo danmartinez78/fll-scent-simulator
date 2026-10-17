@@ -118,7 +118,8 @@ textarea {
 .layout {
   flex: 1;
   display: grid;
-  grid-template-columns: 300px minmax(0, 1fr) 370px;
+  /* The side panels give up some width on 4:3 and laptop screens so the map keeps room. */
+  grid-template-columns: clamp(250px, 21vw, 300px) minmax(0, 1fr) clamp(330px, 27vw, 370px);
   gap: 12px;
   padding: 12px;
   min-height: 0;
@@ -132,8 +133,10 @@ textarea {
 }
 .panel.left {
   padding: 6px;
+  container-type: inline-size;
 }
 .panel.right {
+  container-type: inline-size;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -1988,39 +1991,82 @@ textarea {
   color: var(--ink);
 }
 
-/* Map key: tap an insect to put its kind in the spotlight. */
-.map-key-body {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
+/* Map key: tap a kind of insect to put it in the spotlight. */
+.map-key {
+  font-size: 12px;
+  flex-wrap: wrap;
+}
+.map-key-list {
+  gap: 1px 12px;
+  flex: 1 1 400px;
+}
+.map-key-list svg {
+  width: 14px;
+  height: 14px;
+}
+.key-insects b {
+  font-weight: 700;
+}
+.key-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
 }
 .key-spot {
   display: flex;
   align-items: center;
-  gap: 4px;
-  border: 1px solid transparent;
+  gap: 4px 8px;
+  border: 1px solid var(--line);
   border-radius: 999px;
-  background: none;
-  padding: 0 6px 0 2px;
-  margin-left: -3px;
+  background: #fff;
+  padding: 0 8px;
+  margin-left: -4px;
   font: inherit;
   color: inherit;
   cursor: pointer;
 }
 .key-spot:hover {
-  border-color: var(--line);
   background: #f8fafc;
 }
 .key-spot.on {
   border-color: var(--accent);
   background: var(--accent-soft);
-  font-weight: 600;
 }
 .key-spot.faded {
   opacity: 0.45;
 }
 .key-hint {
-  margin: 0;
-  font-size: 12px;
+  flex-basis: 100%;
+  font-size: 11.5px;
   color: var(--muted);
+}
+
+/* A narrow controls panel: one method per row, title and description side by side. */
+@container (max-width: 340px) {
+  .method-grid {
+    grid-template-columns: 1fr;
+    gap: 4px;
+  }
+  .method {
+    padding: 5px 8px;
+  }
+  .method-text {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: baseline;
+    column-gap: 6px;
+  }
+}
+/* A narrow results panel: smaller icons so the labels fit on one line. */
+@container (max-width: 350px) {
+  .metric {
+    padding: 6px 8px;
+    column-gap: 4px;
+  }
+  .metric-icon {
+    font-size: 15px;
+  }
+  .metric-value {
+    font-size: 18px;
+  }
 }
