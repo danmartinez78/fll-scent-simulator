@@ -37,13 +37,16 @@ export function droneStatus(sim: Simulation, detailed = true): string {
       if (sim.treatmentScheduled)
         return `Drone is waiting at home (H). The treatment starts on Day ${sim.settings.run.treatStartDay ?? 1}.`;
       if (sim.treatmentWaiting) return 'Drone is waiting at home (H) until you press Run to start the treatment.';
+      if (d.outOfBudget) return 'Drone is parked: the money for this season is used up, so the rest of the plan was skipped.';
       if (d.outOfProduct) return 'Drone is parked: it ran out of product.';
       if (d.gaveUp) return 'Drone is parked: the job is too far for one battery.';
       return d.flights > 0 ? 'Drone is parked: all jobs done.' : 'Drone is parked at home (H), waiting for a plan.';
     case 'turnaround':
       return `Drone is on the ground: refilling and swapping the battery (${Math.ceil(d.turnaroundLeft)} s left).`;
     case 'returning':
-      return d.lastReturnReason === 'battery'
+      return d.lastReturnReason === 'budget'
+        ? 'Drone is flying home: the money is almost used up, so it stops here.'
+        : d.lastReturnReason === 'battery'
         ? `Drone is flying home: the battery reached the reserve (${battery}).`
         : d.lastReturnReason === 'refill'
           ? 'Drone is flying home to refill the tank.'
@@ -61,12 +64,22 @@ export function droneStatus(sim: Simulation, detailed = true): string {
 function tipsFor(s: Settings, sim: Simulation): string[] {
   const tips: string[] = [];
   if (s.treatment === 'none') tips.push('No treatment is your baseline: it shows what happens naturally.');
-  if (s.treatment === 'spray') tips.push('Spray acts right away, but the scent drifts and fades over time.');
-  if (s.treatment === 'slowRelease') tips.push('A slow-release source stays in one place but can remain active longer.');
+  if (s.treatment === 'spray') {
+    tips.push('Spray coats the plants right away, but natural scents evaporate in a few days. Watch the purple fade.');
+    tips.push('After the run, check the chart: when does scent coverage start to drop, and what do the pests do then?');
+    if ((s.drone.resprayEveryDays ?? 0) === 0) tips.push('This plan sprays only once. What would spraying again every week change, and what would it cost?');
+  }
+  if (s.treatment === 'slowRelease' || s.treatment === 'pushPull') {
+    tips.push('Each device only protects the dashed circle around it. Where are the gaps between circles?');
+    tips.push('Watch where the pests go. Do they leave the field, or just move to a spot with no scent?');
+  }
+  if (s.treatment === 'slowRelease') tips.push('Devices keep giving off scent for weeks. A spray of natural scent fades in a few days. Which matters more here?');
+  if ((s.treatment === 'slowRelease' || s.treatment === 'pushPull') && s.wind.speedMph > 0)
+    tips.push('Wind pushes each device\'s scent downwind. Does a device protect more crop upwind or downwind of it?');
   if (s.treatment === 'pushPull') tips.push('Push-pull: the repellent pushes pests off the crop while the attractant pulls them somewhere else.');
   if (s.wind.speedMph > 0) tips.push('Wind can carry scent farther in one direction.');
   if (s.wind.speedMph >= 12) tips.push('Strong wind carries scent far, but it also spreads it thin.');
-  if (s.scent.lifetimeMin <= 3) tips.push('This scent only lasts a short time. What happens when it fades?');
+  if (s.scent.lifetimeMin <= 1) tips.push('This scent only lasts a short time. What happens when it fades?');
   if (sim.surveys.length) tips.push('Survey results may not show every pest.');
   else tips.push('Do you know where the pests are? A survey drone could help you find out.');
   tips.push('Pests shown in orange are being bothered by repellent; dark pests are feeding or flying normally.');

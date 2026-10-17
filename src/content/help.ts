@@ -49,11 +49,11 @@ export const HELP: Record<string, HelpTopic> = {
   },
   attractant: {
     title: 'Attractant',
-    text: 'A scent that pests tend to move toward. Put a trap with it and pests that reach it get caught. It is a generic "Attractant B", not a real product.'
+    text: 'A scent that pests tend to move toward. Pests notice a faint attractant from much farther away than a repellent, about three times as far. Put a trap with it and pests that reach it get caught. It is a generic "Attractant B", not a real product.'
   },
   pushPull: {
     title: 'Push-pull',
-    text: 'Push-pull uses two scents together: a repellent "pushes" pests off the crop while an attractant "pulls" them somewhere else, like a trap at the edge.'
+    text: 'Push-pull uses two scents together: a repellent "pushes" pests off the crop while an attractant "pulls" them somewhere else, like a trap out in the grass. Every trap is one less repellent, so it is a trade. A trap on the crop, or inside a repellent cloud, works against you.'
   },
   slowRelease: {
     title: 'Slow-release source',
@@ -61,7 +61,7 @@ export const HELP: Record<string, HelpTopic> = {
   },
   spray: {
     title: 'Spraying',
-    text: 'The drone flies back and forth and sprays scent over the zones you draw. Wind pushes the falling drops downwind, so in a breeze the spray lands a little downwind of the drone and some blows off the field. The spray stays on the plants and wears off over about a week, but its smell drifts downwind.'
+    text: 'The drone flies back and forth and sprays scent over the zones you draw. Wind pushes the falling drops downwind, so in a breeze the spray lands a little downwind of the drone and some blows off the field. The spray stays on the plants and wears off in a few days, but its smell drifts downwind.'
   },
   scentStrength: {
     title: 'Scent strength',
@@ -69,7 +69,7 @@ export const HELP: Record<string, HelpTopic> = {
   },
   scentLifetime: {
     title: 'Spray lasts on plants',
-    text: 'Sprayed repellent coats the leaves and slowly wears off. After this long, about a third of it is left. Real repellent sprays usually work for about 5 to 14 days.'
+    text: 'Sprayed repellent coats the leaves and wears off. After this long, about a third of it is left. Natural scents like plant oils evaporate and break down in sunlight, so sprays of them usually work for only a few days. Slow-release devices hold the scent inside, so they last for weeks.'
   },
   treatStart: {
     title: 'When to start treating',
@@ -81,15 +81,27 @@ export const HELP: Record<string, HelpTopic> = {
   },
   respray: {
     title: 'How often to spray',
-    text: 'Sprayed repellent wears off after about a week, so farmers often spray again. Each repeat spray is a whole new drone mission: it uses more product, more flight time and costs more.'
+    text: 'A sprayed natural scent wears off in a few days, so farmers often spray again. Each repeat spray is a whole new drone mission: it uses more product, more flight time and costs more.'
   },
   timeLapse: {
     title: 'Two clocks',
     text: 'While a drone is flying, the clock runs in real time, so flight times are real minutes. When the drone is on the ground, the field runs as a time-lapse: at 1x, one second on screen is about four hours on the farm. Pests, crop damage and fading scent take days, just like on a real farm.'
   },
+  budget: {
+    title: 'Budget',
+    text: 'The money the team has for the whole season: drone flying time, scent product and devices all come out of it. The plan shows what it will cost before you run it. If the money runs out, the drone flies home and the rest of the plan does not happen. With a budget, the question is not just what works, but what works best for the money.'
+  },
+  sprayVsDevices: {
+    title: 'Spray or devices?',
+    text: 'Spray covers every spot you draw, all at once, but a natural scent wears off in a few days, so you may need to spray again and again. A slow-release device keeps working for weeks, but only protects the circle around it, and you only have so many. Which one wins depends on how big the field is, where the pests are, the wind and your budget. Try both and compare!'
+  },
+  planCoverage: {
+    title: 'How much crop your plan covers',
+    text: 'This counts how much of the crop is inside a spray zone or a repellent circle, before anything happens. It is only a first guess: wind moves scent, spray wears off, and some pests ignore scent. Run it to see what really happens.'
+  },
   scentRange: {
     title: 'Effective range',
-    text: 'How far a slow-release device spreads its scent around itself before the wind carries it away.'
+    text: 'How far from a slow-release device pests can notice its scent. A longer range means each device gives off more scent to fill a bigger circle, so fewer devices can cover the field.'
   },
   threshold: {
     title: 'Noticing threshold',

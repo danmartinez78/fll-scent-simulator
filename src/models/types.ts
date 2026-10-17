@@ -124,6 +124,11 @@ export interface CostSettings {
   flightCostPerMin: number;
   materialCostPerGal: number;
   deviceCost: number;
+  /**
+   * Most money the team can spend on the whole run, in dollars. The drone
+   * stops working when the next job would go over it. 0 or missing = no limit.
+   */
+  budget?: number;
 }
 
 export interface ScoreWeights {

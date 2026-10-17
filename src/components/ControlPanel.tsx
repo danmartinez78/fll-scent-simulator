@@ -1,11 +1,13 @@
+import { useMemo } from 'react';
 import type { PestDistribution, Scenario, Settings, TreatmentMethod, TreatmentPlan } from '../models/types';
-import { formatModelMin, modelMinToDays, TIME_LAPSE } from '../utils/fieldTime';
+import { formatModelMin, TIME_LAPSE } from '../utils/fieldTime';
 import { cropRect } from '../simulation/Simulation';
 import { devicesPerTrip } from '../simulation/Drone';
-import { activePlan, estimateSprayLiters } from '../simulation/Treatment';
+import { activePlan, estimateSprayLiters, planCoverage } from '../simulation/Treatment';
 import { parseScenario } from '../simulation/scenarios';
 import { compassLabel, compassName } from '../utils/geometry';
-import { galToL, lToGal, m2ToAcres } from '../utils/units';
+import { formatMoney, galToL, lToGal, m2ToAcres } from '../utils/units';
+import { estimatePlanCost, sprayRounds } from '../simulation/PlanCost';
 import type { Tool } from './SimulationCanvas';
 import { downloadText, InfoButton, NumberField, pickTextFile, Section, Select, Slider, Toggle } from './ui';
 
@@ -65,15 +67,20 @@ export function ControlPanel({ settings: s, plan, tool, simStarted, scenario, on
 
   const eff = activePlan(plan, s.treatment);
   const crop = cropRect(s.field);
+  // Still-air estimate of how much crop the plan reaches, so students can see gaps and overlaps.
+  const coverage = planCoverage(eff, crop, s.scent.rangeM);
+  const repellentCount = eff.devices.filter((d) => d.kind === 'repellent').length;
   const map = { x: 0, y: 0, w: s.field.width, h: s.field.height };
   const planLiters = estimateSprayLiters(eff.sprayZones, map, s.drone);
   const stockL = galToL(s.drone.productAvailableGal);
   // Repeat sprays: one on the start day, then one every N days until the run ends.
-  const every = s.drone.resprayEveryDays ?? 0;
   const startDay = s.run.treatStartDay ?? 1;
-  const runDays = Math.max(0, modelMinToDays(s.run.durationMin) - (startDay - 1));
-  const sprays = every > 0 ? 1 + Math.floor((runDays - 1e-6) / every) : 1;
+  const sprays = sprayRounds(s);
   const totalLiters = planLiters * sprays;
+  const hasPlan = eff.sprayZones.length > 0 || eff.devices.length > 0;
+  // What the whole plan would cost: the drone flies it on its own, quickly, with no pests.
+  const planCost = useMemo(() => (hasPlan && s.treatment !== 'none' ? estimatePlanCost(s, eff).total : 0), [s, plan, hasPlan]);
+  const budget = s.cost.budget ?? 0;
 
   const chooseMethod = (m: TreatmentMethod) => {
     onSettings({ ...s, treatment: m });
@@ -129,6 +136,12 @@ export function ControlPanel({ settings: s, plan, tool, simStarted, scenario, on
                 ))}
               </div>
             </div>
+          )}
+
+          {s.treatment !== 'none' && (
+            <p className="hint small">
+              Spray or devices? They protect the crop in different ways. <InfoButton topic="sprayVsDevices" />
+            </p>
           )}
 
           {s.treatment === 'none' && (
@@ -188,10 +201,16 @@ export function ControlPanel({ settings: s, plan, tool, simStarted, scenario, on
               </div>
               <p className={`plan-summary ${totalLiters > stockL ? 'warn' : ''}`}>
                 {eff.sprayZones.length} zone{eff.sprayZones.length === 1 ? '' : 's'}
-                {sprays > 1 ? ` × ${sprays} sprays` : ''} · needs about {lToGal(totalLiters).toFixed(1)} gal of{' '}
-                {s.drone.productAvailableGal} gal available
-                {totalLiters > stockL && ' — not enough product for all of it!'}
+                {sprays > 1 ? ` × ${sprays} sprays` : ''} · needs about {lToGal(totalLiters).toFixed(1)} gal
+                {totalLiters > stockL
+                  ? `, but this setup only has ${s.drone.productAvailableGal} gal. The drone will run out partway through, so some spraying won't happen.`
+                  : ` (${s.drone.productAvailableGal} gal available)`}
               </p>
+              {eff.sprayZones.length > 0 && (
+                <p className="plan-summary">
+                  Your zones cover about {coverage.coveredPct.toFixed(0)}% of the crop. <InfoButton topic="planCoverage" />
+                </p>
+              )}
             </>
           )}
 
@@ -231,7 +250,23 @@ export function ControlPanel({ settings: s, plan, tool, simStarted, scenario, on
                     : ` · the drone will fly them out in ${trips} trip${trips === 1 ? '' : 's'} (${perTrip} per trip)`
                   : ' · placed by hand at the start'}
               </p>
+              {repellentCount > 0 && (
+                <p className="plan-summary">
+                  The dashed circles show how far each repellent reaches ({s.scent.rangeM} m). Together they cover about{' '}
+                  {coverage.coveredPct.toFixed(0)}% of the crop in still air. <InfoButton topic="planCoverage" />
+                  {coverage.overlapPct >= 20 && ' Some circles overlap, so those devices protect the same spot twice.'}
+                  {s.wind.speedMph > 0 && ' Wind will push each scent patch downwind.'}
+                </p>
+              )}
             </>
+          )}
+          {s.treatment !== 'none' && (hasPlan || budget > 0) && (
+            <p className={`plan-summary ${budget > 0 && planCost > budget ? 'warn' : ''}`}>
+              💲 {hasPlan ? <>This plan will cost about <strong>{formatMoney(planCost)}</strong></> : 'Nothing planned yet'}
+              {budget > 0 && <> of your <strong>{formatMoney(budget)}</strong> budget</>}.{' '}
+              {budget > 0 && planCost > budget && "That's more than you have, so the drone will stop when the money runs out. "}
+              <InfoButton topic="budget" />
+            </p>
           )}
         </Section>
       )}
@@ -317,7 +352,7 @@ export function ControlPanel({ settings: s, plan, tool, simStarted, scenario, on
             info="product"
             value={s.drone.productAvailableGal}
             min={1}
-            max={60}
+            max={100}
             unit="gal"
             onChange={(v) => set('drone', { productAvailableGal: v })}
           />
@@ -378,6 +413,16 @@ export function ControlPanel({ settings: s, plan, tool, simStarted, scenario, on
           <NumberField label="Drone operating cost" value={s.cost.flightCostPerMin ?? 5} min={0} step={0.5} unit="$/min in the air" onChange={(v) => set('cost', { flightCostPerMin: v })} />
           <NumberField label="Scent product" value={s.cost.materialCostPerGal} min={0} step={1} unit="$/gal" onChange={(v) => set('cost', { materialCostPerGal: v })} />
           <NumberField label="Slow-release device" value={s.cost.deviceCost} min={0} step={0.5} unit="$ each" onChange={(v) => set('cost', { deviceCost: v })} />
+          <Slider
+            label="Budget"
+            info="budget"
+            value={s.cost.budget ?? 0}
+            min={0}
+            max={2000}
+            step={50}
+            format={(v) => (v === 0 ? 'no limit' : formatMoney(v))}
+            onChange={(v) => set('cost', { budget: v })}
+          />
         </Section>
       )}
 

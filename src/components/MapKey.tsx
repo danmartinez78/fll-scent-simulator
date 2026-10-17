@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from 'react';
 import type { Settings, ViewOptions } from '../models/types';
 import { COLORS } from '../render/drawScene';
+import { deviceReachM } from '../simulation/Treatment';
 
 const KEY_OPEN = 'scent-sim-key-open';
 
@@ -40,6 +41,11 @@ const Device = ({ color, letter, waiting, trap }: { color: readonly number[]; le
     </svg>
   );
 };
+const Ring = ({ color }: { color: readonly number[] }) => (
+  <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true">
+    <circle cx="9" cy="9" r="7.5" fill={rgb(color, 0.08)} stroke={rgb(color.map((c) => c * 0.7), 0.8)} strokeWidth="1.2" strokeDasharray="2.5 2" />
+  </svg>
+);
 const Line = ({ color, dashed }: { color: string; dashed?: boolean }) => (
   <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true">
     <path d="M2 13 L8 6 L16 9" fill="none" stroke={color} strokeWidth="1.8" strokeDasharray={dashed ? '2.5 2' : undefined} />
@@ -115,6 +121,9 @@ export function MapKey({ settings: s, view, survey }: Props) {
       rows.push([<Device color={COLORS.attractant} letter="A" trap />, 'Attractant with a trap']);
     }
     rows.push([<Device color={COLORS.repellent} letter="R" waiting />, 'Device not dropped yet']);
+    rows.push([<Ring color={COLORS.repellent} />, `Dashed circle: how far a repellent reaches (${s.scent.rangeM} m) with no wind`]);
+    if (t === 'pushPull')
+      rows.push([<Ring color={COLORS.attractant} />, `Dashed circle: how far pests notice an attractant (${deviceReachM('attractant', s.scent.rangeM)} m)`]);
   }
   if (treated) rows.push([<Home />, "Drone's home pad"]);
   if (view.showPath && treated) {

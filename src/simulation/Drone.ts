@@ -23,7 +23,9 @@ export const T50_REFERENCE: DroneSettings = {
   swathM: 7,
   appRateGalPerAcre: 2,
   turnaroundSec: 60,
-  productAvailableGal: 20,
+  // Enough to spray the standard field every 3 days for the whole run, so
+  // product only runs short in missions that limit it on purpose.
+  productAvailableGal: 70,
   takeoffLandingSec: TAKEOFF_LANDING_SEC,
   dropLoiterSec: DROP_LOITER_SEC
 };
@@ -47,6 +49,20 @@ export interface DroneWorld {
   devicesMassKg: number;
   /** Most devices the drop rack holds on one trip (no limit if left out). */
   devicesPerTrip?: number;
+  /** Money and prices, when the run has a budget (see CostSettings.budget). */
+  budget?: DroneBudget;
+}
+
+/** What the drone needs to know to stay within a budget. */
+export interface DroneBudget {
+  /** Dollars not spent yet. */
+  left(): number;
+  /** Flight cost, dollars per second in the air. */
+  perSec: number;
+  /** Dollars per liter of spray. */
+  perLiter: number;
+  /** Dollars per device dropped. */
+  perDevice: number;
 }
 
 /** How many devices fit on one trip: the drop rack's slots or the weight limit, whichever is smaller. */
@@ -89,6 +105,8 @@ export class Drone {
   lastReturnReason = '';
   outOfProduct = false;
   gaveUp = false;
+  /** The money ran out, so the rest of the jobs were dropped. */
+  outOfBudget = false;
 
   // Logbook
   distanceM = 0;
@@ -195,8 +213,26 @@ export class Drone {
     }
   }
 
+  /** Seconds to fly from here to a point, then home, and land. */
+  private secViaHome(p: Vec | null): number {
+    const leg = p ? dist(this.x, this.y, p.x, p.y) + dist(p.x, p.y, this.home.x, this.home.y) : dist(this.x, this.y, this.home.x, this.home.y);
+    return leg / this.settings.speed + this.landingSec;
+  }
+
+  /** Drop every job and stop: the money is used up. */
+  private stopForBudget(): void {
+    this.tasks = [];
+    this.outOfBudget = true;
+  }
+
   private launchIfReady(world: DroneWorld): void {
     if (this.tasks.length === 0) return;
+    // A flight costs at least a takeoff and a landing; don't start one the budget can't pay for.
+    const b = world.budget;
+    if (b && b.left() < 2 * this.landingSec * b.perSec + 1) {
+      this.stopForBudget();
+      return;
+    }
     this.loadUp(world.devicesMassKg, world.devicesPerTrip ?? Infinity);
     if (this.tasks.length === 0) return;
     this.mode = 'flying';
@@ -319,6 +355,20 @@ export class Drone {
     if (!task) {
       this.goHome('done');
       return;
+    }
+    // Budget: keep enough money to finish this job (a drop) or this bit of spray, and fly home.
+    const b = world.budget;
+    if (b) {
+      const need =
+        task.kind === 'drop'
+          ? (this.secViaHome(task.at) + (this.settings.dropLoiterSec ?? DROP_LOITER_SEC)) * b.perSec + b.perDevice
+          : this.secViaHome(null) * b.perSec + (dt * b.perSec + litersForLength(s, stepLen) * b.perLiter) * 2;
+      if (b.left() < need) {
+        if (this.spraying && task.kind === 'spray') task.from = { x: this.x, y: this.y };
+        this.stopForBudget();
+        this.goHome('budget');
+        return;
+      }
     }
 
     if (task.kind === 'drop') {

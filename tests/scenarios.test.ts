@@ -6,7 +6,7 @@ import { needsReset } from '../src/simulation/settingsRules';
 describe('scenarios', () => {
   it('ships the required presets', () => {
     const names = SCENARIOS.map((s) => s.name);
-    for (const n of ['Basic Field', 'Windy Field', 'Pest Hotspots', 'Limited Product', 'Push-Pull', 'Survey Uncertainty', 'Limited Flight Time']) {
+    for (const n of ['Basic Field', 'Windy Field', 'Pest Hotspots', 'Limited Budget', 'Push-Pull', 'Survey Uncertainty', 'Limited Flight Time']) {
       expect(names).toContain(n);
     }
     expect(new Set(SCENARIOS.map((s) => s.id)).size).toBe(SCENARIOS.length);

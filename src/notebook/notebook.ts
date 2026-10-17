@@ -177,6 +177,7 @@ export function summaryRows(c: CapturedRun): Array<[string, string]> {
     ['Drone flight time', `${m.flightTimeMin.toFixed(1)} min`],
     ['Flights', String(m.flights)],
     ['Estimated cost', formatMoney(m.cost.total)],
+    ...(s.cost.budget ? [['Budget', formatMoney(s.cost.budget)] as [string, string]] : []),
     ['Survey', `${c.surveysDone} done; camera ${s.survey.detectionPct}% detection`],
     ['Random seed', String(s.run.seed)]
   ];
@@ -250,4 +251,80 @@ export function parseNotebook(json: string): NotebookEntry[] {
       out.setup = e.setup && e.setup.settings && e.setup.plan ? e.setup : null;
       return out;
     });
+}
+
+/** A run's setup: what was chosen before pressing Run. */
+export interface RunSetup {
+  settings: Settings;
+  plan: TreatmentPlan;
+}
+
+const RESPRAY_NAMES: Record<number, string> = { 0: 'once', 3: 'every 3 days', 7: 'every week' };
+const usesDevices = (m: string) => m === 'slowRelease' || m === 'pushPull';
+
+function windWords(s: Settings): string {
+  if (s.wind.speedMph <= 0) return 'no wind';
+  return `${s.wind.speedMph} mph toward the ${compassName(s.wind.direction)}${s.wind.changing ? ', changing' : ''}`;
+}
+
+function samePlaces<T extends { x: number; y: number }>(a: T[], b: T[], key: (t: T) => string): boolean {
+  const ka = a.map(key).sort();
+  const kb = b.map(key).sort();
+  return ka.length === kb.length && ka.every((k, i) => k === kb[i]);
+}
+
+/**
+ * The things a student changed between two runs, in plain words
+ * ("Method: Spray → Slow-release devices"). Plan details only count when
+ * both runs use that part of the plan, so switching methods is one change.
+ */
+export function describeChanges(before: RunSetup, after: RunSetup): string[] {
+  const a = before.settings;
+  const b = after.settings;
+  const out: string[] = [];
+  const add = (label: string, x: string | number, y: string | number) => {
+    if (x !== y) out.push(`${label}: ${x} → ${y}`);
+  };
+  add('Method', methodName(a.treatment), methodName(b.treatment));
+  add('Treatment starts', `Day ${a.run.treatStartDay ?? 1}`, `Day ${b.run.treatStartDay ?? 1}`);
+
+  const pa = activePlan(before.plan, a.treatment);
+  const pb = activePlan(after.plan, b.treatment);
+  if (a.treatment === 'spray' && b.treatment === 'spray') {
+    const ra = a.drone.resprayEveryDays ?? 0;
+    const rb = b.drone.resprayEveryDays ?? 0;
+    add('How often to spray', RESPRAY_NAMES[ra] ?? `every ${ra} days`, RESPRAY_NAMES[rb] ?? `every ${rb} days`);
+    const zoneKey = (z: { x: number; y: number; w: number; h: number }) => [z.x, z.y, z.w, z.h].map(Math.round).join(',');
+    if (pa.sprayZones.length !== pb.sprayZones.length) add('Spray zones', pa.sprayZones.length, pb.sprayZones.length);
+    else if (!samePlaces(pa.sprayZones, pb.sprayZones, zoneKey)) out.push('Spray zones were moved or resized');
+  }
+  if (usesDevices(a.treatment) && usesDevices(b.treatment)) {
+    const count = (p: TreatmentPlan, kind: string, trap?: boolean) =>
+      p.devices.filter((d) => d.kind === kind && (trap === undefined || d.trap === trap)).length;
+    add('Repellent devices', count(pa, 'repellent'), count(pb, 'repellent'));
+    add('Attractant devices', count(pa, 'attractant', false), count(pb, 'attractant', false));
+    add('Attractant traps', count(pa, 'attractant', true), count(pb, 'attractant', true));
+    const devKey = (d: { x: number; y: number; kind: string; trap: boolean }) => `${Math.round(d.x)},${Math.round(d.y)},${d.kind},${d.trap}`;
+    if (pa.devices.length === pb.devices.length && !samePlaces(pa.devices, pb.devices, devKey)) out.push('Devices were moved');
+  }
+
+  add('Wind', windWords(a), windWords(b));
+  add('Product available', `${a.drone.productAvailableGal} gal`, `${b.drone.productAvailableGal} gal`);
+  add('Budget', a.cost.budget ? formatMoney(a.cost.budget) : 'no limit', b.cost.budget ? formatMoney(b.cost.budget) : 'no limit');
+  add('Device range', `${a.scent.rangeM} m`, `${b.scent.rangeM} m`);
+  add('Scent strength', a.scent.strength, b.scent.strength);
+  add('Spray lasts', formatModelMin(a.scent.lifetimeMin), formatModelMin(b.scent.lifetimeMin));
+  add('Pests that react to scent', `${a.scent.effectivenessPct ?? 100}%`, `${b.scent.effectivenessPct ?? 100}%`);
+  add('Noticing threshold', a.scent.threshold, b.scent.threshold);
+  add('Device release rate', `${a.devices.releaseRate}x`, `${b.devices.releaseRate}x`);
+  add('Device lifetime', formatModelMin(a.devices.lifetimeMin), formatModelMin(b.devices.lifetimeMin));
+  add('Number of pests', a.pests.count, b.pests.count);
+  add('Where pests start', a.pests.distribution, b.pests.distribution);
+  add('Pest sensitivity', a.pests.sensitivity, b.pests.sensitivity);
+  add('Crop attraction', a.pests.cropAttraction, b.pests.cropAttraction);
+  add('Pests keep arriving for', `${a.pests.buildUpDays ?? 0} days`, `${b.pests.buildUpDays ?? 0} days`);
+  add('Run length', formatModelMin(a.run.durationMin), formatModelMin(b.run.durationMin));
+  add('Random seed', a.run.seed, b.run.seed);
+  if (JSON.stringify(a.field) !== JSON.stringify(b.field)) out.push('Field size changed');
+  return out;
 }

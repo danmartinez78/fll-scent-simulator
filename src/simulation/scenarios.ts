@@ -15,7 +15,7 @@ export function defaultSettings(): Settings {
       buildUpDays: 10
     },
     wind: { direction: 90, speedMph: 0, changing: false },
-    scent: { strength: 1, lifetimeMin: 7, rangeM: 12, threshold: 0.15, effectivenessPct: 80 },
+    scent: { strength: 1, lifetimeMin: 2, rangeM: 18, threshold: 0.15, effectivenessPct: 80 },
     treatment: 'spray',
     drone: { ...T50_REFERENCE },
     devices: { maxDevices: 12, releaseRate: 1, lifetimeMin: 60, massKg: 0.5, perTrip: 4, deployByDrone: true },
@@ -47,7 +47,19 @@ export const SCENARIOS: Scenario[] = [
     name: 'Basic Field',
     purpose: 'Learn the controls. Pests are spread evenly, there is no wind, and there is plenty of product.',
     question: 'What happens to the pests when you spray the whole field?',
-    settings: settingsWith({ treatment: 'spray', drone: { productAvailableGal: 30 } }),
+    settings: settingsWith({ treatment: 'spray' }),
+    plan: emptyPlan()
+  },
+  {
+    id: 'sprayVsDevices',
+    name: 'Spray or Devices?',
+    purpose:
+      'Spray the field with the drone (as often as you like), or drop up to 12 slow-release devices. Run both and compare how much crop each one saves, and what it costs.',
+    question: 'Can 12 devices protect as much crop as spraying? Which plan costs less?',
+    settings: settingsWith({
+      treatment: 'spray',
+      devices: { maxDevices: 12 }
+    }),
     plan: emptyPlan()
   },
   {
@@ -81,14 +93,16 @@ export const SCENARIOS: Scenario[] = [
     plan: emptyPlan()
   },
   {
-    id: 'limited',
-    name: 'Limited Product',
-    purpose: 'There is not enough product to treat the whole field. Decide where it goes.',
-    question: 'With only 4 gallons, which parts of the field should get treatment?',
+    id: 'budget',
+    name: 'Limited Budget',
+    purpose:
+      'Pests gather in a few hotspots, and you have $250 for the whole season. Spend it on spray, scent devices or push-pull. The drone stops working when the money runs out.',
+    question: 'With only $250, which plan protects the most crop?',
     settings: settingsWith({
       treatment: 'spray',
       pests: { distribution: 'hotspots', hotspotCount: 4 },
-      drone: { productAvailableGal: 4 }
+      devices: { maxDevices: 40 },
+      cost: { budget: 250 }
     }),
     plan: emptyPlan()
   },

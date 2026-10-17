@@ -141,4 +141,50 @@ describe('wind and spray', () => {
     sim.advance(120);
     expect(sim.residueVapor.centerOfMass().x).toBeGreaterThan(sim.sprayResidue.centerOfMass().x + 1);
   });
+  it('gives a device a bigger noticed patch when its effective range is longer, even in wind', () => {
+    const patch = (rangeM: number, mph: number) => {
+      const s = settingsWith({
+        treatment: 'slowRelease',
+        wind: { direction: 90, speedMph: mph },
+        scent: { rangeM },
+        devices: { deployByDrone: false },
+        pests: { count: 1 },
+        run: { treatStartDay: 1, durationMin: 3 }
+      });
+      const sim = new Simulation(s, { sprayZones: [], devices: [{ id: 1, x: 110, y: 70, kind: 'repellent', trap: false }] });
+      sim.runToEnd();
+      const f = sim.repellent;
+      let cells = 0;
+      for (let i = 0; i < f.data.length; i++) if (f.data[i] > s.scent.threshold) cells++;
+      // Radius of a circle with the same area.
+      return Math.sqrt((cells * f.cell * f.cell) / Math.PI);
+    };
+    for (const mph of [0, 6]) {
+      const r12 = patch(12, mph);
+      const r24 = patch(24, mph);
+      expect(r24).toBeGreaterThan(r12 * 1.6);
+      // The patch reaches about the effective range from the device.
+      expect(r24).toBeGreaterThan(20);
+      expect(r24).toBeLessThan(30);
+    }
+  });
+  it('lets pests notice an attractant from farther away than a repellent', () => {
+    const patch = (kind: 'repellent' | 'attractant') => {
+      const s = settingsWith({
+        treatment: 'pushPull',
+        devices: { deployByDrone: false },
+        pests: { count: 1 },
+        run: { treatStartDay: 1, durationMin: 3 }
+      });
+      const sim = new Simulation(s, { sprayZones: [], devices: [{ id: 1, x: 110, y: 70, kind, trap: false }] });
+      sim.runToEnd();
+      const f = kind === 'repellent' ? sim.repellent : sim.attractant;
+      // Pests notice attractant at half the threshold (see PEST_RULES.attractNoticeFraction).
+      const th = s.scent.threshold * (kind === 'repellent' ? 1 : 0.5);
+      let cells = 0;
+      for (let i = 0; i < f.data.length; i++) if (f.data[i] > th) cells++;
+      return cells;
+    };
+    expect(patch('attractant')).toBeGreaterThan(patch('repellent') * 4);
+  });
 });

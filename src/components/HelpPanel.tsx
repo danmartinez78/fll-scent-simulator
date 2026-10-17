@@ -11,6 +11,8 @@ const ORDER = [
   'pushPull',
   'slowRelease',
   'spray',
+  'sprayVsDevices',
+  'scentRange',
   'windPlume',
   'payload',
   'flightTime',
