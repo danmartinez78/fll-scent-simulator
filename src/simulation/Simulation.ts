@@ -4,6 +4,8 @@ import type {
   Metrics,
   Rect,
   Settings,
+  SimEvent,
+  SimEventKind,
   SurveyResult,
   TreatmentPlan,
   Vec
@@ -31,7 +33,7 @@ import { HelperSwarm } from './Helpers';
 import { sprayDriftFactor, sprayerCosts, sprayerSettings, usesGroomba } from './Groomba';
 import { pesticideKillRate, PESTICIDE_RULES } from './Pesticide';
 import { RAIN_DEVICE_FACTOR, rainingAt, rainSpans, RESPRAY_AFTER_RAIN, washoffLifetimeSec, type RainSpan } from './Weather';
-import { diffusionFor, RESIDUE_VAPOR_LIFETIME_SEC, RESIDUE_VAPOR_SHARE, scentDrift, sprayLanding } from './Wind';
+import { diffusionFor, RESIDUE_VAPOR_LIFETIME_SEC, RESIDUE_VAPOR_SHARE, scentDrift, sprayBlownAwayShare, sprayLanding } from './Wind';
 import { SECONDS_PER_DAY, TIME_LAPSE } from '../utils/fieldTime';
 
 /**
@@ -157,6 +159,13 @@ export class Simulation {
   private wasRaining = false;
   /** Repeat sprays started so far. */
   resprays = 0;
+  /** Things that happened during the run (repeat sprays, wind changes...), for the Results charts. */
+  events: SimEvent[] = [];
+  /** Liters of spray the wind blew away before they landed. */
+  litersBlownAway = 0;
+  /** Already noted that the money or the product ran out. */
+  private notedBudget = false;
+  private notedProduct = false;
   /** Real pests per simulated pest for crop damage (see SimOptions.pestWeight). */
   readonly pestWeight: number;
   /** Pest time saved up while a drone flies (see PEST_STEP_MIN_SEC). */
@@ -229,6 +238,7 @@ export class Simulation {
    * list; ones that were removed before the drone got to them are dropped.
    */
   setPlan(plan: TreatmentPlan): void {
+    if (this.runStarted && !this.finished && JSON.stringify(plan) !== JSON.stringify(this.plan)) this.note('plan', 'Plan changed');
     this.plan = structuredClone(plan);
     const eff = this.effectivePlan;
     const s = this.settings;
@@ -281,6 +291,12 @@ export class Simulation {
    */
   updateSettings(settings: Settings): void {
     const methodChanged = settings.treatment !== this.settings.treatment;
+    if (this.runStarted && !this.finished) {
+      const a = this.settings.wind;
+      const b = settings.wind;
+      if (a.speedMph !== b.speedMph) this.note('wind', `Wind ${a.speedMph} → ${b.speedMph} mph`);
+      else if (a.direction !== b.direction || !!a.changing !== !!b.changing) this.note('wind', 'Wind turns');
+    }
     this.settings = structuredClone(settings);
     this.drone.settings = { ...sprayerSettings(settings) };
     // What is left in storage: the new limit minus what is already sprayed or in the tank.
@@ -297,6 +313,7 @@ export class Simulation {
     if (holdTreatment && !this.treatmentStarted) this.holdTreatment = true;
     if (this.survey && !this.survey.done) return;
     const id = this.surveys.length + 1;
+    if (this.runStarted) this.note('survey', `Survey ${id}`);
     this.survey = new SurveyRun(
       id,
       `Survey ${id}`,
@@ -389,6 +406,7 @@ export class Simulation {
     if (zones.length && this.drone.stockL > 0.01 && !this.drone.outOfBudget) {
       for (const z of zones) this.drone.tasks.push(...sprayTasksForZone(z, this.map, sprayerSettings(s)));
       this.resprays++;
+      this.note('spray', 'Spray after rain');
     }
   }
 
@@ -468,6 +486,7 @@ export class Simulation {
     if (zones.length && this.drone.stockL > 0.01 && !this.drone.outOfBudget) {
       for (const z of zones) this.drone.tasks.push(...sprayTasksForZone(z, this.map, sprayerSettings(s)));
       this.resprays++;
+      this.note('spray', `Spray #${this.resprays + 1}`);
     }
     this.nextRespray += every * SECONDS_PER_DAY;
   }
@@ -508,6 +527,8 @@ export class Simulation {
         const amount = (liters / REFERENCE_RATE_L_PER_M2) * (isPesticide ? 1 : s.scent.strength);
         const target = isPesticide ? this.pesticide : this.sprayResidue;
         // Wind pushes the falling drops downwind; drops that land off the map are lost.
+        // In a strong wind some of the spray never lands at all.
+        this.litersBlownAway += liters * sprayBlownAwayShare(s.wind, sprayDriftFactor(s));
         for (const part of sprayLanding(s.wind, this.time, sprayDriftFactor(s))) {
           target.addGaussian(x + part.dx, y + part.dy, amount * part.share, swath / 2.5 + part.spread);
         }
@@ -584,10 +605,24 @@ export class Simulation {
       }
     }
 
+    if (this.drone.outOfBudget && !this.notedBudget) {
+      this.notedBudget = true;
+      this.note('budget', 'Money ran out');
+    }
+    if (this.drone.outOfProduct && !this.notedProduct) {
+      this.notedProduct = true;
+      this.note('product', 'Product ran out');
+    }
+
     this.time += bioDt;
     this.fieldTime += flying ? dt : dt * TIME_LAPSE;
     if (this.time + 1e-9 >= this.nextHistory) this.recordHistory();
     if (this.time + 1e-9 >= this.durationSec) this.finished = true;
+  }
+
+  /** Write down something that happened now, for the Results charts. */
+  private note(kind: SimEventKind, label: string): void {
+    this.events.push({ fieldSec: this.fieldTime, kind, label });
   }
 
   /** Move the pests `dt` model seconds and add their feeding to the crop damage. */
@@ -777,7 +812,8 @@ export class Simulation {
       devicesUsed,
       acresSprayed: cost.acresSprayed,
       scentCoveragePct: core.scentCoveragePct,
-      cost
+      cost,
+      sprayBlownAwayPct: d.litersSprayed > 0 ? (this.litersBlownAway / d.litersSprayed) * 100 : 0
     };
   }
 }

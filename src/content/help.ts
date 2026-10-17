@@ -61,7 +61,7 @@ export const HELP: Record<string, HelpTopic> = {
   },
   spray: {
     title: 'Spraying',
-    text: 'The drone flies back and forth and sprays scent over the zones you draw. Wind pushes the falling drops downwind, so in a breeze the spray lands a little downwind of the drone and some blows off the field. The spray stays on the plants and wears off in a few days, but its smell drifts downwind.'
+    text: 'The drone flies back and forth and sprays scent over the zones you draw. Wind pushes the falling drops downwind, so in a breeze the spray lands a little downwind of the drone and some blows off the field. In a strong wind a lot of the spray never lands at all: about 1 drop in 20 at 5 mph, 1 in 5 at 10 mph and almost half at 15 mph. That is why farmers try not to spray from the air on windy days. The spray stays on the plants and wears off in a few days, but its smell drifts downwind.'
   },
   groomba: {
     title: 'The groomba',

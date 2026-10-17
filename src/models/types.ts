@@ -292,6 +292,8 @@ export interface Metrics {
   /** Percent of helpful insects still alive (100 when there are none). */
   helpersAlivePct?: number;
   helpersKilled?: number;
+  /** Percent of the spray the wind blew away before it landed (missing in old saves). */
+  sprayBlownAwayPct?: number;
 }
 
 export interface CostBreakdown {
@@ -300,6 +302,18 @@ export interface CostBreakdown {
   material: number;
   devices: number;
   total: number;
+}
+
+/** Kinds of things that happen during a run, marked on the Results charts. */
+export type SimEventKind = 'spray' | 'wind' | 'plan' | 'survey' | 'budget' | 'product';
+
+/** Something that happened during a run, at a farm time, so students can match cause and effect. */
+export interface SimEvent {
+  /** Farm seconds since the run started. */
+  fieldSec: number;
+  kind: SimEventKind;
+  /** Short words for the chart, such as "Wind 5 → 15 mph". */
+  label: string;
 }
 
 export interface HistoryPoint {

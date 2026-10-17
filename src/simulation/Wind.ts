@@ -20,12 +20,26 @@ export const SPRAY_FINE_SHARE_PER_MPH = 0.015;
 export const SPRAY_FINE_SHARE_MAX = 0.3;
 /** Fine drops travel this many times farther than the main spray. */
 export const SPRAY_FINE_REACH = 5;
+/**
+ * Some spray never reaches the crop at all: the wind blows the mist away or
+ * it dries up in the air. This grows fast with wind speed (with the square of
+ * it): about 5% at 5 mph, 20% at 10 mph and 45% at 15 mph from a drone.
+ */
+export const SPRAY_BLOWN_AWAY_PER_MPH2 = 0.002;
+/** Most of the spray the wind can blow away. */
+export const SPRAY_BLOWN_AWAY_MAX = 0.6;
+
+/** Share of the spray (0 to 1) the wind blows away before it lands. */
+export function sprayBlownAwayShare(w: WindSettings, driftFactor = 1): number {
+  return Math.min(SPRAY_BLOWN_AWAY_MAX, SPRAY_BLOWN_AWAY_PER_MPH2 * w.speedMph * w.speedMph) * driftFactor;
+}
 
 /**
  * Where spray released at a point lands: the main part shifted a little
- * downwind and a small share of fine drops carried farther. Shares add up to 1.
- * `driftFactor` scales how far the wind moves it and how much blows away
- * (1 for the drone; the groomba sprays from just above the plants).
+ * downwind and a small share of fine drops carried farther. In a strong wind
+ * part of it never lands (see sprayBlownAwayShare), so the shares add up to
+ * less than 1. `driftFactor` scales how far the wind moves it and how much
+ * blows away (1 for the drone; the groomba sprays from just above the plants).
  */
 export function sprayLanding(
   w: WindSettings,
@@ -36,9 +50,10 @@ export function sprayLanding(
   const dx = v.x * SPRAY_FALL_SEC * driftFactor;
   const dy = v.y * SPRAY_FALL_SEC * driftFactor;
   const off = Math.hypot(dx, dy);
+  const lands = 1 - sprayBlownAwayShare(w, driftFactor);
   const fine = Math.min(SPRAY_FINE_SHARE_MAX, SPRAY_FINE_SHARE_PER_MPH * w.speedMph) * driftFactor;
-  const parts = [{ dx, dy, share: 1 - fine, spread: 0.3 * off }];
-  if (fine > 0) parts.push({ dx: dx * SPRAY_FINE_REACH, dy: dy * SPRAY_FINE_REACH, share: fine, spread: 1.5 * off });
+  const parts = [{ dx, dy, share: (1 - fine) * lands, spread: 0.3 * off }];
+  if (fine > 0) parts.push({ dx: dx * SPRAY_FINE_REACH, dy: dy * SPRAY_FINE_REACH, share: fine * lands, spread: 1.5 * off });
   return parts;
 }
 

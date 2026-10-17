@@ -1,3 +1,5 @@
+import { dayName, EVENT_STYLE, MAX_LISTED_EVENTS, type ChartEvent } from '../utils/chartEvents';
+
 export interface Series {
   label: string;
   color: string;
@@ -15,10 +17,12 @@ interface Props {
   marker?: { x: number; label: string };
   /** Shaded stretches of x (for example, rain), drawn behind the lines. */
   bands?: Array<{ from: number; to: number; label?: string }>;
+  /** Things that happened (repeat sprays, wind changes...), as thin lines with an icon and a list below. */
+  events?: ChartEvent[];
 }
 
 /** A small, plain line chart (no library needed). */
-export function LineChart({ xs, series, yMax, yLabel, xLabel = 'minutes', height = 150, marker, bands }: Props) {
+export function LineChart({ xs, series, yMax, yLabel, xLabel = 'minutes', height = 150, marker, bands, events }: Props) {
   const W = 320;
   const H = height;
   const pad = { l: 34, r: 8, t: 8, b: 24 };
@@ -27,6 +31,7 @@ export function LineChart({ xs, series, yMax, yLabel, xLabel = 'minutes', height
   const x = (v: number) => pad.l + (v / xMax) * (W - pad.l - pad.r);
   const y = (v: number) => H - pad.b - (v / top) * (H - pad.t - pad.b);
   const ticks = [0, top / 2, top];
+  const shown = (events ?? []).filter((e) => e.day >= 0 && e.day <= xMax);
   return (
     <figure className="chart">
       <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label={series.map((s) => s.label).join(', ') + ' over time'}>
@@ -62,11 +67,20 @@ export function LineChart({ xs, series, yMax, yLabel, xLabel = 'minutes', height
         {marker && marker.x > 0 && marker.x <= xMax && (
           <g className="marker">
             <line x1={x(marker.x)} x2={x(marker.x)} y1={pad.t} y2={H - pad.b} stroke="#475569" strokeDasharray="4 3" />
-            <text x={x(marker.x) + 3} y={pad.t + 9} className="axis">
+            <text x={x(marker.x) + 3} y={pad.t + (shown.length ? 20 : 9)} className="axis">
               {marker.label}
             </text>
           </g>
         )}
+        {shown.map((e, i) => (
+          <g key={i} className="event">
+            <title>{`${dayName(e.day)}: ${e.label}`}</title>
+            <line x1={x(e.day)} x2={x(e.day)} y1={pad.t + 10} y2={H - pad.b} stroke={EVENT_STYLE[e.kind].color} strokeWidth={1.2} strokeDasharray="2 2" />
+            <text x={x(e.day)} y={pad.t + 8} textAnchor="middle" fontSize={10}>
+              {EVENT_STYLE[e.kind].icon}
+            </text>
+          </g>
+        ))}
         {series.map((s) =>
           s.values.length > 1 ? (
             <polyline
@@ -87,6 +101,16 @@ export function LineChart({ xs, series, yMax, yLabel, xLabel = 'minutes', height
           </span>
         ))}
       </figcaption>
+      {shown.length > 0 && (
+        <ul className="event-list" aria-label="What happened during the run">
+          {shown.slice(0, MAX_LISTED_EVENTS).map((e, i) => (
+            <li key={i}>
+              <span aria-hidden="true">{EVENT_STYLE[e.kind].icon}</span> {dayName(e.day)}: {e.label}
+            </li>
+          ))}
+          {shown.length > MAX_LISTED_EVENTS && <li>and {shown.length - MAX_LISTED_EVENTS} more</li>}
+        </ul>
+      )}
     </figure>
   );
 }
