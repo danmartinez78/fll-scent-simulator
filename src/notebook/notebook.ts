@@ -21,7 +21,28 @@ export interface CapturedRun {
   surveysDone: number;
   /** Small JPEG picture of the map when the run was saved, for reports. */
   snapshot?: string;
+  /** The run's charts, thinned out, for reports; missing in runs saved before charts were kept. */
+  charts?: RunCharts;
 }
+
+/** The lines the Results charts draw, x in farm days, values rounded to keep the notebook small. */
+export interface RunCharts {
+  days: number[];
+  arrived: number[];
+  feeding: number[];
+  crop: number[];
+  helpers: number[];
+  killed: number[];
+  scent: number[];
+  product: number[];
+  /** Farm day the treatment started (0 when it starts right away or there is none). */
+  treatStartDay: number;
+  /** Rain as [from, to] farm days. */
+  rains: Array<[number, number]>;
+}
+
+/** Most points a saved chart keeps (plenty for a printed chart). */
+export const CHART_POINTS = 120;
 
 /** Settings to load back into the simulator (for repeating or changing one thing). */
 export interface EntrySetup {
@@ -151,7 +172,32 @@ export function captureRun(sim: Simulation, scenarioName: string, snapshot?: str
     settings: structuredClone(sim.settings),
     plan: structuredClone(sim.plan),
     metrics: sim.metrics(),
-    surveysDone: sim.surveys.length
+    surveysDone: sim.surveys.length,
+    charts: runCharts(sim)
+  };
+}
+
+const r1 = (v: number) => Math.round(v * 10) / 10;
+
+/** The same lines as the Results charts, thinned to at most CHART_POINTS points. */
+export function runCharts(sim: Simulation): RunCharts {
+  const h = sim.history;
+  const step = Math.max(1, (h.length - 1) / (CHART_POINTS - 1));
+  const picks: typeof h = [];
+  for (let i = 0; i < h.length; i += step) picks.push(h[Math.round(i)]);
+  if (h.length && picks[picks.length - 1] !== h[h.length - 1]) picks.push(h[h.length - 1]);
+  const present = (p: (typeof h)[number]) => p.pestsPresentPct ?? 100;
+  return {
+    days: picks.map((p) => Math.round((modelToFieldSec(p.t) / 86400) * 1000) / 1000),
+    arrived: picks.map((p) => r1(present(p))),
+    feeding: picks.map((p) => r1((p.pestsFeedingPct * present(p)) / 100)),
+    crop: picks.map((p) => r1(p.cropAffectedPct)),
+    helpers: picks.map((p) => r1(p.helpersAlivePct ?? 100)),
+    killed: picks.map((p) => r1(p.pestsKilledPct ?? 0)),
+    scent: picks.map((p) => r1(p.scentCoveragePct)),
+    product: picks.map((p) => Math.round(p.productUsedGal * 100) / 100),
+    treatStartDay: sim.settings.treatment === 'none' ? 0 : sim.treatStartFieldSec / 86400,
+    rains: sim.rains.map((r) => [r.start / 86400, r.end / 86400] as [number, number])
   };
 }
 
