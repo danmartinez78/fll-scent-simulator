@@ -131,6 +131,7 @@ export function MapKey({ settings: s, view, survey }: Props) {
     rows.push([<Line color="rgba(37,99,235,0.8)" dashed />, 'Where it will fly next']);
   }
   if (s.wind.speedMph > 0) rows.push([<Line color="#94a3b8" />, 'White streaks show the wind']);
+  if ((s.weather?.rainDays ?? []).length) rows.push([<Patch fill="rgba(71,85,105,0.35)" />, 'Gray with falling streaks: it is raining']);
   if (survey && view.showSurvey) {
     rows.push([<Patch fill={COLORS.survey.healthy} />, 'Survey: looks healthy']);
     rows.push([<Patch fill={COLORS.survey.possible} />, 'Survey: maybe pests']);

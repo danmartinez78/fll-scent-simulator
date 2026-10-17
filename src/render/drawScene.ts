@@ -326,6 +326,8 @@ export function drawScene(ctx: CanvasRenderingContext2D, sim: Simulation, o: Dra
 
   // Wind streaks
   drawWindStreaks(ctx, sim, o.clock, s);
+  // Rain: a gray-blue wash and falling streaks while it rains.
+  if (sim.raining) drawRain(ctx, sim, o.clock, s);
 
   ctx.restore();
 
@@ -444,6 +446,27 @@ function drawWindStreaks(ctx: CanvasRenderingContext2D, sim: Simulation, clock: 
     const len = 4 + w.speedMph * 0.6;
     ctx.moveTo(st.x, st.y);
     ctx.lineTo(st.x - ux * len, st.y - uy * len);
+  }
+  ctx.stroke();
+}
+
+/** Rain over the map: a dim wash and slanted streaks that move with the clock. */
+function drawRain(ctx: CanvasRenderingContext2D, sim: Simulation, clock: number, s: number): void {
+  const { width: W, height: H } = sim.settings.field;
+  ctx.fillStyle = 'rgba(71,85,105,0.18)';
+  ctx.fillRect(0, 0, W, H);
+  ctx.strokeStyle = 'rgba(219,234,254,0.75)';
+  ctx.lineWidth = 1.1 / s;
+  ctx.beginPath();
+  const n = 140;
+  const fall = 60; // meters per real second, for looks only
+  for (let i = 0; i < n; i++) {
+    // Fixed pseudo-random columns, each streak sliding down and wrapping around.
+    const x0 = ((i * 97.13) % 1) * W + ((i * 0.618) % 1) * W;
+    const x = x0 % W;
+    const y = (((i * 53.7) % H) + clock * fall) % (H + 10) - 5;
+    ctx.moveTo(x, y);
+    ctx.lineTo(x - 1.5, y + 5);
   }
   ctx.stroke();
 }

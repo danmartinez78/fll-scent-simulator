@@ -71,6 +71,13 @@ export interface ScentSettings {
   effectivenessPct: number;
 }
 
+export interface WeatherSettings {
+  /** Farm days with rain in the afternoon (Day 1 = the first day). Empty = dry. */
+  rainDays: number[];
+  /** How long each rain lasts, hours (default 6). */
+  rainHours?: number;
+}
+
 export interface DroneSettings {
   tankL: number;
   maxPayloadKg: number;
@@ -85,13 +92,16 @@ export interface DroneSettings {
   appRateGalPerAcre: number;
   /** Seconds on the ground for a refill or battery swap. */
   turnaroundSec: number;
-  /** Total scent product the team has for this run, in gallons. */
+  /** Total scent product the team has for this run, in gallons. 0 = no limit (the usual case; a budget limits spending instead). */
   productAvailableGal: number;
   /** Seconds to take off, and again to land, on each flight. */
   takeoffLandingSec?: number;
   /** Seconds loitering over each drop spot to release a device. */
   dropLoiterSec?: number;
-  /** Spray the zones again every this many farm days (0 or missing = spray once). */
+  /**
+   * Spray the zones again every this many farm days (0 or missing = spray
+   * once; -1 = again each time a rain ends, see RESPRAY_AFTER_RAIN).
+   */
   resprayEveryDays?: number;
 }
 
@@ -171,6 +181,8 @@ export interface Settings {
   cost: CostSettings;
   weights: ScoreWeights;
   run: RunSettings;
+  /** Rain on the farm clock. Missing (setups saved before rain existed) = dry. */
+  weather?: WeatherSettings;
 }
 
 export interface DevicePlan {
@@ -220,7 +232,8 @@ export interface Metrics {
   pestsDeterredAvgPct: number;
   pestsTrapped: number;
   productUsedGal: number;
-  productLeftGal: number;
+  /** Product still available, gallons; null when there is no limit. */
+  productLeftGal: number | null;
   flightTimeMin: number;
   flights: number;
   refills: number;

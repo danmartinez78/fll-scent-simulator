@@ -10,10 +10,10 @@ import type {
 } from '../models/types';
 import { clamp, inRect } from '../utils/geometry';
 import { childSeed, Random } from '../utils/random';
-import { galToL } from '../utils/units';
 import { cropRect, DEVICE_PLUME_LIFETIME_MIN, Simulation } from './Simulation';
 import { activePlan, allowedKinds, estimateSprayLiters } from './Treatment';
 import { estimatePlanCost } from './PlanCost';
+import { productLimitL } from './Drone';
 import { scentDrift } from './Wind';
 
 export interface ScorePart {
@@ -77,7 +77,7 @@ export function planWithinLimits(plan: TreatmentPlan, settings: Settings): boole
   const eff = activePlan(plan, settings.treatment);
   const map = { x: 0, y: 0, w: settings.field.width, h: settings.field.height };
   const liters = estimateSprayLiters(eff.sprayZones, map, settings.drone);
-  if (liters > galToL(settings.drone.productAvailableGal) + 1e-6) return false;
+  if (liters > productLimitL(settings.drone) + 1e-6) return false;
   if (eff.devices.length > settings.devices.maxDevices) return false;
   return withinBudget(eff, settings);
 }
@@ -610,7 +610,7 @@ export class Optimizer {
   // ---- Random plans and small changes -----------------------------------
 
   private literLimit(): number {
-    return galToL(this.settings.drone.productAvailableGal);
+    return productLimitL(this.settings.drone);
   }
 
   private zonesFit(zones: Rect[]): boolean {

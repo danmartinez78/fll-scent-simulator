@@ -2,12 +2,13 @@ import { useMemo } from 'react';
 import type { PestDistribution, Scenario, Settings, TreatmentMethod, TreatmentPlan } from '../models/types';
 import { formatModelMin, TIME_LAPSE } from '../utils/fieldTime';
 import { cropRect } from '../simulation/Simulation';
-import { devicesPerTrip } from '../simulation/Drone';
+import { devicesPerTrip, productLimitL } from '../simulation/Drone';
 import { activePlan, ATTRACTANT_REACH_FACTOR, estimateSprayLiters, planCoverage } from '../simulation/Treatment';
 import { parseScenario } from '../simulation/scenarios';
 import { compassLabel, compassName } from '../utils/geometry';
-import { formatMoney, galToL, lToGal, m2ToAcres } from '../utils/units';
+import { formatMoney, lToGal, m2ToAcres } from '../utils/units';
 import { estimatePlanCost, sprayRounds } from '../simulation/PlanCost';
+import { forecastText, rainSpans, RESPRAY_AFTER_RAIN } from '../simulation/Weather';
 import type { Tool } from './SimulationCanvas';
 import { downloadText, InfoButton, NumberField, pickTextFile, Section, Select, Slider, Toggle } from './ui';
 
@@ -47,6 +48,14 @@ const RESPRAY_OPTIONS: Array<[number, string]> = [
   [3, 'Every 3 days']
 ];
 
+/** Rain choices in the Playground (rain days joined with commas; '' = dry). */
+const RAIN_PRESETS: Array<{ value: string; label: string }> = [
+  { value: '', label: 'No rain' },
+  { value: '6,13', label: 'Day 6 and Day 13' },
+  { value: '5,9,14,18', label: 'Days 5, 9, 14 and 18' },
+  { value: '4,8,12,16,20', label: 'Every 4 days' }
+];
+
 /** Day the treatment starts (farm clock day). */
 const START_DAY_OPTIONS: Array<[number, string]> = [
   [1, 'Day 1'],
@@ -72,7 +81,7 @@ export function ControlPanel({ settings: s, plan, tool, simStarted, scenario, on
   const repellentCount = eff.devices.filter((d) => d.kind === 'repellent').length;
   const map = { x: 0, y: 0, w: s.field.width, h: s.field.height };
   const planLiters = estimateSprayLiters(eff.sprayZones, map, s.drone);
-  const stockL = galToL(s.drone.productAvailableGal);
+  const stockL = productLimitL(s.drone);
   // Repeat sprays: one on the start day, then one every N days until the run ends.
   const startDay = s.run.treatStartDay ?? 1;
   const sprays = sprayRounds(s);
@@ -81,6 +90,11 @@ export function ControlPanel({ settings: s, plan, tool, simStarted, scenario, on
   // What the whole plan would cost: the drone flies it on its own, quickly, with no pests.
   const planCost = useMemo(() => (hasPlan && s.treatment !== 'none' ? estimatePlanCost(s, eff).total : 0), [s, plan, hasPlan]);
   const budget = s.cost.budget ?? 0;
+  const rainy = rainSpans(s).length > 0;
+  const rainKey = (s.weather?.rainDays ?? []).join(',');
+  const rainOptions = RAIN_PRESETS.some((o) => o.value === rainKey)
+    ? RAIN_PRESETS
+    : [...RAIN_PRESETS, { value: rainKey, label: `Days ${rainKey.replace(/,/g, ', ')}` }];
 
   const chooseMethod = (m: TreatmentMethod) => {
     onSettings({ ...s, treatment: m });
@@ -143,6 +157,11 @@ export function ControlPanel({ settings: s, plan, tool, simStarted, scenario, on
               Spray or devices? They protect the crop in different ways. <InfoButton topic="sprayVsDevices" />
             </p>
           )}
+          {rainy && (
+            <p className="forecast">
+              🌧️ <strong>Forecast:</strong> {forecastText(s)}. <InfoButton topic="rain" />
+            </p>
+          )}
 
           {s.treatment === 'none' && (
             <p className="hint">Baseline: nothing is done. Run this first so you have something to compare treatments against.</p>
@@ -187,7 +206,7 @@ export function ControlPanel({ settings: s, plan, tool, simStarted, scenario, on
                   How often to spray <InfoButton topic="respray" />
                 </span>
                 <div className="tool-row">
-                  {RESPRAY_OPTIONS.map(([days, label]) => (
+                  {[...RESPRAY_OPTIONS, ...(rainy ? ([[RESPRAY_AFTER_RAIN, 'After each rain']] as Array<[number, string]>) : [])].map(([days, label]) => (
                     <button
                       key={days}
                       className={(s.drone.resprayEveryDays ?? 0) === days ? 'chip active' : 'chip'}
@@ -204,7 +223,9 @@ export function ControlPanel({ settings: s, plan, tool, simStarted, scenario, on
                 {sprays > 1 ? ` × ${sprays} sprays` : ''} · needs about {lToGal(totalLiters).toFixed(1)} gal
                 {totalLiters > stockL
                   ? `, but this setup only has ${s.drone.productAvailableGal} gal. The drone will run out partway through, so some spraying won't happen.`
-                  : ` (${s.drone.productAvailableGal} gal available)`}
+                  : Number.isFinite(stockL)
+                    ? ` (${s.drone.productAvailableGal} gal available)`
+                    : ''}
               </p>
               {eff.sprayZones.length > 0 && (
                 <p className="plan-summary">
@@ -297,6 +318,15 @@ export function ControlPanel({ settings: s, plan, tool, simStarted, scenario, on
           </div>
           <Slider label="Wind speed" value={s.wind.speedMph} min={0} max={20} unit="mph" onChange={(v) => set('wind', { speedMph: v })} />
           <Toggle label="Changing wind (swings back and forth)" checked={s.wind.changing} onChange={(v) => set('wind', { changing: v })} />
+          {!only && (
+            <Select
+              label="Rain"
+              info="rain"
+              value={rainKey}
+              options={rainOptions}
+              onChange={(v) => set('weather', { rainDays: v ? v.split(',').map(Number) : [] })}
+            />
+          )}
         </Section>
       )}
 
@@ -351,9 +381,9 @@ export function ControlPanel({ settings: s, plan, tool, simStarted, scenario, on
             label="Product available"
             info="product"
             value={s.drone.productAvailableGal}
-            min={1}
+            format={(v) => (v === 0 ? 'no limit' : `${v} gal`)}
+            min={0}
             max={100}
-            unit="gal"
             onChange={(v) => set('drone', { productAvailableGal: v })}
           />
           <Slider

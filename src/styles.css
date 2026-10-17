@@ -202,6 +202,7 @@ textarea {
   font-size: 12px;
 }
 .clock-bar {
+  position: relative;
   grid-column: 1 / 3;
   height: 4px;
   background: var(--line);
@@ -1864,4 +1865,27 @@ textarea {
 }
 .change-check .hint {
   margin: 4px 0;
+}
+
+/* Rain: forecast marks on the clock bar and a label while it rains */
+.rain-mark {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  background: #3b82f6;
+  opacity: 0.85;
+}
+.clock-mode.rain {
+  background: #dbeafe;
+  color: #1e3a8a;
+}
+
+.forecast {
+  margin: 6px 0;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  color: #1e3a8a;
+  font-size: 13.5px;
 }

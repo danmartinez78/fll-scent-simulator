@@ -164,6 +164,7 @@ export function summaryRows(c: CapturedRun): Array<[string, string]> {
     ['Scenario', c.scenarioName],
     ['Run time', `${formatFieldSpan(c.fieldTimeSec ?? modelToFieldSec(c.timeSec))}${c.finished ? '' : ' (not finished)'}`],
     ['Treatment', methodName(s.treatment)],
+    ['Rain', (s.weather?.rainDays ?? []).length ? `Days ${s.weather!.rainDays.join(', ')}` : 'None'],
     ['Wind', s.wind.speedMph > 0 ? `${s.wind.speedMph} mph toward the ${compassName(s.wind.direction)}${s.wind.changing ? ' (changing)' : ''}` : 'No wind'],
     ['Pests', `${s.pests.count}, ${s.pests.distribution}`],
     ['Scent', `strength ${s.scent.strength}, lifetime ${formatModelMin(s.scent.lifetimeMin)}`],
@@ -261,7 +262,7 @@ export interface RunSetup {
   surveysDone?: number;
 }
 
-const RESPRAY_NAMES: Record<number, string> = { 0: 'once', 3: 'every 3 days', 7: 'every week' };
+const RESPRAY_NAMES: Record<number, string> = { 0: 'once', 3: 'every 3 days', 7: 'every week', [-1]: 'after each rain' };
 const usesDevices = (m: string) => m === 'slowRelease' || m === 'pushPull';
 
 function windWords(s: Settings): string {
@@ -312,7 +313,10 @@ export function describeChanges(before: RunSetup, after: RunSetup): string[] {
   }
 
   add('Wind', windWords(a), windWords(b));
-  add('Product available', `${a.drone.productAvailableGal} gal`, `${b.drone.productAvailableGal} gal`);
+  const rainWords = (s: Settings) => ((s.weather?.rainDays ?? []).length ? `days ${s.weather!.rainDays.join(', ')}` : 'none');
+  add('Rain', rainWords(a), rainWords(b));
+  const product = (g: number) => (g > 0 ? `${g} gal` : 'no limit');
+  add('Product available', product(a.drone.productAvailableGal), product(b.drone.productAvailableGal));
   add('Budget', a.cost.budget ? formatMoney(a.cost.budget) : 'no limit', b.cost.budget ? formatMoney(b.cost.budget) : 'no limit');
   add('Device range', `${a.scent.rangeM} m`, `${b.scent.rangeM} m`);
   add('Scent strength', a.scent.strength, b.scent.strength);

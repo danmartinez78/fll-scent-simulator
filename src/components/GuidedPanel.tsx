@@ -107,6 +107,7 @@ const MISSION_INFO: Record<string, { icon: string; level: number }> = {
   basic: { icon: '🌱', level: 1 },
   sprayVsDevices: { icon: '⚖️', level: 2 },
   windy: { icon: '🌬️', level: 2 },
+  rainy: { icon: '🌧️', level: 2 },
   hotspots: { icon: '🎯', level: 2 },
   budget: { icon: '💰', level: 2 },
   pushpull: { icon: '↔️', level: 3 },

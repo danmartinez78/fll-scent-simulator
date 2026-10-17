@@ -80,7 +80,10 @@ describe('simulation', () => {
     const m = sim.metrics();
     expect(m.flights).toBeGreaterThanOrEqual(3);
     expect(m.batterySwaps).toBeGreaterThanOrEqual(2);
-    expect(m.productUsedGal).toBeLessThanOrEqual(s.drone.productAvailableGal + 1e-6);
+    // No product limit: the whole 20-acre field gets its 2 gal/acre (it used to stop at a 40 gal cap).
+    expect(sim.drone.outOfProduct).toBe(false);
+    expect(m.productUsedGal).toBeGreaterThan(40);
+    expect(m.productLeftGal).toBeNull();
   }, 30000);
 
   it('sprays again on schedule when repeat spraying is on', () => {

@@ -37,7 +37,7 @@ export const HELP: Record<string, HelpTopic> = {
   },
   product: {
     title: 'Available product',
-    text: 'The total amount of scent liquid the team has for this run. When it runs out, spraying stops.'
+    text: 'The total amount of scent liquid the team has for this run. Usually there is no limit: a farm can buy what it needs, and a budget limits the money instead. Set a limit to see what happens when product runs out partway: spraying stops.'
   },
   pheromone: {
     title: 'Pheromone',
@@ -81,11 +81,15 @@ export const HELP: Record<string, HelpTopic> = {
   },
   respray: {
     title: 'How often to spray',
-    text: 'A sprayed natural scent wears off in a few days, so farmers often spray again. Each repeat spray is a whole new drone mission: it uses more product, more flight time and costs more.'
+    text: 'A sprayed natural scent wears off in a few days, so farmers often spray again. Each repeat spray is a whole new drone mission: it uses more product, more flight time and costs more. When rain is in the forecast, you can also spray again after each rain, since rain washes the spray off.'
   },
   timeLapse: {
     title: 'Two clocks',
     text: 'While a drone is flying, the clock runs in real time, so flight times are real minutes. When the drone is on the ground, the field runs as a time-lapse: at 1x, one second on screen is about four hours on the farm. Pests, crop damage and fading scent take days, just like on a real farm.'
+  },
+  rain: {
+    title: 'Rain',
+    text: 'Rain washes most of the sprayed scent off the leaves (about 70% each time it rains), and the drone cannot fly or spray in the rain, so it waits at home. Slow-release devices keep their scent inside, so they keep working, though their scent cloud is thinner while it rains. The forecast here is always right; real forecasts are not.'
   },
   budget: {
     title: 'Budget',

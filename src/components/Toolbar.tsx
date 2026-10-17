@@ -30,6 +30,10 @@ interface Props {
   lockedNote?: string;
   /** The run itself has begun (a survey flown first does not count). Default: the clock has moved. */
   started?: boolean;
+  /** It is raining right now. */
+  raining?: boolean;
+  /** Rain in the forecast, as percent of the run (for marks on the clock bar). */
+  rainMarks?: Array<{ left: number; width: number; day: number }>;
 }
 
 const SPEEDS = [1, 5, 20];
@@ -76,8 +80,12 @@ export function Toolbar(p: Props) {
         )}
         <span className="clock-bar">
           <span style={{ width: `${pct}%` }} />
+          {p.rainMarks?.map((r) => (
+            <i key={r.day} className="rain-mark" style={{ left: `${r.left}%`, width: `${Math.max(0.8, r.width)}%` }} title={`Rain on Day ${r.day}`} />
+          ))}
         </span>
       </div>
+      {p.raining && <span className="clock-mode rain">🌧️ Raining</span>}
       <span className={`clock-mode ${p.flying ? 'real' : 'lapse'}`}>
         {p.flying ? '🚁 Real time' : '⏩ Time-lapse'}
         <InfoButton topic="timeLapse" />

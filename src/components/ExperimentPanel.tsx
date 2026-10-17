@@ -3,6 +3,7 @@ import type { Settings } from '../models/types';
 import type { Simulation } from '../simulation/Simulation';
 import type { Tool } from './SimulationCanvas';
 import { lToGal } from '../utils/units';
+import { RESPRAY_AFTER_RAIN } from '../simulation/Weather';
 
 const TOOL_HINTS: Record<Tool, string> = {
   none: '',
@@ -34,6 +35,9 @@ export function droneStatus(sim: Simulation, detailed = true): string {
   if (d.hoverFor === 'drop') return `Drone is hovering low to drop a device · ${load} · ${battery}.`;
   switch (d.mode) {
     case 'parked':
+      if (sim.raining && d.tasks.length) return 'Drone is waiting at home (H) for the rain to stop. It can\'t fly or spray in the rain.';
+      if (sim.raining && sim.settings.treatment === 'spray' && sim.settings.drone.resprayEveryDays === RESPRAY_AFTER_RAIN)
+        return 'It is raining, so the spray is washing off. The drone will spray again when the rain stops.';
       if (sim.treatmentScheduled)
         return `Drone is waiting at home (H). The treatment starts on Day ${sim.settings.run.treatStartDay ?? 1}.`;
       if (sim.treatmentWaiting) return 'Drone is waiting at home (H) until you press Run to start the treatment.';
@@ -44,7 +48,9 @@ export function droneStatus(sim: Simulation, detailed = true): string {
     case 'turnaround':
       return `Drone is on the ground: refilling and swapping the battery (${Math.ceil(d.turnaroundLeft)} s left).`;
     case 'returning':
-      return d.lastReturnReason === 'budget'
+      return d.lastReturnReason === 'rain'
+        ? 'Drone is flying home: it started to rain.'
+        : d.lastReturnReason === 'budget'
         ? 'Drone is flying home: the money is almost used up, so it stops here.'
         : d.lastReturnReason === 'battery'
         ? `Drone is flying home: the battery reached the reserve (${battery}).`
@@ -77,6 +83,10 @@ function tipsFor(s: Settings, sim: Simulation): string[] {
   if ((s.treatment === 'slowRelease' || s.treatment === 'pushPull') && s.wind.speedMph > 0)
     tips.push('Wind pushes each device\'s scent downwind. Does a device protect more crop upwind or downwind of it?');
   if (s.treatment === 'pushPull') tips.push('Push-pull: the repellent pushes pests off the crop while the attractant pulls them somewhere else.');
+  if (sim.rains.length) {
+    tips.push('Rain washes most of the spray off the leaves. Devices keep their scent inside, so they keep working.');
+    if (s.treatment === 'spray') tips.push('Look at the forecast. Is it worth spraying right before it rains?');
+  }
   if (s.wind.speedMph > 0) tips.push('Wind can carry scent farther in one direction.');
   if (s.wind.speedMph >= 12) tips.push('Strong wind carries scent far, but it also spreads it thin.');
   if (s.scent.lifetimeMin <= 1) tips.push('This scent only lasts a short time. What happens when it fades?');

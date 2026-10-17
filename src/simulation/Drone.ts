@@ -23,9 +23,8 @@ export const T50_REFERENCE: DroneSettings = {
   swathM: 7,
   appRateGalPerAcre: 2,
   turnaroundSec: 60,
-  // Enough to spray the standard field every 3 days for the whole run, so
-  // product only runs short in missions that limit it on purpose.
-  productAvailableGal: 70,
+  // No limit: a farm can buy what it needs. Money is limited with a budget instead.
+  productAvailableGal: 0,
   takeoffLandingSec: TAKEOFF_LANDING_SEC,
   dropLoiterSec: DROP_LOITER_SEC
 };
@@ -51,6 +50,8 @@ export interface DroneWorld {
   devicesPerTrip?: number;
   /** Money and prices, when the run has a budget (see CostSettings.budget). */
   budget?: DroneBudget;
+  /** It is raining: don't take off, and fly home if already up. */
+  grounded?: boolean;
 }
 
 /** What the drone needs to know to stay within a budget. */
@@ -63,6 +64,11 @@ export interface DroneBudget {
   perLiter: number;
   /** Dollars per device dropped. */
   perDevice: number;
+}
+
+/** Product the team has, in liters (Infinity when there is no limit). */
+export function productLimitL(s: DroneSettings): number {
+  return s.productAvailableGal > 0 ? galToL(s.productAvailableGal) : Infinity;
 }
 
 /** How many devices fit on one trip: the drop rack's slots or the weight limit, whichever is smaller. */
@@ -132,7 +138,7 @@ export class Drone {
     this.home = { ...home };
     this.x = home.x;
     this.y = home.y;
-    this.stockL = galToL(settings.productAvailableGal);
+    this.stockL = productLimitL(settings);
   }
 
   get payloadKg(): number {
@@ -227,6 +233,11 @@ export class Drone {
 
   private launchIfReady(world: DroneWorld): void {
     if (this.tasks.length === 0) return;
+    // Wait on the ground until the rain stops.
+    if (world.grounded) {
+      this.lastReturnReason = 'rain';
+      return;
+    }
     // A flight costs at least a takeoff and a landing; don't start one the budget can't pay for.
     const b = world.budget;
     if (b && b.left() < 2 * this.landingSec * b.perSec + 1) {
@@ -250,7 +261,8 @@ export class Drone {
   private landed(): void {
     this.mode = 'turnaround';
     this.turnaroundLeft = this.settings.turnaroundSec;
-    if (!this.progressThisFlight) this.idleFlights++;
+    // A flight cut short by rain is not a sign the job is out of reach.
+    if (!this.progressThisFlight && this.lastReturnReason !== 'rain') this.idleFlights++;
     else this.idleFlights = 0;
     // Safety: if two flights in a row got nothing done, the job is out of reach.
     if (this.idleFlights >= 2) {
@@ -344,7 +356,13 @@ export class Drone {
       return;
     }
 
-    // Flying a job.
+    // Flying a job. Rain: stop, remember where the spray strip got to, and fly home.
+    if (world.grounded) {
+      const current = this.tasks[0];
+      if (this.spraying && current?.kind === 'spray') current.from = { x: this.x, y: this.y };
+      this.goHome('rain');
+      return;
+    }
     if (this.battery <= this.batteryNeededToReturn(mass)) {
       const current = this.tasks[0];
       if (this.spraying && current?.kind === 'spray') current.from = { x: this.x, y: this.y };
