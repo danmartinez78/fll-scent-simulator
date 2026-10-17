@@ -148,18 +148,26 @@ export function MapKey({ settings: s, view, survey, onSpotlight }: Props) {
   const devices = t === 'slowRelease' || t === 'pushPull';
   const ignorers = treated && (s.scent.effectivenessPct ?? 100) < 100;
 
-  // The third item marks an insect row that can be tapped to put its group in the spotlight.
-  const rows: Array<[ReactNode, string, InsectGroup?]> = [];
+  // Insects come first, one entry per kind, and can be tapped to put that kind in the spotlight.
+  const insects: Array<{ group: InsectGroup; title: string; items: Array<[ReactNode, string]> }> = [];
   if (view.showPests) {
-    rows.push([<Bug color={COLORS.pest} />, 'Pest (flying or eating)', 'pests']);
-    if (treated) rows.push([<Bug color={COLORS.pestAgitated} />, 'Pest pushed away by repellent', 'pests']);
-    if (ignorers) rows.push([<Bug color={COLORS.pestIgnores} />, 'Pest that ignores the scent', 'pests']);
+    const items: Array<[ReactNode, string]> = [[<Bug color={COLORS.pest} />, 'eating or flying']];
+    if (treated) items.push([<Bug color={COLORS.pestAgitated} />, 'pushed away by repellent']);
+    if (ignorers) items.push([<Bug color={COLORS.pestIgnores} />, 'ignores the scent']);
+    insects.push({ group: 'pests', title: 'Pests', items });
   }
   if (s.helpers?.count) {
-    rows.push([<Bee />, 'Bee (helpful insect)', 'helpers']);
-    rows.push([<Ladybug />, 'Ladybug (helpful, eats pests)', 'helpers']);
+    insects.push({
+      group: 'helpers',
+      title: 'Helpful insects',
+      items: [
+        [<Bee />, 'bee'],
+        [<Ladybug />, 'ladybug (eats pests)']
+      ]
+    });
   }
   const spot = view.spotlight ?? null;
+  const rows: Array<[ReactNode, string]> = [];
   if (treated) rows.push([<Cross color={COLORS.ladybug} />, 'Red ×: a bee or ladybug was killed here']);
   if (t === 'pesticide') {
     rows.push([<Cross color="rgba(17,24,39,0.7)" />, 'Black ×: a pest was killed by pesticide']);
@@ -207,45 +215,45 @@ export function MapKey({ settings: s, view, survey, onSpotlight }: Props) {
         {open ? '▾' : '▸'} Map key
       </button>
       {open && (
-        <div className="map-key-body">
-          <ul className="map-key-list">
-            {rows.map(([icon, label, group]) =>
-              group && onSpotlight ? (
-                <li key={label}>
+        <ul className="map-key-list">
+          {insects.map(({ group, title, items }) => {
+            const inner = (
+              <>
+                <b>{title}:</b>
+                {items.map(([icon, label]) => (
+                  <span key={label} className="key-item">
+                    {icon}
+                    {label}
+                  </span>
+                ))}
+              </>
+            );
+            return (
+              <li key={group} className="key-insects">
+                {onSpotlight ? (
                   <button
                     className={`key-spot ${spot === group ? 'on' : ''} ${spot && spot !== group ? 'faded' : ''}`}
                     aria-pressed={spot === group}
-                    title={spot === group ? 'Tap to show all insects again' : `Tap to show only the ${GROUP_NAME[group]}`}
+                    title={spot === group ? 'Tap to show all insects again' : `Tap to show only the ${GROUP_NAME[group]} on the map`}
                     onClick={() => onSpotlight(spot === group ? null : group)}
                   >
-                    {icon}
-                    <span>{label}</span>
+                    {inner}
                   </button>
-                </li>
-              ) : (
-                <li key={label}>
-                  {icon}
-                  <span>{label}</span>
-                </li>
-              )
-            )}
-          </ul>
-          {onSpotlight && rows.some((r) => r[2]) && (
-            <p className="key-hint">
-              {spot ? (
-                <>
-                  Showing only the {GROUP_NAME[spot]}.{' '}
-                  <button className="link-btn" onClick={() => onSpotlight(null)}>
-                    Show all insects
-                  </button>
-                </>
-              ) : (
-                'Tip: tap an insect in the key to see just that kind on the map.'
-              )}
-            </p>
-          )}
-        </div>
+                ) : (
+                  inner
+                )}
+              </li>
+            );
+          })}
+          {rows.map(([icon, label]) => (
+            <li key={label}>
+              {icon}
+              <span>{label}</span>
+            </li>
+          ))}
+        </ul>
       )}
+      {open && spot && <span className="key-hint">Only the {GROUP_NAME[spot]} are shown. Tap them again to show all insects.</span>}
     </div>
   );
 }
