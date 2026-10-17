@@ -28,6 +28,8 @@ export function ResultsPanel({ sim, onSave, saved }: { sim: Simulation; onSave: 
   const xs = sim.history.map((h) => modelToFieldSec(h.t) / 86400);
   const treat = sim.settings.treatment;
   const treatStartDay = treat === 'none' ? 0 : sim.treatStartFieldSec / 86400;
+  // Rain, as shaded bands on the charts (x is in farm days).
+  const rainBands = sim.rains.map((r) => ({ from: r.start / 86400, to: r.end / 86400, label: '🌧' }));
   return (
     <div className="results">
       <div className="metrics">
@@ -78,6 +80,7 @@ export function ResultsPanel({ sim, onSave, saved }: { sim: Simulation; onSave: 
         <LineChart
           xs={xs}
           xLabel="days"
+          bands={rainBands}
           yMax={100}
           yLabel="%"
           marker={treatStartDay > 0 ? { x: treatStartDay, label: 'treatment starts' } : undefined}
@@ -96,10 +99,12 @@ export function ResultsPanel({ sim, onSave, saved }: { sim: Simulation; onSave: 
         </p>
       )}
       {chart === 'scent' && (
-        <LineChart xs={xs} xLabel="days" yMax={100} yLabel="%" series={[{ label: 'Crop with noticeable repellent', color: '#7c3aed', values: sim.history.map((h) => h.scentCoveragePct) }]} />
+        <LineChart xs={xs} xLabel="days"
+          bands={rainBands} yMax={100} yLabel="%" series={[{ label: 'Crop with noticeable repellent', color: '#7c3aed', values: sim.history.map((h) => h.scentCoveragePct) }]} />
       )}
       {chart === 'product' && (
-        <LineChart xs={xs} xLabel="days" yLabel="gal" series={[{ label: 'Product used (gal)', color: '#2563eb', values: sim.history.map((h) => h.productUsedGal) }]} />
+        <LineChart xs={xs} xLabel="days"
+          bands={rainBands} yLabel="gal" series={[{ label: 'Product used (gal)', color: '#2563eb', values: sim.history.map((h) => h.productUsedGal) }]} />
       )}
 
       {saved ? (

@@ -22,7 +22,8 @@ export function defaultSettings(): Settings {
     survey: { detectionPct: 90, falsePositivesPer1000m2: 0.5, positionNoiseM: 3, uncertainPct: 5 },
     cost: { ...DEFAULT_COSTS },
     weights: { protection: 2, pestsDeterred: 0.5, material: 2, flightTime: 1, cost: 0.5 },
-    run: { durationMin: 21, seed: 42, treatStartDay: 3 }
+    run: { durationMin: 21, seed: 42, treatStartDay: 3 },
+    weather: { rainDays: [] }
   };
 }
 
@@ -59,6 +60,19 @@ export const SCENARIOS: Scenario[] = [
     settings: settingsWith({
       treatment: 'spray',
       devices: { maxDevices: 12 }
+    }),
+    plan: emptyPlan()
+  },
+  {
+    id: 'rainy',
+    name: 'Rainy Season',
+    purpose:
+      'It will rain on Days 5, 9, 14 and 18. Rain washes most of the spray off the leaves and keeps the drone on the ground. Slow-release devices keep their scent inside.',
+    question: 'Rain washes spray away. How do you protect the crop through a rainy spell, and what does it cost?',
+    settings: settingsWith({
+      treatment: 'spray',
+      devices: { maxDevices: 12 },
+      weather: { rainDays: [5, 9, 14, 18] }
     }),
     plan: emptyPlan()
   },

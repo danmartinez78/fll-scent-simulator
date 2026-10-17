@@ -71,6 +71,13 @@ export interface ScentSettings {
   effectivenessPct: number;
 }
 
+export interface WeatherSettings {
+  /** Farm days with rain in the afternoon (Day 1 = the first day). Empty = dry. */
+  rainDays: number[];
+  /** How long each rain lasts, hours (default 6). */
+  rainHours?: number;
+}
+
 export interface DroneSettings {
   tankL: number;
   maxPayloadKg: number;
@@ -91,7 +98,10 @@ export interface DroneSettings {
   takeoffLandingSec?: number;
   /** Seconds loitering over each drop spot to release a device. */
   dropLoiterSec?: number;
-  /** Spray the zones again every this many farm days (0 or missing = spray once). */
+  /**
+   * Spray the zones again every this many farm days (0 or missing = spray
+   * once; -1 = again each time a rain ends, see RESPRAY_AFTER_RAIN).
+   */
   resprayEveryDays?: number;
 }
 
@@ -171,6 +181,8 @@ export interface Settings {
   cost: CostSettings;
   weights: ScoreWeights;
   run: RunSettings;
+  /** Rain on the farm clock. Missing (setups saved before rain existed) = dry. */
+  weather?: WeatherSettings;
 }
 
 export interface DevicePlan {

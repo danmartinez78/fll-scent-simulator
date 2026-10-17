@@ -26,6 +26,7 @@ import {
   zoneKey,
   type DeviceState
 } from './Treatment';
+import { RAIN_DEVICE_FACTOR, rainingAt, rainSpans, RESPRAY_AFTER_RAIN, washoffLifetimeSec, type RainSpan } from './Weather';
 import { diffusionFor, RESIDUE_VAPOR_LIFETIME_SEC, RESIDUE_VAPOR_SHARE, scentDrift, sprayLanding } from './Wind';
 import { SECONDS_PER_DAY, TIME_LAPSE } from '../utils/fieldTime';
 
@@ -137,6 +138,8 @@ export class Simulation {
   private holdTreatment = false;
   /** Farm time of the next repeat spray (see DroneSettings.resprayEveryDays). */
   private nextRespray = 0;
+  /** Was it raining last step (to notice when a rain ends). */
+  private wasRaining = false;
   /** Repeat sprays started so far. */
   resprays = 0;
   /** Real pests per simulated pest for crop damage (see SimOptions.pestWeight). */
@@ -331,7 +334,32 @@ export class Simulation {
 
   /** True while the treatment drone or the survey drone is working (the field clock runs in real time). */
   get droneFlying(): boolean {
-    return (this.treatmentStarted && this.drone.busy) || this.surveying;
+    // A drone waiting on the ground for rain to stop is not flying: the field keeps its time-lapse.
+    const waitingOutRain = this.drone.mode === 'parked' && this.raining;
+    return (this.treatmentStarted && this.drone.busy && !waitingOutRain) || this.surveying;
+  }
+
+  /** The rains in this run (farm clock). */
+  get rains(): RainSpan[] {
+    return rainSpans(this.settings);
+  }
+
+  /** Is it raining right now? */
+  get raining(): boolean {
+    return rainingAt(this.rains, this.fieldTime);
+  }
+
+  /** Spray again when a rain ends, if the plan says so (see RESPRAY_AFTER_RAIN). */
+  private maybeSprayAfterRain(raining: boolean): void {
+    const ended = this.wasRaining && !raining;
+    this.wasRaining = raining;
+    const s = this.settings;
+    if (!ended || s.treatment !== 'spray' || s.drone.resprayEveryDays !== RESPRAY_AFTER_RAIN || !this.treatmentStarted) return;
+    const zones = this.effectivePlan.sprayZones;
+    if (zones.length && this.drone.stockL > 0.01 && !this.drone.outOfBudget) {
+      for (const z of zones) this.drone.tasks.push(...sprayTasksForZone(z, this.map, s.drone));
+      this.resprays++;
+    }
   }
 
   get surveying(): boolean {
@@ -419,15 +447,19 @@ export class Simulation {
     // While a drone flies, the field clock runs in real time and the field
     // itself barely changes; otherwise it runs as a time-lapse.
     const flying = this.droneFlying;
+    const raining = this.raining;
+    const fieldDt = flying ? dt : dt * TIME_LAPSE;
     const bioDt = flying ? dt / TIME_LAPSE : dt;
 
     // Repeat sprays: send the drone over every spray zone again on schedule.
     this.maybeRespray();
+    this.maybeSprayAfterRain(raining);
 
     // Drone: flies its jobs, sprays and drops devices.
     const sprayed = this.sprayed;
     if (treating) this.drone.step(dt, {
       budget: this.droneBudget(),
+      grounded: raining,
       devicesMassKg: s.devices.massKg,
       // Setups saved before this setting existed keep their old behavior (no rack limit).
       devicesPerTrip: s.devices.perTrip,
@@ -454,8 +486,10 @@ export class Simulation {
 
     // Slow-release devices: steady scent while they last.
     const lureRange = deviceReachM('attractant', s);
-    const emitRep = deviceEmissionRate(s.scent.strength, s.devices.releaseRate, s.scent.rangeM) * bioDt;
-    const emitAtt = deviceEmissionRate(s.scent.strength, s.devices.releaseRate, lureRange) * bioDt;
+    // Rain knocks device scent out of the air while it lasts.
+    const rainFactor = raining ? RAIN_DEVICE_FACTOR : 1;
+    const emitRep = deviceEmissionRate(s.scent.strength, s.devices.releaseRate, s.scent.rangeM) * bioDt * rainFactor;
+    const emitAtt = deviceEmissionRate(s.scent.strength, s.devices.releaseRate, lureRange) * bioDt * rainFactor;
     for (const d of this.devices) {
       if (!treating || !deviceActive(d, this.time, s.devices.lifetimeMin)) continue;
       if (d.kind === 'repellent') this.repellentAir.addGaussian(d.x, d.y, emitRep, s.scent.rangeM / 2);
@@ -470,6 +504,8 @@ export class Simulation {
     this.attractant.step(dt, drift.x, drift.y, diff, plumeLife, bioDt);
     // Spray residue sits on the plants and wears off over the spray's lifetime.
     this.sprayResidue.fade(bioDt, s.scent.lifetimeMin * 60);
+    // Rain washes most of the spray off the leaves (RAIN_WASHOFF over one rain).
+    if (raining) this.sprayResidue.fade(fieldDt, washoffLifetimeSec(s));
     // The residue's smell drifts downwind. Fed so that with no wind it matches
     // RESIDUE_VAPOR_SHARE of the residue; it runs on the farm clock like the residue.
     const vapor = this.residueVapor;

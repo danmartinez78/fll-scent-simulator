@@ -13,10 +13,12 @@ interface Props {
   height?: number;
   /** A dashed vertical line at this x value, with a short label. */
   marker?: { x: number; label: string };
+  /** Shaded stretches of x (for example, rain), drawn behind the lines. */
+  bands?: Array<{ from: number; to: number; label?: string }>;
 }
 
 /** A small, plain line chart (no library needed). */
-export function LineChart({ xs, series, yMax, yLabel, xLabel = 'minutes', height = 150, marker }: Props) {
+export function LineChart({ xs, series, yMax, yLabel, xLabel = 'minutes', height = 150, marker, bands }: Props) {
   const W = 320;
   const H = height;
   const pad = { l: 34, r: 8, t: 8, b: 24 };
@@ -47,6 +49,16 @@ export function LineChart({ xs, series, yMax, yLabel, xLabel = 'minutes', height
             {yLabel}
           </text>
         )}
+        {bands?.filter((b) => b.from < xMax).map((b) => (
+          <g key={b.from} className="band">
+            <rect x={x(b.from)} y={pad.t} width={Math.max(2, x(Math.min(b.to, xMax)) - x(b.from))} height={H - pad.b - pad.t} fill="#bfdbfe" opacity={0.7} />
+            {b.label && (
+              <text x={x(b.from) + 1} y={H - pad.b - 3} className="axis">
+                {b.label}
+              </text>
+            )}
+          </g>
+        ))}
         {marker && marker.x > 0 && marker.x <= xMax && (
           <g className="marker">
             <line x1={x(marker.x)} x2={x(marker.x)} y1={pad.t} y2={H - pad.b} stroke="#475569" strokeDasharray="4 3" />

@@ -1,5 +1,6 @@
 import type { CostBreakdown, Settings, TreatmentPlan } from '../models/types';
-import { modelMinToDays } from '../utils/fieldTime';
+import { modelMinToDays, modelToFieldSec, SECONDS_PER_DAY } from '../utils/fieldTime';
+import { rainSpans, RESPRAY_AFTER_RAIN } from './Weather';
 import { computeCost } from './CostModel';
 import { Drone, type DroneTask } from './Drone';
 import { homePoint } from './Simulation';
@@ -10,6 +11,12 @@ export function sprayRounds(s: Settings): number {
   if (s.treatment !== 'spray') return 1;
   const every = s.drone.resprayEveryDays ?? 0;
   const startDay = s.run.treatStartDay ?? 1;
+  if (every === RESPRAY_AFTER_RAIN) {
+    // One spray on the start day, then one after each rain that ends later in the run.
+    const from = (startDay - 1) * SECONDS_PER_DAY;
+    const to = modelToFieldSec(s.run.durationMin * 60);
+    return 1 + rainSpans(s).filter((r) => r.end > from && r.end < to).length;
+  }
   const runDays = Math.max(0, modelMinToDays(s.run.durationMin) - (startDay - 1));
   return every > 0 ? 1 + Math.floor((runDays - 1e-6) / every) : 1;
 }

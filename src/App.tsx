@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { Scenario, Settings, SurveyResult, TreatmentPlan, ViewOptions } from './models/types';
 import { Simulation } from './simulation/Simulation';
+import { modelToFieldSec } from './utils/fieldTime';
 import { SCENARIOS } from './simulation/scenarios';
 import { needsReset, liveSettings } from './simulation/settingsRules';
 import type { SurveyLayer } from './render/drawScene';
@@ -351,6 +352,9 @@ export default function App() {
   // Guided Compare on a mission that hides the pests: show them, and allow the "real pests" survey layer.
   const revealing = mode === 'guided' && step === 'compare' && sim.runStarted && scenario.view?.showPests === false;
   const mapView = revealing ? { ...view, showPests: true } : view;
+  // Where the forecast rain falls on the clock bar (farm time, ignoring the short real-time flights).
+  const runFieldSec = modelToFieldSec(sim.durationSec);
+  const rainMarks = sim.rains.map((r) => ({ day: r.day, left: (r.start / runFieldSec) * 100, width: ((r.end - r.start) / runFieldSec) * 100 }));
   const shownSurvey: SurveyResult | null = useMemo(() => {
     if (!surveys.length) return null;
     return surveys.find((s) => s.id === selectedSurveyId) ?? surveys[surveys.length - 1];
@@ -512,6 +516,8 @@ export default function App() {
             // In Guided the survey is flown from the Plan step: once the run starts the plan can't change.
             showSurvey={mode === 'playground'}
             started={sim.runStarted}
+            raining={sim.raining}
+            rainMarks={rainMarks}
             controls={canRun}
             lockedNote={lockedNote}
           />
