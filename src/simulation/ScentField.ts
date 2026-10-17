@@ -85,34 +85,47 @@ export class ScentField {
    */
   addGaussian(x: number, y: number, amount: number, sigma: number): void {
     if (amount <= 0) return;
+    const stamp = this.stampFor(x, y, sigma);
+    if (!stamp.index.length) return;
+    this.empty = false;
+    const d = this.data;
+    const k = amount / (this.cell * this.cell);
+    for (let i = 0; i < stamp.index.length; i++) d[stamp.index[i]] += k * stamp.weight[i];
+  }
+
+  /**
+   * Which squares a soft circle covers and how much each gets (adding up to 1
+   * over the whole circle, so scent that would land off the map is lost).
+   * Devices add scent at the same spot every step, so the last few are kept.
+   */
+  private stamps = new Map<string, { index: Int32Array; weight: Float32Array }>();
+  private stampFor(x: number, y: number, sigma: number): { index: Int32Array; weight: Float32Array } {
+    const key = `${x},${y},${sigma}`;
+    const hit = this.stamps.get(key);
+    if (hit) return hit;
     const s = Math.max(sigma, this.cell * 0.5);
     const reach = Math.ceil((2.5 * s) / this.cell);
     const cc = Math.floor(x / this.cell);
     const cr = Math.floor(y / this.cell);
-    const area = this.cell * this.cell;
-    // Weights are normalized so the total added is exactly `amount`
-    // (scent that would land outside the map is simply lost).
     let wsum = 0;
-    const weights: number[] = [];
+    const index: number[] = [];
+    const weight: number[] = [];
     for (let r = cr - reach; r <= cr + reach; r++) {
       for (let c = cc - reach; c <= cc + reach; c++) {
         const dx = (c + 0.5) * this.cell - x;
         const dy = (r + 0.5) * this.cell - y;
         const w = Math.exp(-(dx * dx + dy * dy) / (2 * s * s));
-        weights.push(w);
         wsum += w;
-      }
-    }
-    if (wsum <= 0) return;
-    this.empty = false;
-    let i = 0;
-    for (let r = cr - reach; r <= cr + reach; r++) {
-      for (let c = cc - reach; c <= cc + reach; c++) {
-        const w = weights[i++];
         if (c < 0 || r < 0 || c >= this.cols || r >= this.rows) continue;
-        this.data[r * this.cols + c] += (amount * w) / wsum / area;
+        index.push(r * this.cols + c);
+        weight.push(w);
       }
     }
+    const stamp = { index: Int32Array.from(index), weight: Float32Array.from(weight, (w) => (wsum > 0 ? w / wsum : 0)) };
+    // Spray adds at a new spot every step; keep the cache small.
+    if (this.stamps.size >= 64) this.stamps.delete(this.stamps.keys().next().value!);
+    this.stamps.set(key, stamp);
+    return stamp;
   }
 
   /**

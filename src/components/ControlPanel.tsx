@@ -197,9 +197,10 @@ export function ControlPanel({ settings: s, plan, tool, simStarted, scenario, on
               </div>
               <p className={`plan-summary ${totalLiters > stockL ? 'warn' : ''}`}>
                 {eff.sprayZones.length} zone{eff.sprayZones.length === 1 ? '' : 's'}
-                {sprays > 1 ? ` × ${sprays} sprays` : ''} · needs about {lToGal(totalLiters).toFixed(1)} gal of{' '}
-                {s.drone.productAvailableGal} gal available
-                {totalLiters > stockL && ' — not enough product for all of it!'}
+                {sprays > 1 ? ` × ${sprays} sprays` : ''} · needs about {lToGal(totalLiters).toFixed(1)} gal
+                {totalLiters > stockL
+                  ? `, but this setup only has ${s.drone.productAvailableGal} gal. The drone will run out partway through, so some spraying won't happen.`
+                  : ` (${s.drone.productAvailableGal} gal available)`}
               </p>
               {eff.sprayZones.length > 0 && (
                 <p className="plan-summary">
@@ -339,7 +340,7 @@ export function ControlPanel({ settings: s, plan, tool, simStarted, scenario, on
             info="product"
             value={s.drone.productAvailableGal}
             min={1}
-            max={60}
+            max={100}
             unit="gal"
             onChange={(v) => set('drone', { productAvailableGal: v })}
           />

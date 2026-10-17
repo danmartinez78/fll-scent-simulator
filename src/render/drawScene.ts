@@ -1,7 +1,7 @@
 import type { Rect, SurveyResult, Vec, ViewOptions } from '../models/types';
 import { AFFECTED_DAMAGE, type Simulation } from '../simulation/Simulation';
 import { SURVEY_DRONE } from '../simulation/Survey';
-import { deviceActive } from '../simulation/Treatment';
+import { deviceActive, deviceReachM } from '../simulation/Treatment';
 import { scentDrift, windDirectionAt } from '../simulation/Wind';
 import { compassLabel } from '../utils/geometry';
 
@@ -226,10 +226,10 @@ export function drawScene(ctx: CanvasRenderingContext2D, sim: Simulation, o: Dra
 
   // How far each device's scent reaches in still air (its effective range),
   // so students can see gaps and overlaps while they plan.
-  const reach = sim.settings.scent.rangeM;
   ctx.lineWidth = 1.2 / s;
   ctx.setLineDash([4 / s, 3 / s]);
   for (const dev of sim.devices) {
+    const reach = deviceReachM(dev.kind, sim.settings.scent.rangeM);
     const col = dev.kind === 'repellent' ? COLORS.repellent : COLORS.attractant;
     ctx.strokeStyle = `rgba(${col[0] * 0.7},${col[1] * 0.7},${col[2] * 0.7},0.7)`;
     ctx.fillStyle = `rgba(${col[0]},${col[1]},${col[2]},0.06)`;

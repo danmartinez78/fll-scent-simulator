@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from 'react';
 import type { Settings, ViewOptions } from '../models/types';
 import { COLORS } from '../render/drawScene';
+import { deviceReachM } from '../simulation/Treatment';
 
 const KEY_OPEN = 'scent-sim-key-open';
 
@@ -120,7 +121,9 @@ export function MapKey({ settings: s, view, survey }: Props) {
       rows.push([<Device color={COLORS.attractant} letter="A" trap />, 'Attractant with a trap']);
     }
     rows.push([<Device color={COLORS.repellent} letter="R" waiting />, 'Device not dropped yet']);
-    rows.push([<Ring color={COLORS.repellent} />, `Dashed circle: how far a device's scent reaches (${s.scent.rangeM} m) with no wind`]);
+    rows.push([<Ring color={COLORS.repellent} />, `Dashed circle: how far a repellent reaches (${s.scent.rangeM} m) with no wind`]);
+    if (t === 'pushPull')
+      rows.push([<Ring color={COLORS.attractant} />, `Dashed circle: how far pests notice an attractant (${deviceReachM('attractant', s.scent.rangeM)} m)`]);
   }
   if (treated) rows.push([<Home />, "Drone's home pad"]);
   if (view.showPath && treated) {

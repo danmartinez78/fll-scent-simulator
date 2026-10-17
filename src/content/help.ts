@@ -49,11 +49,11 @@ export const HELP: Record<string, HelpTopic> = {
   },
   attractant: {
     title: 'Attractant',
-    text: 'A scent that pests tend to move toward. Put a trap with it and pests that reach it get caught. It is a generic "Attractant B", not a real product.'
+    text: 'A scent that pests tend to move toward. Pests notice a faint attractant from much farther away than a repellent, about three times as far. Put a trap with it and pests that reach it get caught. It is a generic "Attractant B", not a real product.'
   },
   pushPull: {
     title: 'Push-pull',
-    text: 'Push-pull uses two scents together: a repellent "pushes" pests off the crop while an attractant "pulls" them somewhere else, like a trap at the edge.'
+    text: 'Push-pull uses two scents together: a repellent "pushes" pests off the crop while an attractant "pulls" them somewhere else, like a trap out in the grass. Every trap is one less repellent, so it is a trade. A trap on the crop, or inside a repellent cloud, works against you.'
   },
   slowRelease: {
     title: 'Slow-release source',

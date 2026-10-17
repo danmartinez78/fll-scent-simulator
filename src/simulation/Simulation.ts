@@ -21,6 +21,7 @@ import {
   buildDroneTasks,
   deviceActive,
   deviceEmissionRate,
+  deviceReachM,
   sprayTasksForZone,
   zoneKey,
   type DeviceState
@@ -404,11 +405,13 @@ export class Simulation {
     });
 
     // Slow-release devices: steady scent while they last.
-    const emit = deviceEmissionRate(s.scent.strength, s.devices.releaseRate, s.scent.rangeM) * bioDt;
+    const lureRange = deviceReachM('attractant', s.scent.rangeM);
+    const emitRep = deviceEmissionRate(s.scent.strength, s.devices.releaseRate, s.scent.rangeM) * bioDt;
+    const emitAtt = deviceEmissionRate(s.scent.strength, s.devices.releaseRate, lureRange) * bioDt;
     for (const d of this.devices) {
       if (!treating || !deviceActive(d, this.time, s.devices.lifetimeMin)) continue;
-      const field = d.kind === 'repellent' ? this.repellentAir : this.attractant;
-      field.addGaussian(d.x, d.y, emit, s.scent.rangeM / 2);
+      if (d.kind === 'repellent') this.repellentAir.addGaussian(d.x, d.y, emitRep, s.scent.rangeM / 2);
+      else this.attractant.addGaussian(d.x, d.y, emitAtt, lureRange / 2);
     }
 
     // Scent drifts, spreads and fades.

@@ -23,6 +23,19 @@ export const DEVICE_BASE_EMISSION = 8;
 export const DEVICE_REFERENCE_RANGE_M = 12;
 
 /**
+ * An attractant lure is noticed much farther away than a repellent: insects
+ * follow faint attractant smells (like pheromones) from a long way off. Its
+ * scent spreads this many times wider than the effective range, with release
+ * scaled up to match, so a trap can pull pests in from across part of the field.
+ */
+export const ATTRACTANT_REACH_FACTOR = 3;
+
+/** How far a device's scent reaches in still air, in meters. */
+export function deviceReachM(kind: ScentKind, rangeM: number): number {
+  return kind === 'attractant' ? rangeM * ATTRACTANT_REACH_FACTOR : rangeM;
+}
+
+/**
  * Scent one device releases per model second. A longer range spreads the
  * scent over a bigger circle, so the release grows with that circle's area
  * (twice the range, four times the scent). Without this, a longer range would

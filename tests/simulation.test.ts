@@ -168,4 +168,23 @@ describe('wind and spray', () => {
       expect(r24).toBeLessThan(30);
     }
   });
+  it('lets pests notice an attractant from farther away than a repellent', () => {
+    const patch = (kind: 'repellent' | 'attractant') => {
+      const s = settingsWith({
+        treatment: 'pushPull',
+        devices: { deployByDrone: false },
+        pests: { count: 1 },
+        run: { treatStartDay: 1, durationMin: 3 }
+      });
+      const sim = new Simulation(s, { sprayZones: [], devices: [{ id: 1, x: 110, y: 70, kind, trap: false }] });
+      sim.runToEnd();
+      const f = kind === 'repellent' ? sim.repellent : sim.attractant;
+      // Pests notice attractant at half the threshold (see PEST_RULES.attractNoticeFraction).
+      const th = s.scent.threshold * (kind === 'repellent' ? 1 : 0.5);
+      let cells = 0;
+      for (let i = 0; i < f.data.length; i++) if (f.data[i] > th) cells++;
+      return cells;
+    };
+    expect(patch('attractant')).toBeGreaterThan(patch('repellent') * 4);
+  });
 });

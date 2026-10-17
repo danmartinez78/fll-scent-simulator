@@ -23,7 +23,9 @@ export const T50_REFERENCE: DroneSettings = {
   swathM: 7,
   appRateGalPerAcre: 2,
   turnaroundSec: 60,
-  productAvailableGal: 20,
+  // Enough to spray the standard field every 3 days for the whole run, so
+  // product only runs short in missions that limit it on purpose.
+  productAvailableGal: 70,
   takeoffLandingSec: TAKEOFF_LANDING_SEC,
   dropLoiterSec: DROP_LOITER_SEC
 };

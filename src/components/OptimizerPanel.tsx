@@ -134,7 +134,7 @@ export function OptimizerPanel({ settings, plan, surveys, onSettings, onUsePlan 
         </select>
       </label>
       <p className="hint small">
-        The computer tries the obvious plans first (treat everything, the border, the worst areas, devices spread out or where the pests are),
+        The computer tries the obvious plans first (treat everything, the border, the worst areas, devices spread out or where the pests are, and for push-pull a few traps spaced around the grass border),
         keeps the best one, then makes small changes and keeps each change only if the score goes up.
       </p>
 

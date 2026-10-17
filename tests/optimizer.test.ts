@@ -36,6 +36,33 @@ describe('optimizer', () => {
     expect(opt.bestMetrics!.devicesUsed).toBeLessThanOrEqual(4);
   });
 
+  it('keeps attractant traps in the grass border, never on the crop', () => {
+    const s = settingsWith({ treatment: 'pushPull', devices: { maxDevices: 12 }, run: { durationMin: 5 } });
+    const crop = cropRect(s.field);
+    const opt = new Optimizer(s, { kind: 'none' }, 1, 60);
+    const plans = [...opt.startingIdeas().map((i) => i.plan)];
+    let p = opt.randomPlan();
+    for (let i = 0; i < 300; i++) plans.push((p = opt.mutate(p)));
+    let traps = 0;
+    for (const plan of plans) {
+      for (const d of plan.devices) {
+        if (d.kind !== 'attractant') continue;
+        traps++;
+        expect(d.trap).toBe(true);
+        const inside = d.x > crop.x && d.x < crop.x + crop.w && d.y > crop.y && d.y < crop.y + crop.h;
+        expect(inside).toBe(false);
+      }
+    }
+    expect(traps).toBeGreaterThan(20);
+  });
+
+  it('tries push-pull ideas with different numbers of traps', () => {
+    const s = settingsWith({ treatment: 'pushPull', devices: { maxDevices: 12 }, run: { durationMin: 5 } });
+    const opt = new Optimizer(s, { kind: 'none' }, 1, 60);
+    const trapCounts = new Set(opt.startingIdeas().map((i) => i.plan.devices.filter((d) => d.trap).length));
+    for (const t of [0, 1, 2, 3, 4]) expect(trapCounts.has(t)).toBe(true);
+  });
+
   it('only uses repellent devices for slow-release', () => {
     const s = settingsWith({ treatment: 'slowRelease', run: { durationMin: 5 } });
     const opt = new Optimizer(s, { kind: 'none' }, 5, 50);

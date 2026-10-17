@@ -182,7 +182,18 @@ export function kMeans(points: Vec[], k: number, rng: Random, iterations = 10): 
     const j = rng.int(0, i);
     [idx[i], idx[j]] = [idx[j], idx[i]];
   }
-  const centers: Vec[] = idx.slice(0, k).map((i) => ({ x: points[i].x, y: points[i].y }));
+  return lloyd(points, idx.slice(0, k).map((i) => ({ x: points[i].x, y: points[i].y })), iterations);
+}
+
+/**
+ * Move each center to the middle of the points nearest to it, a few times
+ * (Lloyd's method). Run over points spread evenly on the crop, this spaces
+ * devices out so each one looks after about the same amount of crop.
+ */
+export function lloyd(points: Vec[], start: Vec[], iterations: number): Vec[] {
+  const centers = start.map((c) => ({ ...c }));
+  const k = centers.length;
+  if (!points.length || !k) return centers;
   const assign = new Int32Array(points.length);
   for (let it = 0; it < iterations; it++) {
     for (let i = 0; i < points.length; i++) {
@@ -397,20 +408,25 @@ export class Optimizer {
     const counts = [...new Set([max, Math.max(1, Math.round(max / 2))])];
     for (const k of counts) {
       const some = k === max ? 'all' : `${k} of the`;
-      ideas.push({ label: `Spread ${some} devices evenly over the crop`, plan: this.devicePlan(this.gridPoints(k)) });
+      ideas.push({ label: `Spread ${some} devices evenly over the crop`, plan: this.devicePlan(this.evenPoints(k)) });
       ideas.push({ label: `Put ${some} devices where the pests are`, plan: this.devicePlan(this.clusterPoints(k)) });
     }
     const drift = this.plumeDrift();
-    if (Math.hypot(drift.x, drift.y) > 1) {
+    const windy = Math.hypot(drift.x, drift.y) > 1;
+    if (windy) {
       ideas.push({ label: 'Put devices upwind of the pests, so the wind carries the scent over them', plan: this.devicePlan(this.clusterPoints(max).map((p) => ({ x: p.x - drift.x, y: p.y - drift.y }))) });
       ideas.push({ label: 'A row of devices along the upwind edge of the crop', plan: this.devicePlan(this.upwindRow(max, drift)) });
     }
-    if (pushPull) {
-      const traps = Math.max(1, Math.round(max / 4));
-      const push = this.clusterPoints(max - traps);
-      ideas.push({ label: `Repellent where the pests are, ${traps} attractant trap${traps === 1 ? '' : 's'} in the border`, plan: this.devicePlan(push, this.borderTraps(traps, drift)) });
-      const pushEven = this.gridPoints(max - traps);
-      ideas.push({ label: `Repellent spread evenly, ${traps} attractant trap${traps === 1 ? '' : 's'} in the border`, plan: this.devicePlan(pushEven, this.borderTraps(traps, drift)) });
+    if (pushPull && max > 1) {
+      // Push-pull: repellent on the crop to push, traps out in the grass to pull.
+      const trapCounts = [...new Set([1, 2, 3, Math.round(max / 3)])].filter((t) => t >= 1 && t < max);
+      const plural = (t: number) => `${t} attractant trap${t === 1 ? '' : 's'}`;
+      for (const t of trapCounts) {
+        ideas.push({ label: `Repellent spread evenly, ${plural(t)} spaced around the border`, plan: this.devicePlan(this.evenPoints(max - t), this.ringTraps(t)) });
+      }
+      const t = Math.max(1, Math.round(max / 4));
+      ideas.push({ label: `Repellent where the pests are, ${plural(t)} spaced around the border`, plan: this.devicePlan(this.clusterPoints(max - t), this.ringTraps(t)) });
+      if (windy) ideas.push({ label: `Repellent spread evenly, ${plural(t)} on the downwind side`, plan: this.devicePlan(this.evenPoints(max - t), this.borderTraps(t, drift)) });
     }
     return ideas;
   }
@@ -423,17 +439,9 @@ export class Optimizer {
   }
 
   private devicePlan(repellents: Vec[], traps: Vec[] = []): TreatmentPlan {
-    const f = this.settings.field;
-    const place = (p: Vec, kind: 'repellent' | 'attractant'): DevicePlan => ({
-      id: this.nextId++,
-      x: clamp(p.x, 3, f.width - 3),
-      y: clamp(p.y, 3, f.height - 3),
-      kind,
-      trap: kind === 'attractant'
-    });
     return {
       sprayZones: [],
-      devices: [...repellents.map((p) => place(p, 'repellent')), ...traps.map((p) => place(p, 'attractant'))]
+      devices: [...repellents.map((p) => this.placed(p, 'repellent')), ...traps.map((p) => this.placed(p, 'attractant'))]
     };
   }
 
@@ -450,6 +458,83 @@ export class Optimizer {
       }
     }
     return out;
+  }
+
+  /**
+   * k points spaced out over the crop so each looks after about the same
+   * area: start from a grid, then even out the spacing (Lloyd's method).
+   */
+  private evenPoints(k: number): Vec[] {
+    return lloyd(this.cropSamples(), this.gridPoints(k), 25);
+  }
+
+  private samples: Vec[] | null = null;
+  /** Points every 3 m over the crop. */
+  private cropSamples(): Vec[] {
+    if (this.samples) return this.samples;
+    const crop = cropRect(this.settings.field);
+    const out: Vec[] = [];
+    for (let y = crop.y + 1.5; y < crop.y + crop.h; y += 3) for (let x = crop.x + 1.5; x < crop.x + crop.w; x += 3) out.push({ x, y });
+    return (this.samples = out);
+  }
+
+  /** The loop through the grass border, halfway between the crop and the map edge. */
+  private ring(): Rect {
+    const f = this.settings.field;
+    const crop = cropRect(f);
+    const gap = Math.max(3, f.border / 2);
+    return { x: crop.x - gap, y: crop.y - gap, w: crop.w + 2 * gap, h: crop.h + 2 * gap };
+  }
+
+  /** A point on the border loop, t from 0 to 1 going around (0 = middle of the top side). */
+  private ringPoint(t: number): Vec {
+    const r = this.ring();
+    const per = 2 * (r.w + r.h);
+    let d = ((((t * per + r.w / 2) % per) + per) % per);
+    if (d < r.w) return { x: r.x + d, y: r.y };
+    d -= r.w;
+    if (d < r.h) return { x: r.x + r.w, y: r.y + d };
+    d -= r.h;
+    if (d < r.w) return { x: r.x + r.w - d, y: r.y + r.h };
+    d -= r.w;
+    return { x: r.x, y: r.y + r.h - d };
+  }
+
+  /** The closest point on the border loop. */
+  private toRing(p: Vec): Vec {
+    const r = this.ring();
+    const x = clamp(p.x, r.x, r.x + r.w);
+    const y = clamp(p.y, r.y, r.y + r.h);
+    const dl = x - r.x;
+    const dr = r.x + r.w - x;
+    const dt = y - r.y;
+    const db = r.y + r.h - y;
+    const m = Math.min(dl, dr, dt, db);
+    if (m === dl) return { x: r.x, y };
+    if (m === dr) return { x: r.x + r.w, y };
+    if (m === dt) return { x, y: r.y };
+    return { x, y: r.y + r.h };
+  }
+
+  /** k traps spaced evenly around the border loop (two traps face each other across the field). */
+  private ringTraps(k: number): Vec[] {
+    return Array.from({ length: k }, (_, i) => this.ringPoint(i / k));
+  }
+
+  /**
+   * Where a new repellent would help most: a test pest that no repellent
+   * reaches yet (or any test pest, if all are covered).
+   */
+  private gapSpot(devices: DevicePlan[]): Vec {
+    const r2 = this.settings.scent.rangeM ** 2;
+    const reps = devices.filter((d) => d.kind === 'repellent');
+    const crop = cropRect(this.settings.field);
+    const open = this.pests.filter(
+      (p) => inRect(p.x, p.y, crop) && !reps.some((d) => (d.x - p.x) ** 2 + (d.y - p.y) ** 2 <= r2)
+    );
+    const pool = open.length ? open : this.pests;
+    const p = pool[this.rng.int(0, pool.length - 1)];
+    return p ? { x: p.x, y: p.y } : { x: crop.x + crop.w / 2, y: crop.y + crop.h / 2 };
   }
 
   /** k points at the centers of the pest clusters the computer knows about. */
@@ -505,18 +590,36 @@ export class Optimizer {
     return estimateSprayLiters(zones, map, this.settings.drone) <= this.literLimit();
   }
 
-  private randomDevice(): DevicePlan {
+  /**
+   * A new device. Attractant traps always go in the grass border (a trap on
+   * the crop would pull pests onto it); repellent goes on the crop, usually
+   * near a known pest.
+   */
+  private randomDevice(kind?: 'repellent' | 'attractant'): DevicePlan {
     const kinds = allowedKinds(this.settings.treatment);
+    const attract = kind ? kind === 'attractant' : kinds.includes('attractant') && this.rng.chance(0.25);
+    const crop = cropRect(this.settings.field);
+    let p: Vec;
+    if (attract) p = this.ringPoint(this.rng.next());
+    else {
+      const near = this.pests.length && this.rng.chance(0.7) ? this.pests[this.rng.int(0, this.pests.length - 1)] : null;
+      p = near
+        ? { x: near.x + this.rng.gaussian() * 6, y: near.y + this.rng.gaussian() * 6 }
+        : { x: this.rng.range(crop.x, crop.x + crop.w), y: this.rng.range(crop.y, crop.y + crop.h) };
+    }
+    return this.placed(p, attract ? 'attractant' : 'repellent');
+  }
+
+  /** A device at a point, kept on the map (and attractants on the border loop). */
+  private placed(p: Vec, kind: 'repellent' | 'attractant'): DevicePlan {
     const f = this.settings.field;
-    const attract = kinds.includes('attractant') && this.rng.chance(0.3);
-    // Usually near a known pest, sometimes anywhere.
-    const near = this.pests.length && this.rng.chance(0.7) ? this.pests[this.rng.int(0, this.pests.length - 1)] : null;
+    const q = kind === 'attractant' ? this.toRing(p) : p;
     return {
       id: this.nextId++,
-      x: near ? clamp(near.x + this.rng.gaussian() * 6, 3, f.width - 3) : this.rng.range(3, f.width - 3),
-      y: near ? clamp(near.y + this.rng.gaussian() * 6, 3, f.height - 3) : this.rng.range(3, f.height - 3),
-      kind: attract ? 'attractant' : 'repellent',
-      trap: attract
+      x: clamp(q.x, 3, f.width - 3),
+      y: clamp(q.y, 3, f.height - 3),
+      kind,
+      trap: kind === 'attractant'
     };
   }
 
@@ -574,31 +677,35 @@ export class Optimizer {
       const zones = this.zonesFor(chosen);
       return { sprayZones: zones.length && this.zonesFit(zones) ? zones : plan.sprayZones, devices: [] };
     }
-    const f = s.field;
     const devices = plan.devices.map((d) => ({ ...d }));
+    const move = (i: number, dx: number, dy: number) => {
+      const d = devices[i];
+      devices[i] = { ...this.placed({ x: d.x + dx, y: d.y + dy }, d.kind), id: d.id };
+    };
+    const pick = () => rng.int(0, devices.length - 1);
     const r = rng.next();
-    if (r < 0.3 && devices.length) {
+    if (r < 0.25 && devices.length) {
       // Nudge one device a few meters.
-      const d = devices[rng.int(0, devices.length - 1)];
-      d.x = clamp(d.x + rng.gaussian() * 5, 3, f.width - 3);
-      d.y = clamp(d.y + rng.gaussian() * 5, 3, f.height - 3);
-    } else if (r < 0.5 && devices.length) {
+      move(pick(), rng.gaussian() * 5, rng.gaussian() * 5);
+    } else if (r < 0.4 && devices.length) {
       // Move one device a long way.
-      const d = devices[rng.int(0, devices.length - 1)];
-      d.x = clamp(d.x + rng.gaussian() * 20, 3, f.width - 3);
-      d.y = clamp(d.y + rng.gaussian() * 20, 3, f.height - 3);
-    } else if (r < 0.65 && devices.length) {
-      // Put one device somewhere else (same kind), usually near pests.
-      const i = rng.int(0, devices.length - 1);
-      devices[i] = { ...this.randomDevice(), kind: devices[i].kind, trap: devices[i].trap };
-    } else if (r < 0.75 && allowedKinds(s.treatment).length > 1 && devices.length) {
-      const d = devices[rng.int(0, devices.length - 1)];
-      d.kind = d.kind === 'repellent' ? 'attractant' : 'repellent';
-      d.trap = d.kind === 'attractant';
+      move(pick(), rng.gaussian() * 20, rng.gaussian() * 20);
+    } else if (r < 0.6 && devices.length) {
+      // Move a repellent to a spot no repellent reaches yet; a trap to another spot on the border.
+      const i = pick();
+      const d = devices[i];
+      const others = devices.filter((_, k) => k !== i);
+      devices[i] = { ...(d.kind === 'repellent' ? this.placed(this.gapSpot(others), 'repellent') : this.randomDevice('attractant')), id: d.id };
+    } else if (r < 0.72 && allowedKinds(s.treatment).length > 1 && devices.length) {
+      // Swap a repellent for a trap in the nearest border spot, or a trap for a repellent in a gap.
+      const i = pick();
+      const d = devices[i];
+      const others = devices.filter((_, k) => k !== i);
+      devices[i] = d.kind === 'repellent' ? { ...this.placed(d, 'attractant'), id: d.id } : { ...this.placed(this.gapSpot(others), 'repellent'), id: d.id };
     } else if (r < 0.88 && devices.length < s.devices.maxDevices) {
-      devices.push(this.randomDevice());
+      devices.push(rng.chance(0.6) ? this.placed(this.gapSpot(devices), 'repellent') : this.randomDevice());
     } else if (devices.length > 1) {
-      devices.splice(rng.int(0, devices.length - 1), 1);
+      devices.splice(pick(), 1);
     }
     return { sprayZones: [], devices };
   }
