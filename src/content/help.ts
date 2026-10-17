@@ -87,6 +87,10 @@ export const HELP: Record<string, HelpTopic> = {
     title: 'Two clocks',
     text: 'While a drone is flying, the clock runs in real time, so flight times are real minutes. When the drone is on the ground, the field runs as a time-lapse: at 1x, one second on screen is about four hours on the farm. Pests, crop damage and fading scent take days, just like on a real farm.'
   },
+  budget: {
+    title: 'Budget',
+    text: 'The money the team has for the whole season: drone flying time, scent product and devices all come out of it. The plan shows what it will cost before you run it. If the money runs out, the drone flies home and the rest of the plan does not happen. With a budget, the question is not just what works, but what works best for the money.'
+  },
   sprayVsDevices: {
     title: 'Spray or devices?',
     text: 'Spray covers every spot you draw, all at once, but a natural scent wears off in a few days, so you may need to spray again and again. A slow-release device keeps working for weeks, but only protects the circle around it, and you only have so many. Which one wins depends on how big the field is, where the pests are, the wind and your budget. Try both and compare!'

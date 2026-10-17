@@ -93,14 +93,16 @@ export const SCENARIOS: Scenario[] = [
     plan: emptyPlan()
   },
   {
-    id: 'limited',
-    name: 'Limited Product',
-    purpose: 'There is not enough product to treat the whole field. Decide where it goes.',
-    question: 'With only 4 gallons, which parts of the field should get treatment?',
+    id: 'budget',
+    name: 'Limited Budget',
+    purpose:
+      'Pests gather in a few hotspots, and you have $250 for the whole season. Spend it on spray, scent devices or push-pull. The drone stops working when the money runs out.',
+    question: 'With only $250, which plan protects the most crop?',
     settings: settingsWith({
       treatment: 'spray',
       pests: { distribution: 'hotspots', hotspotCount: 4 },
-      drone: { productAvailableGal: 4 }
+      devices: { maxDevices: 40 },
+      cost: { budget: 250 }
     }),
     plan: emptyPlan()
   },

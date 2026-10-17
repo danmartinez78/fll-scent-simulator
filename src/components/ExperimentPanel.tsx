@@ -37,13 +37,16 @@ export function droneStatus(sim: Simulation, detailed = true): string {
       if (sim.treatmentScheduled)
         return `Drone is waiting at home (H). The treatment starts on Day ${sim.settings.run.treatStartDay ?? 1}.`;
       if (sim.treatmentWaiting) return 'Drone is waiting at home (H) until you press Run to start the treatment.';
+      if (d.outOfBudget) return 'Drone is parked: the money for this season is used up, so the rest of the plan was skipped.';
       if (d.outOfProduct) return 'Drone is parked: it ran out of product.';
       if (d.gaveUp) return 'Drone is parked: the job is too far for one battery.';
       return d.flights > 0 ? 'Drone is parked: all jobs done.' : 'Drone is parked at home (H), waiting for a plan.';
     case 'turnaround':
       return `Drone is on the ground: refilling and swapping the battery (${Math.ceil(d.turnaroundLeft)} s left).`;
     case 'returning':
-      return d.lastReturnReason === 'battery'
+      return d.lastReturnReason === 'budget'
+        ? 'Drone is flying home: the money is almost used up, so it stops here.'
+        : d.lastReturnReason === 'battery'
         ? `Drone is flying home: the battery reached the reserve (${battery}).`
         : d.lastReturnReason === 'refill'
           ? 'Drone is flying home to refill the tank.'

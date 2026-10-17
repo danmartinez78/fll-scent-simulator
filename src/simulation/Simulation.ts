@@ -11,8 +11,8 @@ import type {
 import { childSeed, Random } from '../utils/random';
 import { inRect } from '../utils/geometry';
 import { galPerAcreToLPerM2, lToGal } from '../utils/units';
-import { computeCost } from './CostModel';
-import { Drone } from './Drone';
+import { computeCost, DEFAULT_COSTS } from './CostModel';
+import { Drone, type DroneBudget } from './Drone';
 import { PestSwarm, type PestEnvironment } from './Pest';
 import { ScentField } from './ScentField';
 import { SurveyRun } from './Survey';
@@ -346,6 +346,28 @@ export class Simulation {
     };
   }
 
+  /** Dollars spent so far (flight time, product sprayed and devices put out). */
+  spentSoFar(): number {
+    const d = this.drone;
+    const devicesUsed = this.devices.filter((e) => e.activatedAt !== null).length;
+    return computeCost(
+      { sprayedAreaM2: d.sprayedAreaM2, litersUsed: d.litersSprayed, devicesUsed, flightMin: d.airborneSec / 60 },
+      this.settings.cost
+    ).total;
+  }
+
+  /** The budget the drone works within, or undefined when there is none. */
+  private droneBudget(): DroneBudget | undefined {
+    const c = this.settings.cost;
+    if (!c.budget || c.budget <= 0) return undefined;
+    return {
+      left: () => c.budget! - this.spentSoFar(),
+      perSec: (c.flightCostPerMin ?? DEFAULT_COSTS.flightCostPerMin) / 60,
+      perLiter: lToGal(1) * c.materialCostPerGal,
+      perDevice: c.deviceCost
+    };
+  }
+
   private maybeRespray(): void {
     const s = this.settings;
     const every = s.drone.resprayEveryDays ?? 0;
@@ -354,7 +376,7 @@ export class Simulation {
     // Wait for the drone to finish its current work before starting the next round.
     if (this.fieldTime < this.nextRespray || this.drone.busy) return;
     const zones = this.effectivePlan.sprayZones;
-    if (zones.length && this.drone.stockL > 0.01) {
+    if (zones.length && this.drone.stockL > 0.01 && !this.drone.outOfBudget) {
       for (const z of zones) this.drone.tasks.push(...sprayTasksForZone(z, this.map, s.drone));
       this.resprays++;
     }
@@ -380,6 +402,7 @@ export class Simulation {
     // Drone: flies its jobs, sprays and drops devices.
     const sprayed = this.sprayed;
     if (treating) this.drone.step(dt, {
+      budget: this.droneBudget(),
       devicesMassKg: s.devices.massKg,
       // Setups saved before this setting existed keep their old behavior (no rack limit).
       devicesPerTrip: s.devices.perTrip,

@@ -2,14 +2,14 @@ import { describe, expect, it } from 'vitest';
 import { coveredBlocks, kMeans, mergeBlocks, Optimizer, planWithinLimits, scoreMetrics, sprayBlocks } from '../src/simulation/Optimizer';
 import { cropRect, Simulation } from '../src/simulation/Simulation';
 import { Random } from '../src/utils/random';
-import { getScenario, settingsWith } from '../src/simulation/scenarios';
+import { settingsWith } from '../src/simulation/scenarios';
 import { estimateSprayLiters } from '../src/simulation/Treatment';
 import { galToL } from '../src/utils/units';
 import type { Metrics } from '../src/models/types';
 
 describe('optimizer', () => {
   it('keeps spray plans within the product limit', () => {
-    const s = getScenario('limited')!.settings;
+    const s = settingsWith({ treatment: 'spray', pests: { distribution: 'hotspots', hotspotCount: 4 }, drone: { productAvailableGal: 4 } });
     const opt = new Optimizer(s, { kind: 'none' }, 12, 60);
     const map = { x: 0, y: 0, w: s.field.width, h: s.field.height };
     for (let i = 0; i < 200; i++) {

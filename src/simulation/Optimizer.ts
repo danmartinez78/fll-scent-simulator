@@ -13,6 +13,7 @@ import { childSeed, Random } from '../utils/random';
 import { galToL } from '../utils/units';
 import { cropRect, DEVICE_PLUME_LIFETIME_MIN, Simulation } from './Simulation';
 import { activePlan, allowedKinds, estimateSprayLiters } from './Treatment';
+import { estimatePlanCost } from './PlanCost';
 import { scentDrift } from './Wind';
 
 export interface ScorePart {
@@ -71,14 +72,20 @@ export function knowledgePests(settings: Settings, knowledge: Knowledge, n: numb
   return out;
 }
 
-/** Check a plan against the run's limits (product and number of devices). */
+/** Check a plan against the run's limits (product, number of devices and budget). */
 export function planWithinLimits(plan: TreatmentPlan, settings: Settings): boolean {
   const eff = activePlan(plan, settings.treatment);
   const map = { x: 0, y: 0, w: settings.field.width, h: settings.field.height };
   const liters = estimateSprayLiters(eff.sprayZones, map, settings.drone);
   if (liters > galToL(settings.drone.productAvailableGal) + 1e-6) return false;
   if (eff.devices.length > settings.devices.maxDevices) return false;
-  return true;
+  return withinBudget(eff, settings);
+}
+
+/** True when the whole plan costs no more than the budget (or there is no budget). */
+export function withinBudget(plan: TreatmentPlan, settings: Settings): boolean {
+  const budget = settings.cost.budget ?? 0;
+  return budget <= 0 || estimatePlanCost(settings, plan).total <= budget;
 }
 
 /** Spray "blocks": the crop cut into a grid of pieces the computer can choose from. */
@@ -402,14 +409,16 @@ export class Optimizer {
 
   private deviceIdeas(): Array<{ label: string; plan: TreatmentPlan }> {
     const s = this.settings;
-    const max = s.devices.maxDevices;
+    // With a budget, "all the devices" means as many as the money pays for.
+    const max = this.affordableDevices();
     const pushPull = s.treatment === 'pushPull';
     const ideas: Array<{ label: string; plan: TreatmentPlan }> = [];
     const counts = [...new Set([max, Math.max(1, Math.round(max / 2))])];
     for (const k of counts) {
-      const some = k === max ? 'all' : `${k} of the`;
-      ideas.push({ label: `Spread ${some} devices evenly over the crop`, plan: this.devicePlan(this.evenPoints(k)) });
-      ideas.push({ label: `Put ${some} devices where the pests are`, plan: this.devicePlan(this.clusterPoints(k)) });
+      const some =
+        k === s.devices.maxDevices ? 'all the devices' : k === max ? `as many devices as the budget pays for (${k})` : `${k} devices`;
+      ideas.push({ label: `Spread ${some} evenly over the crop`, plan: this.devicePlan(this.evenPoints(k)) });
+      ideas.push({ label: `Put ${some} where the pests are`, plan: this.devicePlan(this.clusterPoints(k)) });
     }
     const drift = this.plumeDrift();
     const windy = Math.hypot(drift.x, drift.y) > 1;
@@ -458,6 +467,21 @@ export class Optimizer {
       }
     }
     return out;
+  }
+
+  /** Most devices the budget pays for (spread evenly), up to the device limit. */
+  private affordableDevices(): number {
+    const s = this.settings;
+    if (!s.cost.budget || s.cost.budget <= 0) return s.devices.maxDevices;
+    const fits = (k: number) => withinBudget(this.devicePlan(this.evenPoints(k)), s);
+    let lo = 0;
+    let hi = s.devices.maxDevices;
+    while (lo < hi) {
+      const mid = Math.ceil((lo + hi) / 2);
+      if (fits(mid)) lo = mid;
+      else hi = mid - 1;
+    }
+    return Math.max(1, lo);
   }
 
   /**
@@ -587,7 +611,8 @@ export class Optimizer {
 
   private zonesFit(zones: Rect[]): boolean {
     const map = { x: 0, y: 0, w: this.settings.field.width, h: this.settings.field.height };
-    return estimateSprayLiters(zones, map, this.settings.drone) <= this.literLimit();
+    if (estimateSprayLiters(zones, map, this.settings.drone) > this.literLimit()) return false;
+    return withinBudget({ sprayZones: zones, devices: [] }, this.settings);
   }
 
   /**

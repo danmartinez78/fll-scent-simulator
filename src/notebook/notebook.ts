@@ -177,6 +177,7 @@ export function summaryRows(c: CapturedRun): Array<[string, string]> {
     ['Drone flight time', `${m.flightTimeMin.toFixed(1)} min`],
     ['Flights', String(m.flights)],
     ['Estimated cost', formatMoney(m.cost.total)],
+    ...(s.cost.budget ? [['Budget', formatMoney(s.cost.budget)] as [string, string]] : []),
     ['Survey', `${c.surveysDone} done; camera ${s.survey.detectionPct}% detection`],
     ['Random seed', String(s.run.seed)]
   ];
@@ -309,6 +310,7 @@ export function describeChanges(before: RunSetup, after: RunSetup): string[] {
 
   add('Wind', windWords(a), windWords(b));
   add('Product available', `${a.drone.productAvailableGal} gal`, `${b.drone.productAvailableGal} gal`);
+  add('Budget', a.cost.budget ? formatMoney(a.cost.budget) : 'no limit', b.cost.budget ? formatMoney(b.cost.budget) : 'no limit');
   add('Device range', `${a.scent.rangeM} m`, `${b.scent.rangeM} m`);
   add('Scent strength', a.scent.strength, b.scent.strength);
   add('Spray lasts', formatModelMin(a.scent.lifetimeMin), formatModelMin(b.scent.lifetimeMin));
