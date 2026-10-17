@@ -343,7 +343,7 @@ function RunStep({ sim, running, onStep, settings, plan }: Props) {
           : running
             ? settings.treatment === 'pesticide'
               ? 'Watch the × marks: each one is an insect killed. A red × is a bee or ladybug.'
-              : 'Watch the pests (small bugs with feelers). Orange pests are pushed away by repellent. Blue pests ignore the scent. The round red bugs with spots are ladybugs eating pests.'
+              : 'Watch the pests (small dark ovals). Orange pests are pushed away by repellent. Blue pests are in repellent but ignore it. The round red dots are ladybugs eating pests.'
             : 'Paused. Press ▶ Resume to keep going.'}
       </p>
       {!sim.runStarted && <p className="hint">Tip: 5x and 20x make the days go by faster.</p>}

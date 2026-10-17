@@ -153,7 +153,7 @@ export function MapKey({ settings: s, view, survey, onSpotlight }: Props) {
   if (view.showPests) {
     const items: Array<[ReactNode, string]> = [[<Bug color={COLORS.pest} />, 'eating or flying']];
     if (treated) items.push([<Bug color={COLORS.pestAgitated} />, 'pushed away by repellent']);
-    if (ignorers) items.push([<Bug color={COLORS.pestIgnores} />, 'ignores the scent']);
+    if (ignorers) items.push([<Bug color={COLORS.pestIgnores} />, 'in repellent but ignores it']);
     insects.push({ group: 'pests', title: 'Pests', items });
   }
   if (s.helpers?.count) {

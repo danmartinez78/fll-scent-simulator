@@ -295,7 +295,10 @@ export function drawScene(ctx: CanvasRenderingContext2D, sim: Simulation, o: Dra
     const p = sim.pests;
     const eff = (sim.settings.scent.effectivenessPct ?? 100) / 100;
     const markIgnorers = sim.settings.treatment !== 'none' && eff < 1;
-    const ignores = (i: number) => markIgnorers && !p.reacts(i, eff);
+    // Blue only while a pest sits in repellent strong enough to push others away and stays put,
+    // so pests aren't blue before any scent is out (or where there is none).
+    const th = Math.max(1e-4, sim.settings.scent.threshold);
+    const ignores = (i: number) => markIgnorers && !p.reacts(i, eff) && sim.repellent.sample(p.x[i], p.y[i]) > th;
     const usual = (i: number) => !p.trapped[i] && p.present(i);
     drawPests(ctx, p, s, COLORS.pest, (i) => usual(i) && !p.repelled[i] && !ignores(i));
     if (markIgnorers) drawPests(ctx, p, s, COLORS.pestIgnores, (i) => usual(i) && ignores(i));
