@@ -18,6 +18,7 @@ import { GuidedPanel, type GuidedStep } from './components/GuidedPanel';
 import { MODEL_NOTE } from './content/help';
 import { SimToRealDialog } from './components/SimToReal';
 import { WelcomeDialog } from './components/WelcomeDialog';
+import { NotebookDialog } from './components/NotebookDialog';
 import { MapKey } from './components/MapKey';
 import { captureRun, loadNotebook, newEntry, nextName, saveNotebook, type EntrySetup, type NotebookEntry } from './notebook/notebook';
 
@@ -133,6 +134,7 @@ export default function App() {
   const [savedTo, setSavedTo] = useState<string | null>(null);
   const [loopOpen, setLoopOpen] = useState(false);
   const [welcomeOpen, setWelcomeOpen] = useState(() => !loadWelcomeSeen());
+  const [notebookOpen, setNotebookOpen] = useState(false);
   const [, setTick] = useState(0);
 
   const simRef = useRef<Simulation>(new Simulation(settings, plan));
@@ -272,6 +274,28 @@ export default function App() {
     [resetSim]
   );
 
+  /**
+   * Switch modes. Guided missions are meant to run with their own settings,
+   * so entering Guided reloads the current mission fresh: anything changed in
+   * the Playground (pest count, scent, drone, costs, map layers, instructor
+   * view) is put back, and the steps start over at Mission.
+   */
+  const switchMode = useCallback(
+    (m: Mode) => {
+      if (m === mode) return;
+      setMode(m);
+      if (m === 'guided') {
+        loadScenario(scenario);
+        setInstructor(false);
+        setSurveyLayer('camera');
+        setPrediction('');
+        setGuess(null);
+        setStepState('mission');
+      }
+    },
+    [mode, setMode, loadScenario, scenario]
+  );
+
   const startSurvey = useCallback(() => {
     simRef.current.startSurvey(true);
     setNotice(null);
@@ -295,6 +319,7 @@ export default function App() {
               : e
           )
         );
+        setActiveEntryId(target.id);
         setSavedTo(target.name);
       } else {
         const e = { ...newEntry(nextName(entries)), ...guided, captured };
@@ -360,10 +385,10 @@ export default function App() {
         <ScenarioSelector scenario={scenario} onLoad={loadScenario} pickable={mode === 'playground'} />
         {!phone && (
         <div className="mode-switch" role="tablist" aria-label="Mode">
-          <button role="tab" aria-selected={mode === 'guided'} className={mode === 'guided' ? 'active' : ''} onClick={() => setMode('guided')}>
+          <button role="tab" aria-selected={mode === 'guided'} className={mode === 'guided' ? 'active' : ''} onClick={() => switchMode('guided')}>
             🧭 Guided
           </button>
-          <button role="tab" aria-selected={mode === 'playground'} className={mode === 'playground' ? 'active' : ''} onClick={() => setMode('playground')}>
+          <button role="tab" aria-selected={mode === 'playground'} className={mode === 'playground' ? 'active' : ''} onClick={() => switchMode('playground')}>
             🛝 Playground
           </button>
         </div>
@@ -419,6 +444,9 @@ export default function App() {
               onSave={() => saveRunToNotebook()}
               saved={savedTo}
               entries={entries}
+              activeEntryId={activeEntryId}
+              onUpdateEntry={(id, patch) => setEntries((list) => list.map((e) => (e.id === id ? { ...e, ...patch } : e)))}
+              onOpenNotebook={() => setNotebookOpen(true)}
               onTryAgain={() => {
                 resetSim(settings, plan);
                 setStep('plan');
@@ -601,6 +629,25 @@ export default function App() {
         </span>
       </footer>
       <SimToRealDialog open={loopOpen} onClose={() => setLoopOpen(false)} />
+      {guided && (
+        <NotebookDialog open={notebookOpen} onClose={() => setNotebookOpen(false)}>
+          <NotebookPanel
+            entries={entries}
+            activeId={activeEntryId}
+            onActive={setActiveEntryId}
+            onEntries={setEntries}
+            onSaveRun={(id) => saveRunToNotebook(id)}
+            onLoadSetup={(setup) => {
+              // Loading a saved setup is "change one thing and run again": go straight to Plan.
+              loadSetup(setup);
+              setSavedTo(null);
+              setNotebookOpen(false);
+              setStepState('plan');
+            }}
+            simTime={sim.time}
+          />
+        </NotebookDialog>
+      )}
       <WelcomeDialog
         open={welcomeOpen}
         phone={phone}

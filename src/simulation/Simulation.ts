@@ -64,6 +64,12 @@ export function gridCellSize(f: FieldSettings): number {
   return Math.max(2.5, f.width / 64);
 }
 
+/**
+ * While a drone flies, pests are moved only once this much model time has
+ * built up (about 2.4 farm minutes), instead of a hair's breadth every step.
+ */
+export const PEST_STEP_MIN_SEC = 0.1;
+
 export interface SimOptions {
   /** Use fewer pests (the optimizer does this to run faster). */
   pestCount?: number;
@@ -72,6 +78,12 @@ export interface SimOptions {
   dt?: number;
   /** Use bigger grid squares (faster, blurrier). */
   cellSize?: number;
+  /**
+   * How many real pests each simulated pest stands for when feeding on the
+   * crop (default 1). With fewer pests than the scenario has, set this to
+   * scenario count / simulated count so crop damage builds up at the real rate.
+   */
+  pestWeight?: number;
 }
 
 export class Simulation {
@@ -121,6 +133,10 @@ export class Simulation {
   private nextRespray = 0;
   /** Repeat sprays started so far. */
   resprays = 0;
+  /** Real pests per simulated pest for crop damage (see SimOptions.pestWeight). */
+  readonly pestWeight: number;
+  /** Pest time saved up while a drone flies (see PEST_STEP_MIN_SEC). */
+  private pestDtOwed = 0;
   private awaySum = 0;
   private awayN = 0;
   private nextHistory = 0;
@@ -132,6 +148,7 @@ export class Simulation {
     this.settings = structuredClone(settings);
     this.plan = structuredClone(plan);
     this.dt = opts.dt ?? DEFAULT_DT;
+    this.pestWeight = opts.pestWeight ?? 1;
     const f = settings.field;
     this.map = { x: 0, y: 0, w: f.width, h: f.height };
     this.crop = cropRect(f);
@@ -405,24 +422,25 @@ export class Simulation {
     // The residue's smell drifts downwind. Fed so that with no wind it matches
     // RESIDUE_VAPOR_SHARE of the residue; it runs on the farm clock like the residue.
     const vapor = this.residueVapor;
-    const feed = RESIDUE_VAPOR_SHARE * (1 - Math.exp(-bioDt / RESIDUE_VAPOR_LIFETIME_SEC));
-    for (let i = 0; i < vapor.data.length; i++) vapor.data[i] += this.sprayResidue.data[i] * feed;
+    if (!this.sprayResidue.empty) {
+      const feed = RESIDUE_VAPOR_SHARE * (1 - Math.exp(-bioDt / RESIDUE_VAPOR_LIFETIME_SEC));
+      for (let i = 0; i < vapor.data.length; i++) vapor.data[i] += this.sprayResidue.data[i] * feed;
+      vapor.touch();
+    }
     vapor.step(bioDt, drift.x, drift.y, diff, RESIDUE_VAPOR_LIFETIME_SEC);
     const rep = this.repellent.data;
     const air = this.repellentAir.data;
     const res = this.sprayResidue.data;
     for (let i = 0; i < rep.length; i++) rep[i] = air[i] + res[i] * (1 - RESIDUE_VAPOR_SHARE) + vapor.data[i];
+    this.repellent.empty = this.repellentAir.empty && this.sprayResidue.empty && vapor.empty;
 
-    // Pests arrive, move and feed.
-    this.pests.now = this.time;
-    this.pests.step(bioDt, this.pestEnvironment(), this.rngMotion);
-    const area = cell * cell;
-    const p = this.pests;
-    for (let i = 0; i < p.n; i++) {
-      if (!p.feeding[i]) continue;
-      const c = Math.min(cols - 1, Math.floor(p.x[i] / cell));
-      const r = Math.min(this.repellent.rows - 1, Math.floor(p.y[i] / cell));
-      this.damage[r * cols + c] += bioDt / area;
+    // Pests arrive, move and feed. While a drone flies the field clock
+    // barely moves, so pest time is saved up and spent in one step once
+    // enough has built up: the same movement and feeding, far fewer steps.
+    this.pestDtOwed += bioDt;
+    if (!flying || this.pestDtOwed >= PEST_STEP_MIN_SEC) {
+      this.stepPests(this.pestDtOwed);
+      this.pestDtOwed = 0;
     }
 
     // Survey drone.
@@ -439,6 +457,23 @@ export class Simulation {
     this.fieldTime += flying ? dt : dt * TIME_LAPSE;
     if (this.time + 1e-9 >= this.nextHistory) this.recordHistory();
     if (this.time + 1e-9 >= this.durationSec) this.finished = true;
+  }
+
+  /** Move the pests `dt` model seconds and add their feeding to the crop damage. */
+  private stepPests(dt: number): void {
+    const cell = this.repellent.cell;
+    const cols = this.repellent.cols;
+    this.pests.now = this.time;
+    this.pests.step(dt, this.pestEnvironment(), this.rngMotion);
+    const area = cell * cell;
+    const p = this.pests;
+    const weight = this.pestWeight / area;
+    for (let i = 0; i < p.n; i++) {
+      if (!p.feeding[i]) continue;
+      const c = Math.min(cols - 1, Math.floor(p.x[i] / cell));
+      const r = Math.min(this.repellent.rows - 1, Math.floor(p.y[i] / cell));
+      this.damage[r * cols + c] += dt * weight;
+    }
   }
 
   /** Run this many seconds' worth of steps (the model clock moves less while a drone flies). */
@@ -472,9 +507,10 @@ export class Simulation {
   }
 
   /**
-   * Pests feeding right now: on the crop, not trapped, not flying off after
-   * giving up, and not bothered by repellent above the threshold. Pests that
-   * ignore the scent keep feeding inside it, the same rule crop damage uses.
+   * Pests feeding right now: on the crop, not trapped, not flying on after
+   * escaping repellent, and not bothered by repellent above the threshold.
+   * Pests that ignore the scent keep feeding inside it, the same rule crop
+   * damage uses.
    */
   feedingCount(): number {
     const p = this.pests;
@@ -482,7 +518,7 @@ export class Simulation {
     const effectiveness = (this.settings.scent.effectivenessPct ?? 100) / 100;
     let k = 0;
     for (let i = 0; i < p.n; i++) {
-      if (p.trapped[i] || !p.present(i) || p.leaving[i] > 0 || !inRect(p.x[i], p.y[i], this.crop)) continue;
+      if (p.trapped[i] || !p.present(i) || p.wary[i] > 0 || !inRect(p.x[i], p.y[i], this.crop)) continue;
       if (
         this.settings.pests.sensitivity > 0 &&
         p.reacts(i, effectiveness) &&

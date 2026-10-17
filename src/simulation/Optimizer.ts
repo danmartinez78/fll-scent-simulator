@@ -8,11 +8,12 @@ import type {
   TreatmentPlan,
   Vec
 } from '../models/types';
-import { clamp } from '../utils/geometry';
+import { clamp, inRect } from '../utils/geometry';
 import { childSeed, Random } from '../utils/random';
 import { galToL } from '../utils/units';
-import { cropRect, gridCellSize, Simulation } from './Simulation';
+import { cropRect, DEVICE_PLUME_LIFETIME_MIN, Simulation } from './Simulation';
 import { activePlan, allowedKinds, estimateSprayLiters } from './Treatment';
+import { scentDrift } from './Wind';
 
 export interface ScorePart {
   label: string;
@@ -94,12 +95,71 @@ export function sprayBlocks(settings: Settings): Rect[] {
   return out;
 }
 
-/** Run a plan quickly with a smaller, blurrier copy of the simulation. */
+/**
+ * Merge chosen blocks into as few rectangles as possible (neighbors in a row
+ * first, then equal rows stacked), so the drone flies long passes the way it
+ * would over a hand-drawn zone instead of many short ones with a turn each.
+ */
+export function mergeBlocks(blocks: Rect[]): Rect[] {
+  const eq = (a: number, b: number) => Math.abs(a - b) < 1e-6;
+  // Rows: same y and height, sorted by x, joined where they touch.
+  const rows = new Map<string, Rect[]>();
+  for (const b of blocks) {
+    const key = `${b.y.toFixed(3)}|${b.h.toFixed(3)}`;
+    rows.set(key, [...(rows.get(key) ?? []), b]);
+  }
+  let out: Rect[] = [];
+  for (const list of rows.values()) {
+    list.sort((a, b) => a.x - b.x);
+    let cur = { ...list[0] };
+    for (let i = 1; i < list.length; i++) {
+      const b = list[i];
+      if (eq(cur.x + cur.w, b.x)) cur.w += b.w;
+      else {
+        out.push(cur);
+        cur = { ...b };
+      }
+    }
+    out.push(cur);
+  }
+  // Stack rows that have the same x and width and touch top to bottom.
+  out.sort((a, b) => a.x - b.x || a.w - b.w || a.y - b.y);
+  const stacked: Rect[] = [];
+  for (const r of out) {
+    const last = stacked[stacked.length - 1];
+    if (last && eq(last.x, r.x) && eq(last.w, r.w) && eq(last.y + last.h, r.y)) last.h += r.h;
+    else stacked.push({ ...r });
+  }
+  return stacked;
+}
+
+/** Which blocks a set of zones covers (at least 40% of the block's area). */
+export function coveredBlocks(zones: Rect[], blocks: Rect[]): number[] {
+  const out: number[] = [];
+  blocks.forEach((b, i) => {
+    let area = 0;
+    for (const z of zones) {
+      const w = Math.min(b.x + b.w, z.x + z.w) - Math.max(b.x, z.x);
+      const h = Math.min(b.y + b.h, z.y + z.h) - Math.max(b.y, z.y);
+      if (w > 0 && h > 0) area += w * h;
+    }
+    if (area >= 0.4 * b.w * b.h) out.push(i);
+  });
+  return out;
+}
+
+/**
+ * Run a plan quickly. The quick run keeps the real grid and the real number
+ * of pests (crop damage is a fixed amount of feeding per square, so fewer
+ * pests or bigger squares would make every plan look better than it is) and
+ * only takes bigger time steps. With fewer test pests than the scenario has,
+ * each one stands for several when it feeds (`pestWeight`).
+ */
 export function evaluatePlan(settings: Settings, plan: TreatmentPlan, pests: Vec[]): Metrics {
   const sim = new Simulation(settings, plan, {
     initialPests: pests,
     dt: 1,
-    cellSize: gridCellSize(settings.field) * 2
+    pestWeight: pests.length ? settings.pests.count / pests.length : 1
   });
   sim.runToEnd();
   return sim.metrics();
@@ -112,6 +172,46 @@ export function runFull(settings: Settings, plan: TreatmentPlan): Metrics {
   return sim.metrics();
 }
 
+/** Group points into k clusters (Lloyd's k-means) and return the cluster centers. */
+export function kMeans(points: Vec[], k: number, rng: Random, iterations = 10): Vec[] {
+  if (!points.length || k <= 0) return [];
+  k = Math.min(k, points.length);
+  // Start from k different random points.
+  const idx = points.map((_, i) => i);
+  for (let i = idx.length - 1; i > 0; i--) {
+    const j = rng.int(0, i);
+    [idx[i], idx[j]] = [idx[j], idx[i]];
+  }
+  const centers: Vec[] = idx.slice(0, k).map((i) => ({ x: points[i].x, y: points[i].y }));
+  const assign = new Int32Array(points.length);
+  for (let it = 0; it < iterations; it++) {
+    for (let i = 0; i < points.length; i++) {
+      let best = 0;
+      let bestD = Infinity;
+      for (let c = 0; c < k; c++) {
+        const dx = points[i].x - centers[c].x;
+        const dy = points[i].y - centers[c].y;
+        const d = dx * dx + dy * dy;
+        if (d < bestD) {
+          bestD = d;
+          best = c;
+        }
+      }
+      assign[i] = best;
+    }
+    const sx = new Float64Array(k);
+    const sy = new Float64Array(k);
+    const n = new Int32Array(k);
+    for (let i = 0; i < points.length; i++) {
+      sx[assign[i]] += points[i].x;
+      sy[assign[i]] += points[i].y;
+      n[assign[i]]++;
+    }
+    for (let c = 0; c < k; c++) if (n[c]) centers[c] = { x: sx[c] / n[c], y: sy[c] / n[c] };
+  }
+  return centers;
+}
+
 export interface OptimizerProgress {
   tried: number;
   total: number;
@@ -119,6 +219,24 @@ export interface OptimizerProgress {
   done: boolean;
 }
 
+/** A named plan the computer tried first, with the score it got in the quick run. */
+export interface StartingIdea {
+  label: string;
+  plan: TreatmentPlan;
+  score: number;
+  metrics: Metrics | null;
+  /** False when the plan broke a limit and was skipped. */
+  allowed: boolean;
+}
+
+/**
+ * Searches for a good plan the way a careful person would: first try the
+ * obvious ideas (treat everything, treat the border, treat the worst areas,
+ * spread devices evenly, put devices where the pests are), then keep the best
+ * one and improve it with small changes, keeping each change only if the
+ * score goes up. Every plan is tested against the same "test pests", built
+ * from what the computer knows.
+ */
 export class Optimizer {
   readonly settings: Settings;
   readonly total: number;
@@ -127,21 +245,34 @@ export class Optimizer {
   best: TreatmentPlan | null = null;
   bestScore = -Infinity;
   bestMetrics: Metrics | null = null;
+  /** The label of the idea the best plan grew from. */
+  bestFrom = '';
   /** Best score after each try (for a small progress chart). */
   trace: number[] = [];
+  /** The named ideas tried first, in order, with their scores. */
+  starts: StartingIdea[] = [];
+  /** How many small improvements were kept after the starting ideas. */
+  improvements = 0;
   private rng: Random;
   private pests: Vec[];
   private blocks: Rect[];
+  /** Block indices sorted by how many test pests they hold, worst first. */
+  private blocksByLoad: number[];
+  private queue: Array<{ label: string; plan: TreatmentPlan }> = [];
   private nextId = 1000;
 
-  constructor(settings: Settings, knowledge: Knowledge, total = 150, evalPests = 200) {
+  constructor(settings: Settings, knowledge: Knowledge, total = 60, evalPests = Infinity) {
     this.settings = structuredClone(settings);
     this.knowledge = knowledge;
     this.total = total;
     this.rng = new Random(childSeed(settings.run.seed, 77));
     // Every plan is tested against the same pests so scores are comparable.
-    this.pests = knowledgePests(settings, knowledge, Math.min(evalPests, settings.pests.count), this.rng);
+    const n = Math.max(1, Math.min(evalPests, settings.pests.count));
+    this.pests = knowledgePests(settings, knowledge, n, this.rng);
     this.blocks = sprayBlocks(settings);
+    const load = this.blocks.map((b) => this.pests.filter((p) => inRect(p.x, p.y, b)).length);
+    this.blocksByLoad = this.blocks.map((_, i) => i).sort((u, v) => load[v] - load[u]);
+    if (settings.treatment !== 'none') this.queue = this.startingIdeas();
   }
 
   get done(): boolean {
@@ -152,10 +283,13 @@ export class Optimizer {
     return { tried: this.tried, total: this.total, bestScore: this.bestScore, done: this.done };
   }
 
-  /** Try strategies until the time budget (ms) runs out; call again to continue. */
+  /** Try plans until the time budget (ms) runs out (at least one); call again to continue. */
   work(budgetMs = 30): OptimizerProgress {
     const start = performance.now();
-    while (!this.done && performance.now() - start < budgetMs) this.tryOne();
+    do {
+      if (this.done) break;
+      this.tryOne();
+    } while (performance.now() - start < budgetMs);
     return this.progress;
   }
 
@@ -165,21 +299,202 @@ export class Optimizer {
   }
 
   private tryOne(): void {
-    // First explore at random, then improve the best plan with small changes.
-    const explore = this.best === null || this.tried < this.total * 0.35;
-    const plan = explore ? this.randomPlan() : this.mutate(this.best!);
     this.tried++;
-    if (planWithinLimits(plan, this.settings)) {
-      const m = evaluatePlan(this.settings, plan, this.pests);
-      const score = scoreMetrics(m, this.settings.weights).total;
+    const next = this.queue.shift();
+    if (next) {
+      const allowed = planWithinLimits(next.plan, this.settings);
+      const m = allowed ? evaluatePlan(this.settings, next.plan, this.pests) : null;
+      const score = m ? scoreMetrics(m, this.settings.weights).total : -Infinity;
+      this.starts.push({ label: next.label, plan: next.plan, score, metrics: m, allowed });
       if (score > this.bestScore) {
         this.bestScore = score;
-        this.best = plan;
+        this.best = next.plan;
         this.bestMetrics = m;
+        this.bestFrom = next.label;
+      }
+    } else {
+      // Improve the best plan so far with a small change; keep it only if it scores higher.
+      const plan = this.best ? this.mutate(this.best) : this.randomPlan();
+      if (planWithinLimits(plan, this.settings)) {
+        const m = evaluatePlan(this.settings, plan, this.pests);
+        const score = scoreMetrics(m, this.settings.weights).total;
+        if (score > this.bestScore) {
+          if (this.best) this.improvements++;
+          this.bestScore = score;
+          this.best = plan;
+          this.bestMetrics = m;
+        }
       }
     }
     this.trace.push(this.bestScore);
   }
+
+  // ---- Starting ideas -------------------------------------------------
+
+  /** The obvious plans a person would try first, in the order they are tested. */
+  startingIdeas(): Array<{ label: string; plan: TreatmentPlan }> {
+    const s = this.settings;
+    const ideas = s.treatment === 'spray' ? this.sprayIdeas() : this.deviceIdeas();
+    // The baseline, so the computer can say honestly when nothing beats it.
+    ideas.push({ label: 'Do nothing', plan: { sprayZones: [], devices: [] } });
+    return ideas;
+  }
+
+  /** Zones for a set of block indices, merged into long passes. */
+  private zonesFor(indices: number[]): Rect[] {
+    return mergeBlocks(indices.map((i) => this.blocks[i]));
+  }
+
+  private sprayIdeas(): Array<{ label: string; plan: TreatmentPlan }> {
+    const crop = cropRect(this.settings.field);
+    const ideas: Array<{ label: string; plan: TreatmentPlan }> = [];
+    const seen = new Set<string>();
+    const add = (label: string, zones: Rect[]) => {
+      const key = zones
+        .map((z) => `${z.x.toFixed(1)},${z.y.toFixed(1)},${z.w.toFixed(1)},${z.h.toFixed(1)}`)
+        .sort()
+        .join('|');
+      if (!zones.length || seen.has(key)) return;
+      seen.add(key);
+      ideas.push({ label, plan: { sprayZones: zones, devices: [] } });
+    };
+    const affordable = this.worstBlocks(this.blocks.length).length;
+    if (this.zonesFit([crop])) add('Whole field', [crop]);
+    else add(`As much as the product allows (worst ${affordable} areas first)`, this.zonesFor(this.worstBlocks(affordable)));
+    const border = Math.max(this.settings.drone.swathM * 2, 8);
+    const strips = [
+      { x: crop.x, y: crop.y, w: crop.w, h: border },
+      { x: crop.x, y: crop.y + crop.h - border, w: crop.w, h: border },
+      { x: crop.x, y: crop.y + border, w: border, h: crop.h - 2 * border },
+      { x: crop.x + crop.w - border, y: crop.y + border, w: border, h: crop.h - 2 * border }
+    ];
+    if (this.zonesFit(strips)) add('Border strips', strips);
+    // Treat the worst areas first: a few sizes between "a little" and "all we can afford".
+    const fractions = [0.25, 0.5, 0.75];
+    for (const f of fractions) {
+      const k = Math.max(1, Math.round(affordable * f));
+      if (k < affordable) add(`Worst ${k} area${k === 1 ? '' : 's'}`, this.zonesFor(this.worstBlocks(k)));
+    }
+    if (affordable > 1) add('Worst area only', this.zonesFor(this.worstBlocks(1)));
+    return ideas;
+  }
+
+  /** The k blocks (indices) with the most test pests that fit the product limit together. */
+  private worstBlocks(k: number): number[] {
+    const out: number[] = [];
+    for (const i of this.blocksByLoad) {
+      if (out.length >= k) break;
+      if (this.zonesFit(this.zonesFor([...out, i]))) out.push(i);
+    }
+    return out;
+  }
+
+  private deviceIdeas(): Array<{ label: string; plan: TreatmentPlan }> {
+    const s = this.settings;
+    const max = s.devices.maxDevices;
+    const pushPull = s.treatment === 'pushPull';
+    const ideas: Array<{ label: string; plan: TreatmentPlan }> = [];
+    const counts = [...new Set([max, Math.max(1, Math.round(max / 2))])];
+    for (const k of counts) {
+      const some = k === max ? 'all' : `${k} of the`;
+      ideas.push({ label: `Spread ${some} devices evenly over the crop`, plan: this.devicePlan(this.gridPoints(k)) });
+      ideas.push({ label: `Put ${some} devices where the pests are`, plan: this.devicePlan(this.clusterPoints(k)) });
+    }
+    const drift = this.plumeDrift();
+    if (Math.hypot(drift.x, drift.y) > 1) {
+      ideas.push({ label: 'Put devices upwind of the pests, so the wind carries the scent over them', plan: this.devicePlan(this.clusterPoints(max).map((p) => ({ x: p.x - drift.x, y: p.y - drift.y }))) });
+      ideas.push({ label: 'A row of devices along the upwind edge of the crop', plan: this.devicePlan(this.upwindRow(max, drift)) });
+    }
+    if (pushPull) {
+      const traps = Math.max(1, Math.round(max / 4));
+      const push = this.clusterPoints(max - traps);
+      ideas.push({ label: `Repellent where the pests are, ${traps} attractant trap${traps === 1 ? '' : 's'} in the border`, plan: this.devicePlan(push, this.borderTraps(traps, drift)) });
+      const pushEven = this.gridPoints(max - traps);
+      ideas.push({ label: `Repellent spread evenly, ${traps} attractant trap${traps === 1 ? '' : 's'} in the border`, plan: this.devicePlan(pushEven, this.borderTraps(traps, drift)) });
+    }
+    return ideas;
+  }
+
+  /** How far a device's scent is carried downwind while it lingers (meters, as a vector). */
+  private plumeDrift(): Vec {
+    const v = scentDrift(this.settings.wind, 0);
+    const sec = DEVICE_PLUME_LIFETIME_MIN * 60;
+    return { x: v.x * sec * 0.6, y: v.y * sec * 0.6 };
+  }
+
+  private devicePlan(repellents: Vec[], traps: Vec[] = []): TreatmentPlan {
+    const f = this.settings.field;
+    const place = (p: Vec, kind: 'repellent' | 'attractant'): DevicePlan => ({
+      id: this.nextId++,
+      x: clamp(p.x, 3, f.width - 3),
+      y: clamp(p.y, 3, f.height - 3),
+      kind,
+      trap: kind === 'attractant'
+    });
+    return {
+      sprayZones: [],
+      devices: [...repellents.map((p) => place(p, 'repellent')), ...traps.map((p) => place(p, 'attractant'))]
+    };
+  }
+
+  /** k points spread evenly over the crop. */
+  private gridPoints(k: number): Vec[] {
+    const crop = cropRect(this.settings.field);
+    const cols = Math.max(1, Math.round(Math.sqrt((k * crop.w) / crop.h)));
+    const rows = Math.max(1, Math.ceil(k / cols));
+    const out: Vec[] = [];
+    for (let r = 0; r < rows && out.length < k; r++) {
+      const inRow = Math.min(cols, k - out.length);
+      for (let c = 0; c < inRow; c++) {
+        out.push({ x: crop.x + (crop.w * (c + 0.5)) / inRow, y: crop.y + (crop.h * (r + 0.5)) / rows });
+      }
+    }
+    return out;
+  }
+
+  /** k points at the centers of the pest clusters the computer knows about. */
+  private clusterPoints(k: number): Vec[] {
+    const pts = kMeans(this.pests, k, this.rng);
+    while (pts.length < k) pts.push(...this.gridPoints(k - pts.length));
+    return pts;
+  }
+
+  /** k points in a line along the crop edge the wind comes from. */
+  private upwindRow(k: number, drift: Vec): Vec[] {
+    const crop = cropRect(this.settings.field);
+    const out: Vec[] = [];
+    const alongX = Math.abs(drift.x) >= Math.abs(drift.y);
+    for (let i = 0; i < k; i++) {
+      const t = (i + 0.5) / k;
+      if (alongX) out.push({ x: drift.x > 0 ? crop.x + 2 : crop.x + crop.w - 2, y: crop.y + crop.h * t });
+      else out.push({ x: crop.x + crop.w * t, y: drift.y > 0 ? crop.y + 2 : crop.y + crop.h - 2 });
+    }
+    return out;
+  }
+
+  /** Trap spots in the grass border, on the side the wind blows toward (or the long sides in calm air). */
+  private borderTraps(k: number, drift: Vec): Vec[] {
+    const f = this.settings.field;
+    const crop = cropRect(f);
+    const gap = Math.max(4, f.border / 2);
+    const out: Vec[] = [];
+    const windy = Math.hypot(drift.x, drift.y) > 1;
+    for (let i = 0; i < k; i++) {
+      const t = (i + 0.5) / k;
+      if (windy && Math.abs(drift.x) >= Math.abs(drift.y)) {
+        out.push({ x: drift.x > 0 ? crop.x + crop.w + gap : crop.x - gap, y: crop.y + crop.h * t });
+      } else if (windy) {
+        out.push({ x: crop.x + crop.w * t, y: drift.y > 0 ? crop.y + crop.h + gap : crop.y - gap });
+      } else {
+        // Calm: alternate between the two long sides.
+        const side = i % 2 === 0 ? crop.y - gap : crop.y + crop.h + gap;
+        out.push({ x: crop.x + crop.w * ((Math.floor(i / 2) + 0.5) / Math.ceil(k / 2)), y: side });
+      }
+    }
+    return out;
+  }
+
+  // ---- Random plans and small changes -----------------------------------
 
   private literLimit(): number {
     return galToL(this.settings.drone.productAvailableGal);
@@ -194,10 +509,12 @@ export class Optimizer {
     const kinds = allowedKinds(this.settings.treatment);
     const f = this.settings.field;
     const attract = kinds.includes('attractant') && this.rng.chance(0.3);
+    // Usually near a known pest, sometimes anywhere.
+    const near = this.pests.length && this.rng.chance(0.7) ? this.pests[this.rng.int(0, this.pests.length - 1)] : null;
     return {
       id: this.nextId++,
-      x: this.rng.range(3, f.width - 3),
-      y: this.rng.range(3, f.height - 3),
+      x: near ? clamp(near.x + this.rng.gaussian() * 6, 3, f.width - 3) : this.rng.range(3, f.width - 3),
+      y: near ? clamp(near.y + this.rng.gaussian() * 6, 3, f.height - 3) : this.rng.range(3, f.height - 3),
       kind: attract ? 'attractant' : 'repellent',
       trap: attract
     };
@@ -206,18 +523,18 @@ export class Optimizer {
   randomPlan(): TreatmentPlan {
     const s = this.settings;
     if (s.treatment === 'spray') {
-      const order = [...this.blocks];
+      const order = this.blocks.map((_, i) => i);
       for (let i = order.length - 1; i > 0; i--) {
         const j = this.rng.int(0, i);
         [order[i], order[j]] = [order[j], order[i]];
       }
       const want = this.rng.int(1, order.length);
-      const zones: Rect[] = [];
-      for (const b of order) {
-        if (zones.length >= want) break;
-        if (this.zonesFit([...zones, b])) zones.push(b);
+      const chosen: number[] = [];
+      for (const i of order) {
+        if (chosen.length >= want) break;
+        if (this.zonesFit(this.zonesFor([...chosen, i]))) chosen.push(i);
       }
-      return { sprayZones: zones, devices: [] };
+      return { sprayZones: this.zonesFor(chosen), devices: [] };
     }
     const max = s.devices.maxDevices;
     const n = this.rng.int(Math.max(1, Math.ceil(max / 2)), max);
@@ -226,38 +543,59 @@ export class Optimizer {
     return { sprayZones: [], devices };
   }
 
+  /** A small change to a plan: one block or device added, removed, moved or swapped (sometimes two). */
   mutate(plan: TreatmentPlan): TreatmentPlan {
+    let out = this.mutateOnce(plan);
+    if (this.rng.chance(0.25)) out = this.mutateOnce(out);
+    return out;
+  }
+
+  private mutateOnce(plan: TreatmentPlan): TreatmentPlan {
     const s = this.settings;
     const rng = this.rng;
     if (s.treatment === 'spray') {
-      const zones = [...plan.sprayZones];
-      const unused = this.blocks.filter((b) => !zones.some((z) => z.x === b.x && z.y === b.y));
+      // Work on the set of blocks the plan covers, then merge back into long passes.
+      const chosen = coveredBlocks(plan.sprayZones, this.blocks);
+      const unused = this.blocksByLoad.filter((i) => !chosen.includes(i));
+      // Blocks with more pests are picked more often when adding (unused is worst-first).
+      const pickUnused = () => unused[Math.min(unused.length - 1, Math.floor(Math.abs(rng.gaussian()) * unused.length * 0.4))];
       const r = rng.next();
-      if ((r < 0.35 || unused.length === 0) && zones.length > 1) {
-        zones.splice(rng.int(0, zones.length - 1), 1);
+      if ((r < 0.35 || unused.length === 0) && chosen.length > 1) {
+        chosen.splice(rng.int(0, chosen.length - 1), 1);
       } else if (r < 0.7 && unused.length) {
-        const add = unused[rng.int(0, unused.length - 1)];
-        if (this.zonesFit([...zones, add])) zones.push(add);
-        else if (zones.length) zones[rng.int(0, zones.length - 1)] = add;
-      } else if (unused.length && zones.length) {
-        zones[rng.int(0, zones.length - 1)] = unused[rng.int(0, unused.length - 1)];
+        const add = pickUnused();
+        if (this.zonesFit(this.zonesFor([...chosen, add]))) chosen.push(add);
+        else if (chosen.length) chosen[rng.int(0, chosen.length - 1)] = add;
+      } else if (unused.length && chosen.length) {
+        chosen[rng.int(0, chosen.length - 1)] = pickUnused();
+      } else if (unused.length) {
+        chosen.push(pickUnused());
       }
-      return { sprayZones: this.zonesFit(zones) ? zones : plan.sprayZones, devices: [] };
+      const zones = this.zonesFor(chosen);
+      return { sprayZones: zones.length && this.zonesFit(zones) ? zones : plan.sprayZones, devices: [] };
     }
     const f = s.field;
     const devices = plan.devices.map((d) => ({ ...d }));
     const r = rng.next();
-    if (r < 0.55 && devices.length) {
+    if (r < 0.3 && devices.length) {
+      // Nudge one device a few meters.
       const d = devices[rng.int(0, devices.length - 1)];
-      d.x = clamp(d.x + rng.gaussian() * 15, 3, f.width - 3);
-      d.y = clamp(d.y + rng.gaussian() * 15, 3, f.height - 3);
-    } else if (r < 0.7 && devices.length) {
-      devices[rng.int(0, devices.length - 1)] = { ...this.randomDevice() };
-    } else if (r < 0.8 && allowedKinds(s.treatment).length > 1 && devices.length) {
+      d.x = clamp(d.x + rng.gaussian() * 5, 3, f.width - 3);
+      d.y = clamp(d.y + rng.gaussian() * 5, 3, f.height - 3);
+    } else if (r < 0.5 && devices.length) {
+      // Move one device a long way.
+      const d = devices[rng.int(0, devices.length - 1)];
+      d.x = clamp(d.x + rng.gaussian() * 20, 3, f.width - 3);
+      d.y = clamp(d.y + rng.gaussian() * 20, 3, f.height - 3);
+    } else if (r < 0.65 && devices.length) {
+      // Put one device somewhere else (same kind), usually near pests.
+      const i = rng.int(0, devices.length - 1);
+      devices[i] = { ...this.randomDevice(), kind: devices[i].kind, trap: devices[i].trap };
+    } else if (r < 0.75 && allowedKinds(s.treatment).length > 1 && devices.length) {
       const d = devices[rng.int(0, devices.length - 1)];
       d.kind = d.kind === 'repellent' ? 'attractant' : 'repellent';
       d.trap = d.kind === 'attractant';
-    } else if (r < 0.9 && devices.length < s.devices.maxDevices) {
+    } else if (r < 0.88 && devices.length < s.devices.maxDevices) {
       devices.push(this.randomDevice());
     } else if (devices.length > 1) {
       devices.splice(rng.int(0, devices.length - 1), 1);

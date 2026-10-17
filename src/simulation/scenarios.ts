@@ -21,7 +21,7 @@ export function defaultSettings(): Settings {
     devices: { maxDevices: 12, releaseRate: 1, lifetimeMin: 60, massKg: 0.5, perTrip: 4, deployByDrone: true },
     survey: { detectionPct: 90, falsePositivesPer1000m2: 0.5, positionNoiseM: 3, uncertainPct: 5 },
     cost: { ...DEFAULT_COSTS },
-    weights: { protection: 1, pestsDeterred: 0.5, material: 2, flightTime: 1, cost: 0.5 },
+    weights: { protection: 2, pestsDeterred: 0.5, material: 2, flightTime: 1, cost: 0.5 },
     run: { durationMin: 21, seed: 42, treatStartDay: 3 }
   };
 }

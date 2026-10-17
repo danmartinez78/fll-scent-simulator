@@ -1,8 +1,7 @@
 import type { Scenario, Settings, TreatmentPlan } from '../models/types';
 import type { Simulation } from '../simulation/Simulation';
-import type { NotebookEntry } from '../notebook/notebook';
+import { ENTRY_FIELDS, methodName, type NotebookEntry } from '../notebook/notebook';
 import { activePlan } from '../simulation/Treatment';
-import { methodName } from '../notebook/notebook';
 import { formatFieldClock } from '../utils/fieldTime';
 import { ReportButtons } from './ReportButtons';
 import { SCENARIOS } from '../simulation/scenarios';
@@ -43,6 +42,11 @@ interface Props {
   onSave: () => void;
   saved: string | null;
   entries: NotebookEntry[];
+  /** The notebook experiment the current run was saved into (if any). */
+  activeEntryId: string | null;
+  onUpdateEntry: (id: string, patch: Partial<NotebookEntry>) => void;
+  /** Open the full notebook (all experiments, compare two, report, export). */
+  onOpenNotebook: () => void;
   /** Reset the run with the current settings and go back to planning. */
   onTryAgain: () => void;
 }
@@ -67,6 +71,12 @@ export function GuidedPanel(p: Props) {
           </li>
         ))}
       </ol>
+      <div className="guided-tools">
+        <span className="hint small">{p.scenario.name}</span>
+        <button className="btn small" onClick={p.onOpenNotebook} title="Every experiment: notes, results, compare two, report">
+          📓 Notebook{p.entries.length ? ` (${p.entries.length})` : ''}
+        </button>
+      </div>
 
       <div className="guided-body">
         {p.step === 'mission' && <MissionStep {...p} />}
@@ -395,20 +405,20 @@ function CompareStep(p: Props) {
         </>
       )}
       {ran && !tableFirst && <RunsTable {...p} />}
+      {ran && <WriteItDown {...p} />}
       {p.entries.length > 0 && (
         <div className="guided-report">
           <span className="hint small">
             📓 {p.entries.length} experiment{p.entries.length === 1 ? '' : 's'} in the notebook
           </span>
           <div className="tool-row">
+            <button className="btn small" onClick={p.onOpenNotebook}>
+              📓 Open notebook
+            </button>
             <ReportButtons entries={p.entries} />
           </div>
         </div>
       )}
-      <div className="real-check">
-        <strong>🌱 Sim vs. real world</strong>
-        <span>How could you test this plan for real? If a real test came out different, which setting would you change to make the model match?</span>
-      </div>
       <div className="guided-again">
         <button className="btn primary wide" onClick={p.onTryAgain}>
           🔁 Change one thing and run again
@@ -418,5 +428,43 @@ function CompareStep(p: Props) {
         </button>
       </div>
     </>
+  );
+}
+
+/** The notebook fields students fill in after a run, right where the results are. */
+const WRITE_UP_KEYS: Array<keyof NotebookEntry> = ['variablesChanged', 'variablesSame', 'result', 'surprise', 'next', 'realWorld'];
+
+function WriteItDown({ entries, activeEntryId, saved, onUpdateEntry, onSave }: Props) {
+  const entry = entries.find((e) => e.id === activeEntryId && e.captured) ?? null;
+  if (!entry || !saved) {
+    return (
+      <div className="write-up">
+        <h3 className="runs-title">✍️ Write it down</h3>
+        <p className="hint small">Save this run to the notebook, then write what happened here.</p>
+        <button className="btn small primary" onClick={onSave}>
+          📓 Save this run
+        </button>
+      </div>
+    );
+  }
+  const fields = ENTRY_FIELDS.filter((f) => WRITE_UP_KEYS.includes(f.key));
+  return (
+    <div className="write-up">
+      <h3 className="runs-title">✍️ Write it down</h3>
+      <p className="hint small">
+        Notes for <strong>{entry.name}</strong>. They are saved as you type.
+      </p>
+      {fields.map((f) => (
+        <label key={f.key} className="control">
+          <span className="control-label">{f.key === 'realWorld' ? '🌱 ' : ''}{f.label}</span>
+          <textarea
+            rows={2}
+            placeholder={f.hint}
+            value={entry[f.key] as string}
+            onChange={(ev) => onUpdateEntry(entry.id, { [f.key]: ev.target.value } as Partial<NotebookEntry>)}
+          />
+        </label>
+      ))}
+    </div>
   );
 }

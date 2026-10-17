@@ -90,22 +90,62 @@ describe('pest movement', () => {
       expect(swarm.y[i]).toBeLessThanOrEqual(200);
     }
   });
-  it('lets some pests give up on repellent and fly off in a random direction', () => {
+  /** A flat repellent cloud over the middle 100 m square, well above the threshold everywhere inside. */
+  function flatCloud(field: ScentField, level = 1) {
+    for (let r = 0; r < field.rows; r++) {
+      for (let c = 0; c < field.cols; c++) {
+        const x = (c + 0.5) * field.cell;
+        const y = (r + 0.5) * field.cell;
+        if (x >= 50 && x < 150 && y >= 50 && y < 150) field.data[r * field.cols + c] = level;
+      }
+    }
+    field.touch();
+  }
+  const inCloud = (s: PestSwarm, i: number) => s.x[i] >= 50 && s.x[i] < 150 && s.y[i] >= 50 && s.y[i] < 150;
+
+  it('flies out of a flat repellent cloud in straight-ish runs instead of milling around inside it', () => {
     const { env, swarm, field, rng } = setup('repellent');
-    // Build up a strong cloud first, so the pests start inside it.
-    for (let i = 0; i < 240; i++) {
-      field.addGaussian(100, 100, 25, 10);
-      field.step(0.5, 0, 0, 0.5, 300);
+    flatCloud(field);
+    // All 300 pests start inside the cloud (they were placed 20 to 40 m from the center).
+    expect(Array.from({ length: swarm.n }, (_, i) => inCloud(swarm, i)).every(Boolean)).toBe(true);
+    // At 1.6 x 1 m/s a pest 40 m from the edge needs about 25 s on a straight line; allow 120 s.
+    for (let i = 0; i < 240; i++) swarm.step(0.5, env, rng);
+    let inside = 0;
+    for (let i = 0; i < swarm.n; i++) if (inCloud(swarm, i)) inside++;
+    expect(inside / swarm.n).toBeLessThan(0.1);
+  });
+
+  it('turns around when a flee run leads deeper into the repellent', () => {
+    const { env, swarm, field, rng } = setup('repellent');
+    // A cloud that gets stronger toward the center, with a flat-looking patch where the pests start.
+    for (let r = 0; r < field.rows; r++) {
+      for (let c = 0; c < field.cols; c++) {
+        const d = Math.hypot((c + 0.5) * field.cell - 100, (r + 0.5) * field.cell - 100);
+        field.data[r * field.cols + c] = d < 60 ? 0.5 + 2 * Math.max(0, 1 - d / 60) ** 2 : 0;
+      }
     }
-    let leftEver = 0;
-    for (let i = 0; i < 60; i++) {
-      field.addGaussian(100, 100, 25, 10);
-      field.step(0.5, 0, 0, 0.5, 300);
-      swarm.step(0.5, env, rng);
-      for (let k = 0; k < swarm.n; k++) if (swarm.leaving[k] > 0) leftEver++;
+    field.touch();
+    const before = meanDistance(swarm);
+    for (let i = 0; i < 160; i++) swarm.step(0.5, env, rng);
+    expect(meanDistance(swarm)).toBeGreaterThan(before + 20);
+  });
+
+  it('stays wary for a while after escaping, so it moves on instead of testing the same edge', () => {
+    const { env, swarm, field, rng } = setup('repellent');
+    flatCloud(field);
+    // After 60 s many pests have just escaped; the wary period lasts 60 s, so nearly all of them are still wary.
+    for (let i = 0; i < 120; i++) swarm.step(0.5, env, rng);
+    let outside = 0;
+    let wary = 0;
+    for (let i = 0; i < swarm.n; i++) {
+      if (inCloud(swarm, i)) continue;
+      outside++;
+      if (swarm.wary[i] > 0) wary++;
     }
-    expect(leftEver).toBeGreaterThan(0);
-    for (let k = 0; k < swarm.n; k++) if (swarm.leaving[k] > 0) expect(swarm.feeding[k]).toBe(0);
+    expect(outside / swarm.n).toBeGreaterThan(0.3);
+    expect(wary / outside).toBeGreaterThan(0.8);
+    // Fleeing and wary pests are never counted as feeding.
+    for (let k = 0; k < swarm.n; k++) if (swarm.repelled[k] || swarm.wary[k] > 0) expect(swarm.feeding[k]).toBe(0);
   });
 
   it('lets pests that ignore the scent keep feeding inside a repellent cloud', () => {
