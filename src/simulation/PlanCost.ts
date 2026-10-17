@@ -4,6 +4,7 @@ import { rainSpans, RESPRAY_AFTER_RAIN } from './Weather';
 import { computeCost } from './CostModel';
 import { Drone, type DroneTask } from './Drone';
 import { homePoint } from './Simulation';
+import { sprayerCosts, sprayerSettings } from './Groomba';
 import { activePlan, buildDroneTasks, usesSprayZones } from './Treatment';
 
 /** How many times the spray zones get sprayed in the run (the first spray plus repeats). */
@@ -30,8 +31,10 @@ export function estimatePlanCost(s: Settings, plan: TreatmentPlan): CostBreakdow
   const eff = activePlan(plan, s.treatment);
   const map = { x: 0, y: 0, w: s.field.width, h: s.field.height };
   const home = homePoint(s.field);
-  const drone = new Drone(s.drone, home);
-  const sprayOnly = buildDroneTasks({ sprayZones: eff.sprayZones, devices: [] }, map, home, s.drone, s.devices);
+  // The groomba, when it does the spraying (devices are always flown out by the drone).
+  const sprayer = sprayerSettings(s);
+  const drone = new Drone(sprayer, home);
+  const sprayOnly = buildDroneTasks({ sprayZones: eff.sprayZones, devices: [] }, map, home, sprayer, s.devices);
   const tasks: DroneTask[] = [];
   for (let r = 0; r < sprayRounds(s); r++) tasks.push(...sprayOnly.map((t) => ({ ...t })));
   if (s.devices.deployByDrone) tasks.push(...buildDroneTasks({ sprayZones: [], devices: eff.devices }, map, home, s.drone, s.devices));
@@ -50,6 +53,6 @@ export function estimatePlanCost(s: Settings, plan: TreatmentPlan): CostBreakdow
       devicesUsed: s.devices.deployByDrone ? drone.devicesDropped : eff.devices.length,
       flightMin: drone.airborneSec / 60
     },
-    s.cost
+    sprayerCosts(s)
   );
 }

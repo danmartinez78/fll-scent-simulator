@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
-import type { PestDistribution, Scenario, Settings, TreatmentMethod, TreatmentPlan } from '../models/types';
+import type { GroombaSettings, PestDistribution, Scenario, Settings, Sprayer, TreatmentMethod, TreatmentPlan } from '../models/types';
+import { groombaSettings, sprayerOf, sprayerSettings } from '../simulation/Groomba';
 import { formatModelMin, TIME_LAPSE } from '../utils/fieldTime';
 import { cropRect } from '../simulation/Simulation';
 import { devicesPerTrip, productLimitL } from '../simulation/Drone';
@@ -26,7 +27,12 @@ interface Props {
   only?: SectionKey[];
 }
 
-export type SectionKey = 'plan' | 'wind' | 'pests' | 'scent' | 'drone' | 'devices' | 'survey' | 'cost' | 'run' | 'editor';
+export type SectionKey = 'plan' | 'wind' | 'pests' | 'scent' | 'drone' | 'groomba' | 'devices' | 'survey' | 'cost' | 'run' | 'editor';
+
+const SPRAYERS: Array<{ value: Sprayer; label: string }> = [
+  { value: 'drone', label: '🚁 Drone' },
+  { value: 'groomba', label: '🤖 Groomba' }
+];
 
 const METHODS: Array<{ value: TreatmentMethod; label: string; icon: string; sub: string; info?: string }> = [
   { value: 'none', label: 'No treatment', icon: '🚫', sub: 'Do nothing, to compare' },
@@ -81,7 +87,12 @@ export function ControlPanel({ settings: s, plan, tool, simStarted, scenario, on
   const coverage = planCoverage(eff, crop, s.scent.rangeM);
   const repellentCount = eff.devices.filter((d) => d.kind === 'repellent').length;
   const map = { x: 0, y: 0, w: s.field.width, h: s.field.height };
-  const planLiters = estimateSprayLiters(eff.sprayZones, map, s.drone);
+  const planLiters = estimateSprayLiters(eff.sprayZones, map, sprayerSettings(s));
+  const sprayer = sprayerOf(s);
+  const g = groombaSettings(s);
+  const setGroomba = (v: Partial<GroombaSettings>) => onSettings({ ...s, groomba: { ...g, ...v } });
+  // Guided shows the sprayer choice only on the mission about it, so the other missions stay the same.
+  const sprayerChoice = !only || scenario.id === 'groundAir' || sprayer === 'groomba';
   const stockL = productLimitL(s.drone);
   // Repeat sprays: one on the start day, then one every N days until the run ends.
   const startDay = s.run.treatStartDay ?? 1;
@@ -176,8 +187,35 @@ export function ControlPanel({ settings: s, plan, tool, simStarted, scenario, on
           )}
           {usesSprayZones(s.treatment) && (
             <>
+              {sprayerChoice && (
+                <div className="control">
+                  <span className="control-label">
+                    Sprayer <InfoButton topic="groomba" />
+                  </span>
+                  <div className="tool-row" role="radiogroup" aria-label="Sprayer">
+                    {SPRAYERS.map((o) => (
+                      <button
+                        key={o.value}
+                        role="radio"
+                        aria-checked={sprayer === o.value}
+                        className={sprayer === o.value ? 'chip active' : 'chip'}
+                        onClick={() => onSettings({ ...s, sprayer: o.value })}
+                      >
+                        {o.label}
+                      </button>
+                    ))}
+                  </div>
+                  <span className="hint small">
+                    {sprayer === 'groomba'
+                      ? 'Slow, but it sprays right onto the plants, so the wind barely moves its spray.'
+                      : 'Fast, but the wind pushes its spray as it falls.'}
+                  </span>
+                </div>
+              )}
               <p className="hint">
-                Drag on the map to draw spray zones. The drone flies back and forth over each zone. <InfoButton topic="spray" />
+                Drag on the map to draw spray zones.{' '}
+                {sprayer === 'groomba' ? 'The groomba drives up and down between the rows in each zone.' : 'The drone flies back and forth over each zone.'}{' '}
+                <InfoButton topic="spray" />
               </p>
               <div className="tool-row">
                 {toolButton('zone', '▭ Draw zone')}
@@ -427,6 +465,32 @@ export function ControlPanel({ settings: s, plan, tool, simStarted, scenario, on
         </Section>
       )}
 
+      {shows('groomba') && (
+        <Section title="Groomba" icon="🤖" note="ground robot" open={isOpen('groomba')}>
+          <p className="hint small">
+            The team's ground robot. It sprays when you pick 🤖 Groomba as the sprayer for Spray or Pesticide. These numbers are guesses, not a
+            real machine. <InfoButton topic="groomba" />
+          </p>
+          <Slider label="Driving speed" value={g.speed} min={0.25} max={3} step={0.25} unit="m/s" onChange={(v) => setGroomba({ speed: v })} />
+          <Slider label="Spray width (swath)" info="swath" value={g.swathM} min={1} max={8} step={0.5} unit="m" onChange={(v) => setGroomba({ swathM: v })} />
+          <Slider
+            label="Spray drift"
+            value={g.driftFactor}
+            min={0}
+            max={1}
+            step={0.05}
+            format={(v) => `${Math.round(v * 100)}% of the drone's drift`}
+            onChange={(v) => setGroomba({ driftFactor: v })}
+          />
+          <Slider label="Tank size" value={g.tankL} min={10} max={200} step={10} unit="L" onChange={(v) => setGroomba({ tankL: v })} />
+          <Slider label="Battery" value={g.batteryHours} min={1} max={10} step={0.5} unit="hours of driving" onChange={(v) => setGroomba({ batteryHours: v })} />
+          <p className="hint small">
+            Spraying the whole crop once takes at least {Math.round(((crop.h / g.swathM) * crop.w) / g.speed / 60)} minutes of driving, plus turns
+            and refills. The drone needs at least {Math.round(((crop.h / s.drone.swathM) * crop.w) / s.drone.speed / 60)} minutes of flying.
+          </p>
+        </Section>
+      )}
+
       {shows('devices') && (
         <Section title="Slow-release devices" icon="⏳" open={isOpen('devices')}>
           <Slider label="Devices available" value={s.devices.maxDevices} min={1} max={40} onChange={(v) => set('devices', { maxDevices: v })} />
@@ -467,6 +531,7 @@ export function ControlPanel({ settings: s, plan, tool, simStarted, scenario, on
             This simulator does not know the actual cost of the team's scent product. Change these to try different guesses. <InfoButton topic="cost" />
           </p>
           <NumberField label="Drone operating cost" value={s.cost.flightCostPerMin ?? 5} min={0} step={0.5} unit="$/min in the air" onChange={(v) => set('cost', { flightCostPerMin: v })} />
+          <NumberField label="Groomba operating cost" value={g.costPerMin} min={0} step={0.1} unit="$/min driving" onChange={(v) => setGroomba({ costPerMin: v })} />
           <NumberField label="Scent product" value={s.cost.materialCostPerGal} min={0} step={1} unit="$/gal" onChange={(v) => set('cost', { materialCostPerGal: v })} />
           <NumberField label="Slow-release device" value={s.cost.deviceCost} min={0} step={0.5} unit="$ each" onChange={(v) => set('cost', { deviceCost: v })} />
           <Slider

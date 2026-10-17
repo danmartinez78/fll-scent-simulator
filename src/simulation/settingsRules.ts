@@ -13,6 +13,7 @@ export function needsReset(current: Settings, next: Settings): boolean {
     (current.pests.buildUpDays ?? 0) !== (next.pests.buildUpDays ?? 0) ||
     current.run.seed !== next.run.seed ||
     current.devices.deployByDrone !== next.devices.deployByDrone ||
+    (current.sprayer ?? 'drone') !== (next.sprayer ?? 'drone') ||
     JSON.stringify(current.helpers ?? null) !== JSON.stringify(next.helpers ?? null)
   );
 }
@@ -31,6 +32,7 @@ export function liveSettings(current: Settings, next: Settings): Settings {
     },
     run: { ...next.run, seed: current.run.seed },
     devices: { ...next.devices, deployByDrone: current.devices.deployByDrone },
-    helpers: current.helpers
+    helpers: current.helpers,
+    sprayer: current.sprayer
   };
 }

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { Scenario, Settings, SurveyResult, TreatmentPlan, ViewOptions } from './models/types';
 import { Simulation } from './simulation/Simulation';
+import { GROOMBA_PLAYBACK } from './simulation/Groomba';
 import { modelToFieldSec } from './utils/fieldTime';
 import { SCENARIOS } from './simulation/scenarios';
 import { needsReset, liveSettings } from './simulation/settingsRules';
@@ -208,7 +209,8 @@ export default function App() {
       last = now;
       const sim = simRef.current;
       if (runningRef.current) {
-        acc += realDt * BASE_SIM_SPEED * speedRef.current;
+        // The groomba's drives take hours, so they play faster than the drone's flights.
+        acc += realDt * BASE_SIM_SPEED * speedRef.current * (sim.groombaDriving ? GROOMBA_PLAYBACK : 1);
         let steps = Math.floor(acc / sim.dt);
         acc -= steps * sim.dt;
         steps = Math.min(steps, 600);
@@ -579,6 +581,7 @@ export default function App() {
             duration={sim.durationSec}
             fieldTime={sim.fieldTime}
             flying={sim.droneFlying}
+            driving={sim.groombaDriving}
             surveying={sim.surveying}
             surveyProgress={sim.survey?.progress ?? 0}
             pendingReset={pendingReset}

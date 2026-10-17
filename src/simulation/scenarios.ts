@@ -132,6 +132,20 @@ export const SCENARIOS: Scenario[] = [
     plan: emptyPlan()
   },
   {
+    id: 'groundAir',
+    name: 'Ground or air?',
+    purpose:
+      'A strong 15 mph wind blows across the field, and the whole field gets sprayed every week. The drone flies fast, but the wind pushes its spray around. The groomba is a ground robot that drives between the rows and sprays right onto the plants. It is slow, but the wind barely moves its spray. Try both sprayers.',
+    question: 'On a windy day, which sprayer protects more crop: the fast drone or the slow groomba? How much longer does the groomba take?',
+    settings: settingsWith({
+      treatment: 'spray',
+      wind: { direction: 0, speedMph: 15 },
+      drone: { resprayEveryDays: 7 }
+    }),
+    // The whole crop (see cropRect), sprayed every week.
+    plan: { sprayZones: [{ x: 20, y: 20, w: 180, h: 100 }], devices: [] }
+  },
+  {
     id: 'pushpull',
     name: 'Push-Pull',
     purpose: 'Use a repellent to push pests off the crop and an attractant trap to pull them somewhere else.',

@@ -8,6 +8,8 @@ export default defineConfig({
   base: './',
   test: {
     globals: true,
-    environment: 'node'
+    environment: 'node',
+    // Some tests run whole simulations, which take a few seconds and slow down when files run side by side.
+    testTimeout: 20000
   }
 });

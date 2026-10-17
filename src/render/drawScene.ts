@@ -7,6 +7,7 @@ import { FATE_POISONED } from '../simulation/Pest';
 import { PESTICIDE_RULES } from '../simulation/Pesticide';
 import { scentDrift, windDirectionAt } from '../simulation/Wind';
 import { compassLabel } from '../utils/geometry';
+import { usesGroomba } from '../simulation/Groomba';
 
 export type SurveyLayer = 'camera' | 'estimate' | 'truth';
 
@@ -193,8 +194,10 @@ export function drawScene(ctx: CanvasRenderingContext2D, sim: Simulation, o: Dra
 
   // Drone path: what's left to fly, and where it has been.
   const d = sim.drone;
+  const groomba = usesGroomba(sim.settings);
   if (o.view.showPath) {
-    if (d.trail.length > 1) {
+    if (groomba && d.trail.length > 1) drawWheelTracks(ctx, [...d.trail, { x: d.x, y: d.y }], s);
+    else if (d.trail.length > 1) {
       ctx.strokeStyle = 'rgba(30,41,59,0.25)';
       ctx.lineWidth = 1.2 / s;
       ctx.beginPath();
@@ -336,7 +339,8 @@ export function drawScene(ctx: CanvasRenderingContext2D, sim: Simulation, o: Dra
     ctx.arc(d.x, d.y, d.settings.swathM / 2, 0, Math.PI * 2);
     ctx.fill();
   }
-  if (sim.settings.treatment !== 'none' || d.mode !== 'parked') drawDroneIcon(ctx, d.x, d.y, d.heading, Math.max(3.5, 11 / s), COLORS.drone, o.clock);
+  if (groomba) drawGroombaIcon(ctx, d.x, d.y, d.heading, Math.max(2.5, 8 / s), d.spraying);
+  else if (sim.settings.treatment !== 'none' || d.mode !== 'parked') drawDroneIcon(ctx, d.x, d.y, d.heading, Math.max(3.5, 11 / s), COLORS.drone, o.clock);
 
   // Wind streaks
   drawWindStreaks(ctx, sim, o.clock, s);
@@ -381,6 +385,52 @@ function drawSurvey(ctx: CanvasRenderingContext2D, sv: SurveyResult, layer: Surv
       }
     }
   }
+}
+
+/** The groomba's path: two brown wheel tracks side by side. */
+function drawWheelTracks(ctx: CanvasRenderingContext2D, pts: Vec[], s: number): void {
+  const gap = Math.max(0.6, 2.2 / s);
+  ctx.strokeStyle = 'rgba(120,72,32,0.55)';
+  ctx.lineWidth = Math.max(0.35, 1.1 / s);
+  ctx.beginPath();
+  for (let i = 1; i < pts.length; i++) {
+    const a = pts[i - 1];
+    const b = pts[i];
+    const len = Math.hypot(b.x - a.x, b.y - a.y);
+    if (len < 1e-6) continue;
+    // Offset each wheel to either side of the robot's path.
+    const nx = (-(b.y - a.y) / len) * gap;
+    const ny = ((b.x - a.x) / len) * gap;
+    for (const k of [1, -1]) {
+      ctx.moveTo(a.x + nx * k, a.y + ny * k);
+      ctx.lineTo(b.x + nx * k, b.y + ny * k);
+    }
+  }
+  ctx.stroke();
+}
+
+/** The groomba: a small white rover with four wheels, seen from above, with a spray bar that glows blue while spraying. */
+function drawGroombaIcon(ctx: CanvasRenderingContext2D, x: number, y: number, heading: number, size: number, spraying: boolean): void {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(heading);
+  const L = size * 1.3;
+  const W = size;
+  // Wheels
+  ctx.fillStyle = '#334155';
+  for (const wx of [-L * 0.6, L * 0.6]) for (const wy of [-W * 0.62, W * 0.62]) ctx.fillRect(wx - L * 0.22, wy - W * 0.16, L * 0.44, W * 0.32);
+  // Body
+  ctx.fillStyle = '#ffffff';
+  ctx.strokeStyle = '#1f2937';
+  ctx.lineWidth = size * 0.14;
+  ctx.beginPath();
+  ctx.roundRect(-L * 0.75, -W * 0.5, L * 1.5, W, W * 0.3);
+  ctx.fill();
+  ctx.stroke();
+  // Spray bar at the front
+  ctx.fillStyle = spraying ? '#3b82f6' : '#94a3b8';
+  ctx.fillRect(L * 0.45, -W * 0.42, L * 0.18, W * 0.84);
+  ctx.restore();
 }
 
 function drawDroneIcon(

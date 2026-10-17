@@ -1,7 +1,7 @@
 import { compassName } from '../utils/geometry';
 import { formatMoney } from '../utils/units';
 import { compareChartHtml, runChartsHtml } from './reportCharts';
-import { ENTRY_FIELDS, methodName, summaryRows, type CapturedRun, type NotebookEntry } from './notebook';
+import { ENTRY_FIELDS, runMethodName, summaryRows, workTimeText, type CapturedRun, type NotebookEntry } from './notebook';
 
 /** Short columns for the overview table and the spreadsheet. */
 function overview(c: CapturedRun): Array<[string, string]> {
@@ -9,19 +9,19 @@ function overview(c: CapturedRun): Array<[string, string]> {
   const m = c.metrics;
   return [
     ['Scenario', c.scenarioName],
-    ['Treatment', methodName(s.treatment)],
+    ['Treatment', runMethodName(s)],
     ['Wind', s.wind.speedMph > 0 ? `${s.wind.speedMph} mph ${compassName(s.wind.direction)}` : 'None'],
     ['Crop protected', `${m.cropProtectedPct.toFixed(0)}%`],
     ['Pests kept off (avg)', `${m.pestsDeterredAvgPct.toFixed(0)}%`],
     ['Product used', `${m.productUsedGal.toFixed(1)} gal`],
-    ['Flight time', `${m.flightTimeMin.toFixed(1)} min`],
+    ['Flying or driving time', workTimeText(s, m.flightTimeMin)],
     ['Cost', formatMoney(m.cost.total)],
     ['Insects killed', m.pestsKilled === undefined ? '—' : String(m.pestsKilled + (m.helpersKilled ?? 0))],
     ['Helpful alive', m.helpersAlivePct === undefined ? '—' : `${m.helpersAlivePct.toFixed(0)}%`]
   ];
 }
 
-const OVERVIEW_LABELS = ['Scenario', 'Treatment', 'Wind', 'Crop protected', 'Pests kept off (avg)', 'Product used', 'Flight time', 'Cost', 'Insects killed', 'Helpful alive'];
+const OVERVIEW_LABELS = ['Scenario', 'Treatment', 'Wind', 'Crop protected', 'Pests kept off (avg)', 'Product used', 'Flying or driving time', 'Cost', 'Insects killed', 'Helpful alive'];
 
 function csvCell(v: string): string {
   // Quote everything; a leading = + - @ would make a spreadsheet run it as a formula.

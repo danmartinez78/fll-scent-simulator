@@ -2,6 +2,7 @@ import { useState, type ReactNode } from 'react';
 import type { Settings, ViewOptions } from '../models/types';
 import { COLORS } from '../render/drawScene';
 import { deviceReachM } from '../simulation/Treatment';
+import { usesGroomba } from '../simulation/Groomba';
 
 const KEY_OPEN = 'scent-sim-key-open';
 
@@ -11,6 +12,22 @@ const rgb = (c: readonly number[], a = 1) => `rgba(${c[0]},${c[1]},${c[2]},${a})
 const Dot = ({ color }: { color: string }) => (
   <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true">
     <circle cx="9" cy="9" r="4" fill={color} />
+  </svg>
+);
+/** The groomba as the map draws it: a white rover with a spray bar. */
+const Rover = () => (
+  <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true">
+    <rect x="3" y="3" width="4" height="2.5" fill="#334155" />
+    <rect x="11" y="3" width="4" height="2.5" fill="#334155" />
+    <rect x="3" y="12.5" width="4" height="2.5" fill="#334155" />
+    <rect x="11" y="12.5" width="4" height="2.5" fill="#334155" />
+    <rect x="2" y="5" width="14" height="8" rx="2.5" fill="#fff" stroke="#1f2937" strokeWidth="1.2" />
+    <rect x="13" y="5.8" width="1.6" height="6.4" fill="#3b82f6" />
+  </svg>
+);
+const Tracks = () => (
+  <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true">
+    <path d="M1 7h16M1 11h16" stroke="rgba(120,72,32,0.75)" strokeWidth="1.4" />
   </svg>
 );
 const Patch = ({ fill, stroke, dashed }: { fill: string; stroke?: string; dashed?: boolean }) => (
@@ -126,7 +143,8 @@ export function MapKey({ settings: s, view, survey }: Props) {
   if (view.showScent && t === 'pushPull') rows.push([<Cloud color={COLORS.attractant} />, 'Attractant scent']);
   if (t === 'spray' || t === 'pesticide') {
     rows.push([<Patch fill="rgba(37,99,235,0.1)" stroke={COLORS.zone} dashed />, 'Spray zone you drew']);
-    rows.push([<Dot color="rgba(96,165,250,0.8)" />, 'Spray coming out of the drone']);
+    rows.push([<Dot color="rgba(96,165,250,0.8)" />, usesGroomba(s) ? 'Spray coming out of the groomba' : 'Spray coming out of the drone']);
+    if (usesGroomba(s)) rows.push([<Rover />, 'The groomba (ground robot)']);
   }
   if (devices) {
     rows.push([<Device color={COLORS.repellent} letter="R" />, 'Repellent device']);
@@ -139,10 +157,11 @@ export function MapKey({ settings: s, view, survey }: Props) {
     if (t === 'pushPull')
       rows.push([<Ring color={COLORS.attractant} />, `Dashed circle: how far pests notice an attractant (${deviceReachM('attractant', s)} m)`]);
   }
-  if (treated) rows.push([<Home />, "Drone's home pad"]);
+  if (treated) rows.push([<Home />, usesGroomba(s) ? "Groomba's home spot" : "Drone's home pad"]);
   if (view.showPath && treated) {
-    rows.push([<Line color="rgba(30,41,59,0.45)" />, 'Where the drone has flown']);
-    rows.push([<Line color="rgba(37,99,235,0.8)" dashed />, 'Where it will fly next']);
+    if (usesGroomba(s)) rows.push([<Tracks />, 'Wheel tracks: where the groomba has driven']);
+    else rows.push([<Line color="rgba(30,41,59,0.45)" />, 'Where the drone has flown']);
+    rows.push([<Line color="rgba(37,99,235,0.8)" dashed />, usesGroomba(s) ? 'Where it will drive next' : 'Where it will fly next']);
   }
   if (s.wind.speedMph > 0) rows.push([<Line color="#94a3b8" />, 'White streaks show the wind']);
   if ((s.weather?.rainDays ?? []).length) rows.push([<Patch fill="rgba(71,85,105,0.35)" />, 'Gray with falling streaks: it is raining']);

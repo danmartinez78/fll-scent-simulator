@@ -13,6 +13,8 @@ interface Props {
   fieldTime: number;
   /** A drone is flying, so the clock runs in real time. */
   flying: boolean;
+  /** The groomba is driving (shown faster than real time). */
+  driving?: boolean;
   surveying: boolean;
   surveyProgress: number;
   pendingReset: boolean;
@@ -87,7 +89,7 @@ export function Toolbar(p: Props) {
       </div>
       {p.raining && <span className="clock-mode rain">🌧️ Raining</span>}
       <span className={`clock-mode ${p.flying ? 'real' : 'lapse'}`}>
-        {p.flying ? '🚁 Real time' : '⏩ Time-lapse'}
+        {p.driving ? '🤖 Groomba driving (10x)' : p.flying ? '🚁 Real time' : '⏩ Time-lapse'}
         <InfoButton topic="timeLapse" />
       </span>
       {p.showSurvey !== false && p.controls !== false && (
