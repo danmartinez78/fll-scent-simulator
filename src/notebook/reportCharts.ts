@@ -1,4 +1,9 @@
 import type { RunCharts } from './notebook';
+import { dayName, EVENT_STYLE, isEventKind, MAX_LISTED_EVENTS, type ChartEvent } from '../utils/chartEvents';
+
+function escText(v: string): string {
+  return v.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
 
 /** One line on a report chart. */
 interface Line {
@@ -17,6 +22,7 @@ interface ChartSpec {
   yLabel: string;
   marker?: number;
   rains?: Array<[number, number]>;
+  events?: ChartEvent[];
   /** Last x to show (so charts of different runs share a scale). */
   xMax?: number;
 }
@@ -47,7 +53,14 @@ export function safeCharts(c: unknown): RunCharts | null {
   const rains = Array.isArray(r.rains)
     ? r.rains.filter((x): x is [number, number] => Array.isArray(x) && num(x[0]) !== null && num(x[1]) !== null).map(([a, b]) => [a, b] as [number, number])
     : [];
-  return { days, ...lines, treatStartDay: num(r.treatStartDay) ?? 0, rains };
+  const events: ChartEvent[] = Array.isArray(r.events)
+    ? r.events.flatMap((e) => {
+        const o = e as Record<string, unknown> | null;
+        const day = num(o?.day);
+        return o && day !== null && isEventKind(o.kind) && typeof o.label === 'string' ? [{ day, kind: o.kind, label: o.label.slice(0, 60) }] : [];
+      })
+    : [];
+  return { days, ...lines, treatStartDay: num(r.treatStartDay) ?? 0, rains, events };
 }
 
 function tick(t: number): string {
@@ -79,7 +92,15 @@ function svgChart(c: ChartSpec): string {
   if (c.marker && c.marker > 0 && c.marker <= xMax) {
     const mx = x(c.marker).toFixed(1);
     parts.push(`<line x1="${mx}" x2="${mx}" y1="${pad.t}" y2="${H - pad.b}" class="marker"/>`);
-    parts.push(`<text x="${(x(c.marker) + 3).toFixed(1)}" y="${pad.t + 9}">treatment starts</text>`);
+    // Below the event icons, which sit along the top.
+    parts.push(`<text x="${(x(c.marker) + 3).toFixed(1)}" y="${pad.t + 20}">treatment starts</text>`);
+  }
+  const events = (c.events ?? []).filter((e) => e.day >= 0 && e.day <= xMax);
+  for (const e of events) {
+    const ex = x(e.day).toFixed(1);
+    const st = EVENT_STYLE[e.kind];
+    parts.push(`<line x1="${ex}" x2="${ex}" y1="${pad.t + 10}" y2="${H - pad.b}" stroke="${st.color}" stroke-width="1.2" stroke-dasharray="2 2"/>`);
+    parts.push(`<text x="${ex}" y="${pad.t + 8}" text-anchor="middle">${st.icon}</text>`);
   }
   for (const l of c.lines) {
     const xs = l.xs ?? c.xs;
@@ -88,14 +109,20 @@ function svgChart(c: ChartSpec): string {
   }
   const legend = c.lines.map((l) => `<span><i style="background:${l.color}"></i>${l.label}</span>`).join('');
   const rainNote = c.rains?.some(([from]) => from < xMax) ? '<span><i class="rain-key"></i>Rain</span>' : '';
-  return `<figure class="chart"><figcaption>${c.title}</figcaption><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${c.title}">${parts.join('')}</svg><div class="legend">${legend}${rainNote}</div></figure>`;
+  const eventList = events.length
+    ? `<ul class="events">${events
+        .slice(0, MAX_LISTED_EVENTS)
+        .map((e) => `<li>${EVENT_STYLE[e.kind].icon} ${dayName(e.day)}: ${escText(e.label)}</li>`)
+        .join('')}${events.length > MAX_LISTED_EVENTS ? `<li>and ${events.length - MAX_LISTED_EVENTS} more</li>` : ''}</ul>`
+    : '';
+  return `<figure class="chart"><figcaption>${c.title}</figcaption><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${c.title}">${parts.join('')}</svg><div class="legend">${legend}${rainNote}</div>${eventList}</figure>`;
 }
 
 /** The four Results charts for one run, as a 2 by 2 grid. */
 export function runChartsHtml(raw: unknown): string {
   const c = safeCharts(raw);
   if (!c) return '';
-  const common = { xs: c.days, rains: c.rains, marker: c.treatStartDay };
+  const common = { xs: c.days, rains: c.rains, marker: c.treatStartDay, events: c.events };
   return `<div class="charts">${[
     svgChart({
       ...common,

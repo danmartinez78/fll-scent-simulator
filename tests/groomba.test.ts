@@ -39,7 +39,11 @@ describe('groomba', () => {
     const drone = sprayLanding(wind, 0);
     const groomba = sprayLanding(wind, 0, GROOMBA_REFERENCE.driftFactor);
     expect(Math.abs(groomba[0].dx)).toBeCloseTo(Math.abs(drone[0].dx) * 0.1);
-    expect(groomba[1].share).toBeCloseTo(drone[1].share * 0.1);
+    // Fewer fine drops drift off, and far less of the spray blows away before it lands.
+    expect(groomba[1].share).toBeLessThan(drone[1].share * 0.2);
+    const landed = (parts: typeof drone) => parts.reduce((a, p) => a + p.share, 0);
+    expect(landed(drone)).toBeLessThan(0.6);
+    expect(landed(groomba)).toBeGreaterThan(0.95);
   });
 
   it('takes about two hours for the whole field but costs about the same as the drone', () => {

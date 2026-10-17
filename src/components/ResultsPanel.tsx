@@ -34,6 +34,8 @@ export function ResultsPanel({ sim, onSave, saved, showSave = true }: { sim: Sim
   const killed = (m.pestsKilled ?? 0) + (m.helpersKilled ?? 0);
   // Rain, as shaded bands on the charts (x is in farm days).
   const rainBands = sim.rains.map((r) => ({ from: r.start / 86400, to: r.end / 86400, label: '🌧' }));
+  // Repeat sprays, wind changes and other events, so a change in a line can be matched to its cause.
+  const events = sim.events.map((e) => ({ day: e.fieldSec / 86400, kind: e.kind, label: e.label }));
   return (
     <div className="results">
       <div className="metrics">
@@ -77,7 +79,12 @@ export function ResultsPanel({ sim, onSave, saved, showSave = true }: { sim: Sim
       </button>
       {more && (
         <div className="metrics">
-          <Card icon="💧" label="Product used" value={`${m.productUsedGal.toFixed(1)} gal`} sub={m.productLeftGal == null ? 'no limit on product' : `${m.productLeftGal.toFixed(1)} gal left`} />
+          <Card
+            icon="💧"
+            label="Product used"
+            value={`${m.productUsedGal.toFixed(1)} gal`}
+            sub={`${m.productLeftGal == null ? 'no limit on product' : `${m.productLeftGal.toFixed(1)} gal left`}${m.sprayBlownAwayPct ? ` · ${m.sprayBlownAwayPct.toFixed(0)}% blown away by the wind` : ''}`}
+          />
           <Card icon="⏳" label="Scent devices used" value={String(m.devicesUsed)} sub={treat === 'pushPull' || treat === 'slowRelease' ? `of ${sim.settings.devices.maxDevices}` : ''} />
           {groomba ? (
             <>
@@ -113,6 +120,7 @@ export function ResultsPanel({ sim, onSave, saved, showSave = true }: { sim: Sim
           xs={xs}
           xLabel="days"
           bands={rainBands}
+          events={events}
           yMax={100}
           yLabel="%"
           marker={treatStartDay > 0 ? { x: treatStartDay, label: 'treatment starts' } : undefined}
@@ -135,6 +143,7 @@ export function ResultsPanel({ sim, onSave, saved, showSave = true }: { sim: Sim
           xs={xs}
           xLabel="days"
           bands={rainBands}
+          events={events}
           yMax={100}
           yLabel="%"
           marker={treatStartDay > 0 ? { x: treatStartDay, label: 'treatment starts' } : undefined}
@@ -146,11 +155,13 @@ export function ResultsPanel({ sim, onSave, saved, showSave = true }: { sim: Sim
       )}
       {chart === 'scent' && (
         <LineChart xs={xs} xLabel="days"
-          bands={rainBands} yMax={100} yLabel="%" series={[{ label: 'Crop with noticeable repellent', color: '#7c3aed', values: sim.history.map((h) => h.scentCoveragePct) }]} />
+          bands={rainBands}
+          events={events} yMax={100} yLabel="%" series={[{ label: 'Crop with noticeable repellent', color: '#7c3aed', values: sim.history.map((h) => h.scentCoveragePct) }]} />
       )}
       {chart === 'product' && (
         <LineChart xs={xs} xLabel="days"
-          bands={rainBands} yLabel="gal" series={[{ label: 'Product used (gal)', color: '#2563eb', values: sim.history.map((h) => h.productUsedGal) }]} />
+          bands={rainBands}
+          events={events} yLabel="gal" series={[{ label: 'Product used (gal)', color: '#2563eb', values: sim.history.map((h) => h.productUsedGal) }]} />
       )}
 
       {showSave &&

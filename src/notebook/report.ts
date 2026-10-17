@@ -66,6 +66,7 @@ th{background:#f1f5f9}.overview td:first-child{font-weight:600}
 .chart svg{width:100%;height:auto;display:block}.chart text{font-size:10px;fill:#64748b}.chart .grid{stroke:#e2e8f0}.chart .marker{stroke:#475569;stroke-dasharray:4 3}
 .chart .rain{fill:#bfdbfe;opacity:.7}.legend{display:flex;flex-wrap:wrap;gap:2px 10px;font-size:11.5px;color:#475569}
 .legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:4px;vertical-align:-1px}.legend .rain-key{background:#bfdbfe}
+.chart .events{list-style:none;margin:3px 0 0;padding:0;display:flex;flex-wrap:wrap;gap:1px 10px;font-size:11.5px;color:#1e293b}
 @media (max-width:700px){.cols,.charts{grid-template-columns:1fr}}
 @media print{.actions{display:none}body{padding:0}.entry{break-before:page}h2,h3{break-after:avoid}*{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
 `;

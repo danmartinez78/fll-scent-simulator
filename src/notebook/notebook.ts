@@ -1,4 +1,5 @@
 import type { Metrics, Settings, TreatmentPlan } from '../models/types';
+import type { ChartEvent } from '../utils/chartEvents';
 import type { Simulation } from '../simulation/Simulation';
 import { activePlan, usesSprayZones } from '../simulation/Treatment';
 import { usesGroomba } from '../simulation/Groomba';
@@ -40,6 +41,8 @@ export interface RunCharts {
   treatStartDay: number;
   /** Rain as [from, to] farm days. */
   rains: Array<[number, number]>;
+  /** Repeat sprays, wind changes and other events (missing in runs saved before events were kept). */
+  events?: ChartEvent[];
 }
 
 /** Most points a saved chart keeps (plenty for a printed chart). */
@@ -211,7 +214,8 @@ export function runCharts(sim: Simulation): RunCharts {
     scent: picks.map((p) => r1(p.scentCoveragePct)),
     product: picks.map((p) => Math.round(p.productUsedGal * 100) / 100),
     treatStartDay: sim.settings.treatment === 'none' ? 0 : sim.treatStartFieldSec / 86400,
-    rains: sim.rains.map((r) => [r.start / 86400, r.end / 86400] as [number, number])
+    rains: sim.rains.map((r) => [r.start / 86400, r.end / 86400] as [number, number]),
+    events: sim.events.map((e) => ({ day: Math.round((e.fieldSec / 86400) * 1000) / 1000, kind: e.kind, label: e.label }))
   };
 }
 
@@ -235,6 +239,7 @@ export function summaryRows(c: CapturedRun): Array<[string, string]> {
     ['Pests kept off crop (average)', `${m.pestsDeterredAvgPct.toFixed(0)}%`],
     ['Pests trapped', String(m.pestsTrapped)],
     ['Product used', `${m.productUsedGal.toFixed(1)} gal`],
+    ['Spray blown away by the wind', m.sprayBlownAwayPct === undefined || !m.productUsedGal ? '—' : `${m.sprayBlownAwayPct.toFixed(0)}%`],
     ['Devices used', String(m.devicesUsed)],
     // Both rows are always there so two runs line up row by row; the groomba drives instead of flying.
     ['Drone flight time', usesGroomba(s) ? '—' : `${m.flightTimeMin.toFixed(1)} min`],

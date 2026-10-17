@@ -208,7 +208,7 @@ export function ControlPanel({ settings: s, plan, tool, simStarted, scenario, on
                   <span className="hint small">
                     {sprayer === 'groomba'
                       ? 'Slow, but it sprays right onto the plants, so the wind barely moves its spray.'
-                      : 'Fast, but the wind pushes its spray as it falls.'}
+                      : 'Fast, but in a strong wind a lot of its spray blows away.'}
                   </span>
                 </div>
               )}

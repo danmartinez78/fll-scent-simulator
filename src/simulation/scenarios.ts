@@ -135,7 +135,7 @@ export const SCENARIOS: Scenario[] = [
     id: 'groundAir',
     name: 'Ground or air?',
     purpose:
-      'A strong 15 mph wind blows across the field, and the whole field gets sprayed every week. The drone flies fast, but the wind pushes its spray around. The groomba is a ground robot that drives between the rows and sprays right onto the plants. It is slow, but the wind barely moves its spray. Try both sprayers.',
+      'A strong 15 mph wind blows across the field, and the whole field gets sprayed every week. The drone flies fast, but the wind blows a lot of its spray away before it lands. The groomba is a ground robot that drives between the rows and sprays right onto the plants. It is slow, but the wind barely moves its spray. Try both sprayers.',
     question: 'On a windy day, which sprayer protects more crop: the fast drone or the slow groomba? How much longer does the groomba take?',
     settings: settingsWith({
       treatment: 'spray',
