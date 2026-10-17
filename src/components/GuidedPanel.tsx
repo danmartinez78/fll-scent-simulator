@@ -97,10 +97,10 @@ export function GuidedPanel(p: Props) {
   );
 }
 
-/** Icon and level for each built-in mission, easiest first. */
+/** Icon and level for each built-in mission, easiest first (listed in this order within a level). */
 const MISSION_INFO: Record<string, { icon: string; level: number }> = {
-  basic: { icon: '🌱', level: 1 },
   baseline: { icon: '📏', level: 1 },
+  basic: { icon: '🌱', level: 1 },
   sprayVsDevices: { icon: '⚖️', level: 2 },
   windy: { icon: '🌬️', level: 2 },
   hotspots: { icon: '🎯', level: 2 },
@@ -112,11 +112,16 @@ const MISSION_INFO: Record<string, { icon: string; level: number }> = {
 const LEVEL_NAMES = ['', 'Starter', 'Next step', 'Challenge'];
 
 function MissionStep({ scenario, onLoadScenario }: Props) {
-  const missions = [...SCENARIOS].sort((a, b) => (MISSION_INFO[a.id]?.level ?? 9) - (MISSION_INFO[b.id]?.level ?? 9));
+  const order = Object.keys(MISSION_INFO);
+  const rank = (id: string) => (MISSION_INFO[id]?.level ?? 9) * 100 + (order.includes(id) ? order.indexOf(id) : 99);
+  const missions = [...SCENARIOS].sort((a, b) => rank(a.id) - rank(b.id));
   return (
     <>
       <h2 className="guided-title">Pick a mission</h2>
-      <p className="hint">New here? Start with <strong>Basic Field</strong>. Missions get harder as you go down.</p>
+      <p className="hint">
+        New here? Start with <strong>No Treatment</strong> to see what the pests do on their own, then try <strong>Basic Field</strong>.
+        Missions get harder as you go down.
+      </p>
       <div className="missions">
         {missions.map((s) => {
           const info = MISSION_INFO[s.id];
@@ -193,8 +198,28 @@ function PredictStep({ scenario, prediction, onPrediction, guess, onGuess }: Pro
   );
 }
 
+/** A mission where nothing is treated: the baseline every other run is compared to. */
+const isBaseline = (sc: Scenario) => sc.settings.treatment === 'none';
+
 function PlanStep(p: Props) {
   const survey = p.scenario.id === 'survey';
+  if (isBaseline(p.scenario)) {
+    return (
+      <>
+        <h2 className="guided-title">Nothing to plan this time</h2>
+        <div className="guided-extra">
+          <p className="hint">
+            📏 This run is the <strong>baseline</strong>. The drone stays home and no scent is used, so you can see what the pests do on
+            their own.
+          </p>
+          <p className="hint">
+            Every treatment you try later gets compared to this. A plan only helps if it protects <strong>more</strong> crop than doing
+            nothing.
+          </p>
+        </div>
+      </>
+    );
+  }
   return (
     <>
       <h2 className="guided-title">Plan your treatment</h2>
@@ -421,6 +446,8 @@ function guessVerdict(guess: number, actual: number): string {
 
 function CompareStep(p: Props) {
   const ran = p.sim.time > 0;
+  // After the baseline, the next step is a mission with a treatment to compare against it.
+  const nextMission = SCENARIOS.find((s) => s.id === 'basic');
   const actual = p.sim.metrics().cropProtectedPct;
   // With two or more runs to line up, the comparison table is the main thing, so it goes first.
   const runCount = p.entries.filter((e) => e.captured?.scenarioName === p.scenario.name).length + (p.saved ? 0 : 1);
@@ -468,9 +495,21 @@ function CompareStep(p: Props) {
         </div>
       )}
       <div className="guided-again">
-        <button className="btn primary wide" onClick={p.onTryAgain}>
-          🔁 Change one thing and run again
-        </button>
+        {isBaseline(p.scenario) && nextMission ? (
+          <button
+            className="btn primary wide"
+            onClick={() => {
+              p.onLoadScenario(nextMission);
+              p.onStep('mission');
+            }}
+          >
+            ➡️ Now try a treatment: {nextMission.name}
+          </button>
+        ) : (
+          <button className="btn primary wide" onClick={p.onTryAgain}>
+            🔁 Change one thing and run again
+          </button>
+        )}
         <button className="btn wide" onClick={() => p.onStep('mission')}>
           🗺️ Pick a new mission
         </button>

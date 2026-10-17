@@ -107,15 +107,20 @@ function loadMode(): Mode {
   }
 }
 
+/** Guided starts with the no-treatment baseline; the Playground starts with Basic Field. */
+function firstScenario(): Scenario {
+  return (loadMode() === 'guided' && SCENARIOS.find((s) => s.id === 'baseline')) || SCENARIOS[0];
+}
+
 export default function App() {
-  const [scenario, setScenario] = useState<Scenario>(SCENARIOS[0]);
-  const [settings, setSettings] = useState<Settings>(() => structuredClone(SCENARIOS[0].settings));
-  const [plan, setPlanState] = useState<TreatmentPlan>(() => structuredClone(SCENARIOS[0].plan));
-  const [view, setView] = useState<ViewOptions>({ ...DEFAULT_VIEW, ...SCENARIOS[0].view });
+  const [scenario, setScenario] = useState<Scenario>(firstScenario);
+  const [settings, setSettings] = useState<Settings>(() => structuredClone(scenario.settings));
+  const [plan, setPlanState] = useState<TreatmentPlan>(() => structuredClone(scenario.plan));
+  const [view, setView] = useState<ViewOptions>(() => ({ ...DEFAULT_VIEW, ...scenario.view }));
   const [surveyLayer, setSurveyLayer] = useState<SurveyLayer>('camera');
   const [selectedSurveyId, setSelectedSurveyId] = useState<number | null>(null);
   const [instructor, setInstructor] = useState(false);
-  const [tool, setTool] = useState<Tool>(() => defaultTool(SCENARIOS[0].settings.treatment));
+  const [tool, setTool] = useState<Tool>(() => defaultTool(scenario.settings.treatment));
   const [running, setRunning] = useState(false);
   const [speed, setSpeed] = useState(1);
   const [pendingReset, setPendingReset] = useState(false);
