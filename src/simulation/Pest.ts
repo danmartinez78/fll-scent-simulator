@@ -109,14 +109,22 @@ function lureDirection(px: number, py: number, env: PestEnvironment): Vec | null
   return gl > 1e-7 ? { x: g.x / gl, y: g.y / gl } : null;
 }
 
+/** What happened to a pest (PestSwarm.fate). */
+export const FATE_FREE = 0;
+export const FATE_TRAPPED = 1;
+export const FATE_POISONED = 2;
+export const FATE_EATEN = 3;
+
 /** All pests stored in flat arrays (fast with hundreds of pests). */
 export class PestSwarm {
   readonly n: number;
   x: Float32Array;
   y: Float32Array;
   heading: Float32Array;
-  /** 0 = flying free, 1 = caught in a trap. */
+  /** 1 once the pest is gone from the field (caught, poisoned or eaten); see `fate`. */
   trapped: Uint8Array;
+  /** What happened to the pest: FATE_FREE, FATE_TRAPPED, FATE_POISONED or FATE_EATEN. */
+  fate: Uint8Array;
   /** 1 while sitting on the crop, feeding (and not bothered by repellent). */
   feeding: Uint8Array;
   /** 1 while repellent above the threshold is bothering this pest. */
@@ -151,6 +159,7 @@ export class PestSwarm {
     this.y = new Float32Array(n);
     this.heading = new Float32Array(n);
     this.trapped = new Uint8Array(n);
+    this.fate = new Uint8Array(n);
     this.feeding = new Uint8Array(n);
     this.repelled = new Uint8Array(n);
     this.fleeLeft = new Float32Array(n);
@@ -400,8 +409,7 @@ export class PestSwarm {
         const ddx = this.x[i] - t.x;
         const ddy = this.y[i] - t.y;
         if (ddx * ddx + ddy * ddy < R.trapRadius * R.trapRadius) {
-          this.trapped[i] = 1;
-          this.feeding[i] = 0;
+          this.remove(i, FATE_TRAPPED);
           break;
         }
       }
@@ -416,9 +424,22 @@ export class PestSwarm {
     return k;
   }
 
+  /** Take a pest out of the field for good, and remember why. */
+  remove(i: number, fate: number): void {
+    this.trapped[i] = 1;
+    this.feeding[i] = 0;
+    this.repelled[i] = 0;
+    this.fate[i] = fate;
+  }
+
+  /** Pests caught in traps. */
   countTrapped(): number {
+    return this.countFate(FATE_TRAPPED);
+  }
+
+  countFate(fate: number): number {
     let k = 0;
-    for (let i = 0; i < this.n; i++) k += this.trapped[i];
+    for (let i = 0; i < this.n; i++) if (this.fate[i] === fate) k++;
     return k;
   }
 

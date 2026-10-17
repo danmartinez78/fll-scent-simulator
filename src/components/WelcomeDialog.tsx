@@ -47,6 +47,11 @@ export function WelcomeDialog({ open, onClose, phone }: Props) {
           <strong>attractant</strong> that pulls them somewhere else. Here you can test ideas like that safely before anyone tries them on a real
           farm.
         </p>
+        <p className="welcome-bio">
+          🐝 <strong>The big goal: protect the crop without killing insects.</strong> Pesticides kill pests, but they also kill bees that
+          pollinate crops and ladybugs that eat pests for free. Scents move pests instead of killing them. Every run counts the insects killed,
+          so you can see the cost of each plan.
+        </p>
         <ol className="welcome-steps">
           {STEPS.map(([name, text]) => (
             <li key={name}>

@@ -13,7 +13,7 @@ import { inRect } from '../utils/geometry';
 import { galPerAcreToLPerM2, lToGal } from '../utils/units';
 import { computeCost, DEFAULT_COSTS } from './CostModel';
 import { Drone, productLimitL, type DroneBudget } from './Drone';
-import { PestSwarm, type PestEnvironment } from './Pest';
+import { FATE_EATEN, FATE_POISONED, FATE_TRAPPED, PestSwarm, type PestEnvironment } from './Pest';
 import { ScentField } from './ScentField';
 import { SurveyRun } from './Survey';
 import {
@@ -23,9 +23,12 @@ import {
   deviceEmissionRate,
   deviceReachM,
   sprayTasksForZone,
+  usesSprayZones,
   zoneKey,
   type DeviceState
 } from './Treatment';
+import { HelperSwarm } from './Helpers';
+import { pesticideKillRate, PESTICIDE_RULES } from './Pesticide';
 import { RAIN_DEVICE_FACTOR, rainingAt, rainSpans, RESPRAY_AFTER_RAIN, washoffLifetimeSec, type RainSpan } from './Weather';
 import { diffusionFor, RESIDUE_VAPOR_LIFETIME_SEC, RESIDUE_VAPOR_SHARE, scentDrift, sprayLanding } from './Wind';
 import { SECONDS_PER_DAY, TIME_LAPSE } from '../utils/fieldTime';
@@ -118,6 +121,10 @@ export class Simulation {
   /** Smell given off by the spray residue, carried downwind by the wind. */
   residueVapor: ScentField;
   attractant: ScentField;
+  /** Pesticide on the plants (stays put, wears off over days, kills on contact). */
+  pesticide: ScentField;
+  /** Helpful insects: bees and ladybugs. */
+  helpers: HelperSwarm;
   /** Feeding so far in each grid square (pest-seconds per square meter). */
   damage: Float32Array;
   /** 1 for grid squares that are crop. */
@@ -158,6 +165,8 @@ export class Simulation {
   private nextHistory = 0;
   private rngMotion: Random;
   private rngSurvey: Random;
+  private rngHelpers: Random;
+  private rngPoison: Random;
   private zoneKeys = new Set<string>();
 
   constructor(settings: Settings, plan: TreatmentPlan, opts: SimOptions = {}) {
@@ -175,6 +184,7 @@ export class Simulation {
     this.sprayResidue = new ScentField(f.width, f.height, cell);
     this.residueVapor = new ScentField(f.width, f.height, cell);
     this.attractant = new ScentField(f.width, f.height, cell);
+    this.pesticide = new ScentField(f.width, f.height, cell);
     const n = this.repellent.cols * this.repellent.rows;
     this.damage = new Float32Array(n);
     this.sprayed = new Uint8Array(n);
@@ -192,6 +202,9 @@ export class Simulation {
     const rngStart = new Random(childSeed(seed, 1));
     this.rngMotion = new Random(childSeed(seed, 2));
     this.rngSurvey = new Random(childSeed(seed, 3));
+    this.rngHelpers = new Random(childSeed(seed, 7));
+    this.rngPoison = new Random(childSeed(seed, 8));
+    this.helpers = HelperSwarm.create(settings.helpers, f.width, f.height, this.crop, new Random(childSeed(seed, 6)));
     this.pests = opts.initialPests
       ? PestSwarm.fromPositions(opts.initialPests, rngStart)
       : PestSwarm.create(settings.pests, f.width, f.height, this.crop, rngStart, opts.pestCount);
@@ -369,7 +382,7 @@ export class Simulation {
     const ended = this.wasRaining && !raining;
     this.wasRaining = raining;
     const s = this.settings;
-    if (!ended || s.treatment !== 'spray' || s.drone.resprayEveryDays !== RESPRAY_AFTER_RAIN || !this.treatmentStarted) return;
+    if (!ended || !usesSprayZones(s.treatment) || s.drone.resprayEveryDays !== RESPRAY_AFTER_RAIN || !this.treatmentStarted) return;
     const zones = this.effectivePlan.sprayZones;
     if (zones.length && this.drone.stockL > 0.01 && !this.drone.outOfBudget) {
       for (const z of zones) this.drone.tasks.push(...sprayTasksForZone(z, this.map, s.drone));
@@ -440,7 +453,7 @@ export class Simulation {
   private maybeRespray(): void {
     const s = this.settings;
     const every = s.drone.resprayEveryDays ?? 0;
-    if (s.treatment !== 'spray' || every <= 0 || !this.treatmentStarted || this.finished) return;
+    if (!usesSprayZones(s.treatment) || every <= 0 || !this.treatmentStarted || this.finished) return;
     if (this.nextRespray === 0) this.nextRespray = this.fieldTime + every * SECONDS_PER_DAY;
     // Wait for the drone to finish its current work before starting the next round.
     if (this.fieldTime < this.nextRespray || this.drone.busy) return;
@@ -483,10 +496,13 @@ export class Simulation {
       // Setups saved before this setting existed keep their old behavior (no rack limit).
       devicesPerTrip: s.devices.perTrip,
       spray: (x, y, liters, swath) => {
-        const amount = (liters / REFERENCE_RATE_L_PER_M2) * s.scent.strength;
+        // Pesticide goes into its own grid; scent strength doesn't apply to it.
+        const isPesticide = s.treatment === 'pesticide';
+        const amount = (liters / REFERENCE_RATE_L_PER_M2) * (isPesticide ? 1 : s.scent.strength);
+        const target = isPesticide ? this.pesticide : this.sprayResidue;
         // Wind pushes the falling drops downwind; drops that land off the map are lost.
         for (const part of sprayLanding(s.wind, this.time)) {
-          this.sprayResidue.addGaussian(x + part.dx, y + part.dy, amount * part.share, swath / 2.5 + part.spread);
+          target.addGaussian(x + part.dx, y + part.dy, amount * part.share, swath / 2.5 + part.spread);
         }
         const half = swath / 2;
         for (let yy = y - half; yy <= y + half; yy += cell / 2) {
@@ -534,6 +550,9 @@ export class Simulation {
       vapor.touch();
     }
     vapor.step(bioDt, drift.x, drift.y, diff, RESIDUE_VAPOR_LIFETIME_SEC);
+    // Pesticide wears off the plants over days, and rain washes it off too.
+    this.pesticide.fade(bioDt, PESTICIDE_RULES.lifetimeMin * 60);
+    if (raining) this.pesticide.fade(fieldDt, washoffLifetimeSec(s));
     const rep = this.repellent.data;
     const air = this.repellentAir.data;
     const res = this.sprayResidue.data;
@@ -569,7 +588,34 @@ export class Simulation {
     const cell = this.repellent.cell;
     const cols = this.repellent.cols;
     this.pests.now = this.time;
-    this.pests.step(dt, this.pestEnvironment(), this.rngMotion);
+    const env = this.pestEnvironment();
+    this.pests.step(dt, env, this.rngMotion);
+    // Pesticide kills pests it touches, even the ones that ignore scent.
+    if (!this.pesticide.empty) {
+      const p = this.pests;
+      for (let i = 0; i < p.n; i++) {
+        // A few pests are resistant (a fixed random share, separate from those that ignore scent).
+        if (p.trapped[i] || !p.present(i) || p.toughness[i] < PESTICIDE_RULES.resistantShare) continue;
+        const rate = pesticideKillRate(this.pesticide.sample(p.x[i], p.y[i]));
+        if (rate > 0 && this.rngPoison.chance(1 - Math.exp(-rate * dt))) p.remove(i, FATE_POISONED);
+      }
+    }
+    // Helpful insects: move, eat pests (ladybugs), and die from pesticide or sticky traps.
+    if (this.helpers.n) {
+      this.helpers.step(
+        dt,
+        {
+          width: env.width,
+          height: env.height,
+          crop: this.crop,
+          pesticide: this.pesticide,
+          killRate: pesticideKillRate,
+          traps: env.traps,
+          pests: this.pests
+        },
+        this.rngHelpers
+      );
+    }
     const area = cell * cell;
     const p = this.pests;
     const weight = this.pestWeight / area;
@@ -642,15 +688,36 @@ export class Simulation {
     return (this.feedingCount() / present) * 100;
   }
 
+  /** Insects killed and kept alive (the biodiversity numbers). */
+  lifeCounts() {
+    const p = this.pests;
+    const h = this.helpers;
+    const trapped = p.countFate(FATE_TRAPPED);
+    const poisoned = p.countFate(FATE_POISONED);
+    const helpersAlive = h.countAlive();
+    return {
+      pestsKilled: trapped + poisoned,
+      pestsPoisoned: poisoned,
+      pestsEaten: p.countFate(FATE_EATEN),
+      helpersTotal: h.n,
+      helpersAlive,
+      helpersAlivePct: h.n ? (helpersAlive / h.n) * 100 : 100,
+      helpersKilled: h.n - helpersAlive
+    };
+  }
+
   private recordHistory(): void {
     const m = this.coreMetrics();
+    const life = this.lifeCounts();
     this.history.push({
       t: this.time,
       pestsFeedingPct: m.pestsFeedingPct,
       pestsPresentPct: this.pests.n ? (this.pests.countPresent() / this.pests.n) * 100 : 0,
       cropAffectedPct: m.cropAffectedPct,
       productUsedGal: m.productUsedGal,
-      scentCoveragePct: m.scentCoveragePct
+      scentCoveragePct: m.scentCoveragePct,
+      helpersAlivePct: life.helpersAlivePct,
+      pestsKilledPct: this.pests.n ? (life.pestsKilled / this.pests.n) * 100 : 0
     });
     this.awaySum += 100 - m.pestsFeedingPct;
     this.awayN++;
@@ -692,6 +759,7 @@ export class Simulation {
       pestsDeterredPct: 100 - core.pestsFeedingPct,
       pestsDeterredAvgPct: this.awayN ? this.awaySum / this.awayN : 100 - core.pestsFeedingPct,
       pestsTrapped: this.pests.countTrapped(),
+      ...this.lifeCounts(),
       productUsedGal: core.productUsedGal,
       productLeftGal: Number.isFinite(d.stockL) ? lToGal(d.stockL + d.payloadL) : null,
       flightTimeMin: d.airborneSec / 60,

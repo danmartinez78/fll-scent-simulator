@@ -11,7 +11,7 @@ import type {
 import { clamp, inRect } from '../utils/geometry';
 import { childSeed, Random } from '../utils/random';
 import { cropRect, DEVICE_PLUME_LIFETIME_MIN, Simulation } from './Simulation';
-import { activePlan, allowedKinds, estimateSprayLiters } from './Treatment';
+import { activePlan, allowedKinds, estimateSprayLiters, usesSprayZones } from './Treatment';
 import { estimatePlanCost } from './PlanCost';
 import { productLimitL } from './Drone';
 import { scentDrift } from './Wind';
@@ -38,6 +38,8 @@ export interface ScoreBreakdown {
  *         - material weight x gallons used
  *         - flight weight x minutes of drone flight
  *         - cost weight x (estimated cost / $10)
+ *         - pests-killed weight x pests trapped or poisoned
+ *         - helpers-killed weight x bees and ladybugs killed
  */
 export function scoreMetrics(m: Metrics, w: ScoreWeights): ScoreBreakdown {
   const parts: ScorePart[] = [
@@ -45,7 +47,9 @@ export function scoreMetrics(m: Metrics, w: ScoreWeights): ScoreBreakdown {
     { label: 'Pests kept off the crop (average)', value: m.pestsDeterredAvgPct, unit: '%', weight: w.pestsDeterred, points: w.pestsDeterred * m.pestsDeterredAvgPct },
     { label: 'Product used', value: m.productUsedGal, unit: 'gal', weight: w.material, points: -w.material * m.productUsedGal },
     { label: 'Drone flight time', value: m.flightTimeMin, unit: 'min', weight: w.flightTime, points: -w.flightTime * m.flightTimeMin },
-    { label: 'Estimated cost', value: m.cost.total, unit: '$', weight: w.cost, points: (-w.cost * m.cost.total) / 10 }
+    { label: 'Estimated cost', value: m.cost.total, unit: '$', weight: w.cost, points: (-w.cost * m.cost.total) / 10 },
+    { label: 'Pests killed', value: m.pestsKilled ?? 0, unit: '', weight: w.pestsKilled ?? 0, points: -(w.pestsKilled ?? 0) * (m.pestsKilled ?? 0) },
+    { label: 'Helpful insects killed', value: m.helpersKilled ?? 0, unit: '', weight: w.helpersKilled ?? 0, points: -(w.helpersKilled ?? 0) * (m.helpersKilled ?? 0) }
   ];
   return { total: parts.reduce((a, p) => a + p.points, 0), parts };
 }
@@ -352,7 +356,7 @@ export class Optimizer {
   /** The obvious plans a person would try first, in the order they are tested. */
   startingIdeas(): Array<{ label: string; plan: TreatmentPlan }> {
     const s = this.settings;
-    const ideas = s.treatment === 'spray' ? this.sprayIdeas() : this.deviceIdeas();
+    const ideas = usesSprayZones(s.treatment) ? this.sprayIdeas() : this.deviceIdeas();
     // The baseline, so the computer can say honestly when nothing beats it.
     ideas.push({ label: 'Do nothing', plan: { sprayZones: [], devices: [] } });
     return ideas;
@@ -653,7 +657,7 @@ export class Optimizer {
 
   randomPlan(): TreatmentPlan {
     const s = this.settings;
-    if (s.treatment === 'spray') {
+    if (usesSprayZones(s.treatment)) {
       const order = this.blocks.map((_, i) => i);
       for (let i = order.length - 1; i > 0; i--) {
         const j = this.rng.int(0, i);
@@ -684,7 +688,7 @@ export class Optimizer {
   private mutateOnce(plan: TreatmentPlan): TreatmentPlan {
     const s = this.settings;
     const rng = this.rng;
-    if (s.treatment === 'spray') {
+    if (usesSprayZones(s.treatment)) {
       // Work on the set of blocks the plan covers, then merge back into long passes.
       const chosen = coveredBlocks(plan.sprayZones, this.blocks);
       const unused = this.blocksByLoad.filter((i) => !chosen.includes(i));

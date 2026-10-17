@@ -4,11 +4,11 @@ import { rainSpans, RESPRAY_AFTER_RAIN } from './Weather';
 import { computeCost } from './CostModel';
 import { Drone, type DroneTask } from './Drone';
 import { homePoint } from './Simulation';
-import { activePlan, buildDroneTasks } from './Treatment';
+import { activePlan, buildDroneTasks, usesSprayZones } from './Treatment';
 
 /** How many times the spray zones get sprayed in the run (the first spray plus repeats). */
 export function sprayRounds(s: Settings): number {
-  if (s.treatment !== 'spray') return 1;
+  if (!usesSprayZones(s.treatment)) return 1;
   const every = s.drone.resprayEveryDays ?? 0;
   const startDay = s.run.treatStartDay ?? 1;
   if (every === RESPRAY_AFTER_RAIN) {

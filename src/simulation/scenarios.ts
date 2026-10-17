@@ -21,9 +21,11 @@ export function defaultSettings(): Settings {
     devices: { maxDevices: 12, releaseRate: 1, lifetimeMin: 60, massKg: 0.5, perTrip: 4, deployByDrone: true },
     survey: { detectionPct: 90, falsePositivesPer1000m2: 0.5, positionNoiseM: 3, uncertainPct: 5 },
     cost: { ...DEFAULT_COSTS },
-    weights: { protection: 2, pestsDeterred: 0.5, material: 2, flightTime: 1, cost: 0.5 },
+    // Killing insects counts heavily: a helpful insect costs as much as half a percent of crop.
+    weights: { protection: 2, pestsDeterred: 0.5, material: 2, flightTime: 1, cost: 0.5, pestsKilled: 0.05, helpersKilled: 1 },
     run: { durationMin: 21, seed: 42, treatStartDay: 3 },
-    weather: { rainDays: [] }
+    weather: { rainDays: [] },
+    helpers: { count: 120, ladybugShare: 0.5 }
   };
 }
 
@@ -49,6 +51,15 @@ export const SCENARIOS: Scenario[] = [
     purpose: 'Learn the controls. Pests are spread evenly, there is no wind, and there is plenty of product.',
     question: 'What happens to the pests when you spray the whole field?',
     settings: settingsWith({ treatment: 'spray' }),
+    plan: emptyPlan()
+  },
+  {
+    id: 'critters',
+    name: 'Crops and Critters',
+    purpose:
+      'Pesticide kills pests fast, but it also kills the bees that pollinate crops and the ladybugs that eat pests for free. Try it, then try scents, and count the insects each plan kills.',
+    question: 'Can you protect the crop as well as pesticide does, while killing far fewer insects?',
+    settings: settingsWith({ treatment: 'pesticide' }),
     plan: emptyPlan()
   },
   {

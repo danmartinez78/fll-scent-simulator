@@ -36,7 +36,7 @@ const DEFAULT_VIEW: ViewOptions = {
 
 /** The map tool that fits a treatment method. */
 export function defaultTool(method: Settings['treatment']): Tool {
-  if (method === 'spray') return 'zone';
+  if (method === 'spray' || method === 'pesticide') return 'zone';
   if (method === 'slowRelease' || method === 'pushPull') return 'repellent';
   return 'none';
 }

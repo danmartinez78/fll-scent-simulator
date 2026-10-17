@@ -14,11 +14,13 @@ function overview(c: CapturedRun): Array<[string, string]> {
     ['Pests kept off (avg)', `${m.pestsDeterredAvgPct.toFixed(0)}%`],
     ['Product used', `${m.productUsedGal.toFixed(1)} gal`],
     ['Flight time', `${m.flightTimeMin.toFixed(1)} min`],
-    ['Cost', formatMoney(m.cost.total)]
+    ['Cost', formatMoney(m.cost.total)],
+    ['Insects killed', m.pestsKilled === undefined ? '—' : String(m.pestsKilled + (m.helpersKilled ?? 0))],
+    ['Helpful alive', m.helpersAlivePct === undefined ? '—' : `${m.helpersAlivePct.toFixed(0)}%`]
   ];
 }
 
-const OVERVIEW_LABELS = ['Scenario', 'Treatment', 'Wind', 'Crop protected', 'Pests kept off (avg)', 'Product used', 'Flight time', 'Cost'];
+const OVERVIEW_LABELS = ['Scenario', 'Treatment', 'Wind', 'Crop protected', 'Pests kept off (avg)', 'Product used', 'Flight time', 'Cost', 'Insects killed', 'Helpful alive'];
 
 function csvCell(v: string): string {
   // Quote everything; a leading = + - @ would make a spreadsheet run it as a formula.
