@@ -4,6 +4,7 @@ import type { Simulation } from '../simulation/Simulation';
 import type { Tool } from './SimulationCanvas';
 import { lToGal } from '../utils/units';
 import { RESPRAY_AFTER_RAIN } from '../simulation/Weather';
+import { GROOMBA_PLAYBACK, usesGroomba } from '../simulation/Groomba';
 
 const TOOL_HINTS: Record<Tool, string> = {
   none: '',
@@ -19,6 +20,7 @@ const TOOL_HINTS: Record<Tool, string> = {
  * the minutes of flying left before the battery reserve (Playground).
  */
 export function droneStatus(sim: Simulation, detailed = true): string {
+  if (usesGroomba(sim.settings)) return groombaStatus(sim);
   const d = sim.drone;
   const mass = sim.settings.devices.massKg;
   const load =
@@ -64,6 +66,28 @@ export function droneStatus(sim: Simulation, detailed = true): string {
       const job = t?.kind === 'drop' ? 'carrying a device to its spot' : d.spraying ? 'spraying' : 'flying to the next spray strip';
       return `Drone is ${job} · ${load} · ${battery}.`;
     }
+  }
+}
+
+/** What the groomba is doing right now (it drives instead of flying, so there is no takeoff or landing). */
+export function groombaStatus(sim: Simulation): string {
+  const d = sim.drone;
+  const status = `tank ${lToGal(d.payloadL).toFixed(1)} gal · battery ${Math.round(Math.max(0, d.battery) * 100)}%`;
+  if (d.hoverFor === 'turn') return `Groomba is turning into the next row · ${status}.`;
+  switch (d.mode) {
+    case 'parked':
+      if (sim.raining && d.tasks.length) return 'Groomba is waiting at home (H) for the rain to stop.';
+      if (sim.treatmentScheduled) return `Groomba is waiting at home (H). The treatment starts on Day ${sim.settings.run.treatStartDay ?? 1}.`;
+      if (sim.treatmentWaiting) return 'Groomba is waiting at home (H) until you press Run to start the treatment.';
+      if (d.outOfBudget) return 'Groomba is parked: the money for this season is used up, so the rest of the plan was skipped.';
+      if (d.outOfProduct) return 'Groomba is parked: it ran out of product.';
+      return d.flights > 0 ? 'Groomba is parked: all rows done.' : 'Groomba is parked at home (H), waiting for a plan.';
+    case 'turnaround':
+      return `Groomba is at home: refilling the tank and charging (${Math.ceil(d.turnaroundLeft)} s left).`;
+    case 'returning':
+      return d.lastReturnReason === 'refill' ? 'Groomba is driving home to refill the tank.' : 'Groomba is driving home.';
+    default:
+      return `Groomba is ${d.spraying ? 'spraying along a row' : 'driving to the next row'} (shown ${GROOMBA_PLAYBACK}x faster) · ${status}.`;
   }
 }
 
@@ -126,7 +150,8 @@ export function ExperimentPanel({ settings, sim, tool, running, canRun = true, d
   // One line: the most useful thing to know right now.
   let line: { icon: string; text: string; tone: string };
   if (sim.surveying) line = { icon: '🛰️', text: 'Survey drone is scanning the field…', tone: 'status-line' };
-  else if (running && settings.treatment !== 'none') line = { icon: '🚁', text: droneStatus(sim, detailed), tone: 'status-line' };
+  else if (running && settings.treatment !== 'none')
+    line = { icon: usesGroomba(settings) ? '🤖' : '🚁', text: droneStatus(sim, detailed), tone: 'status-line' };
   else if (!running && toolHint && !sim.finished) line = { icon: '✏️', text: toolHint, tone: 'tool-hint' };
   else if (!running && !sim.runStarted && canRun) line = { icon: '▶', text: 'Press Run to start.', tone: 'hint-strong' };
   else line = { icon: '💡', text: tip, tone: 'tip' };

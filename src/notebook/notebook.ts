@@ -1,6 +1,7 @@
 import type { Metrics, Settings, TreatmentPlan } from '../models/types';
 import type { Simulation } from '../simulation/Simulation';
-import { activePlan } from '../simulation/Treatment';
+import { activePlan, usesSprayZones } from '../simulation/Treatment';
+import { usesGroomba } from '../simulation/Groomba';
 import { compassName } from '../utils/geometry';
 import { formatMoney } from '../utils/units';
 import { formatFieldSpan, formatModelMin, modelToFieldSec } from '../utils/fieldTime';
@@ -93,6 +94,19 @@ const METHOD_NAMES: Record<string, string> = {
 
 export function methodName(m: string): string {
   return METHOD_NAMES[m] ?? m;
+}
+
+/** The method as a student would say it, naming the groomba when it did the spraying ("Spray with the groomba"). */
+export function runMethodName(s: Pick<Settings, 'treatment' | 'sprayer'>): string {
+  return usesGroomba(s) ? `${methodName(s.treatment)} with the groomba` : methodName(s.treatment);
+}
+
+/** How long the sprayer worked: "12.4 min flying" for the drone, "1 h 53 min driving" for the groomba. */
+export function workTimeText(s: Pick<Settings, 'treatment' | 'sprayer'>, minutes: number): string {
+  if (!usesGroomba(s)) return `${minutes.toFixed(1)} min flying`;
+  const h = Math.floor(minutes / 60);
+  const min = Math.round(minutes - h * 60);
+  return `${h ? `${h} h ` : ''}${min} min driving`;
 }
 
 let counter = 0;
@@ -210,7 +224,7 @@ export function summaryRows(c: CapturedRun): Array<[string, string]> {
   return [
     ['Scenario', c.scenarioName],
     ['Run time', `${formatFieldSpan(c.fieldTimeSec ?? modelToFieldSec(c.timeSec))}${c.finished ? '' : ' (not finished)'}`],
-    ['Treatment', methodName(s.treatment)],
+    ['Treatment', runMethodName(s)],
     ['Rain', (s.weather?.rainDays ?? []).length ? `Days ${s.weather!.rainDays.join(', ')}` : 'None'],
     ['Wind', s.wind.speedMph > 0 ? `${s.wind.speedMph} mph toward the ${compassName(s.wind.direction)}${s.wind.changing ? ' (changing)' : ''}` : 'No wind'],
     ['Pests', `${s.pests.count}, ${s.pests.distribution}`],
@@ -222,8 +236,10 @@ export function summaryRows(c: CapturedRun): Array<[string, string]> {
     ['Pests trapped', String(m.pestsTrapped)],
     ['Product used', `${m.productUsedGal.toFixed(1)} gal`],
     ['Devices used', String(m.devicesUsed)],
-    ['Drone flight time', `${m.flightTimeMin.toFixed(1)} min`],
-    ['Flights', String(m.flights)],
+    // Both rows are always there so two runs line up row by row; the groomba drives instead of flying.
+    ['Drone flight time', usesGroomba(s) ? '—' : `${m.flightTimeMin.toFixed(1)} min`],
+    ['Groomba driving time', usesGroomba(s) ? workTimeText(s, m.flightTimeMin) : '—'],
+    ['Flights', usesGroomba(s) ? '—' : String(m.flights)],
     ['Estimated cost', formatMoney(m.cost.total)],
     // Always present (even when empty) so two runs line up row by row.
     ['Budget', s.cost.budget ? formatMoney(s.cost.budget) : 'No limit'],
@@ -251,7 +267,7 @@ export function compareRows(a: CapturedRun, b: CapturedRun): CompareRow[] {
 /** Plain facts, no verdict. The student decides what they mean. */
 export function neutralSummary(nameA: string, a: CapturedRun, nameB: string, b: CapturedRun): string {
   const f = (n: string, c: CapturedRun) =>
-    `${n} used ${c.metrics.productUsedGal.toFixed(1)} gallons and ${c.metrics.devicesUsed} devices, flew ${c.metrics.flightTimeMin.toFixed(1)} minutes, protected ${c.metrics.cropProtectedPct.toFixed(0)}% of the crop` +
+    `${n} used ${c.metrics.productUsedGal.toFixed(1)} gallons and ${c.metrics.devicesUsed} devices, ${usesGroomba(c.settings) ? `drove the groomba ${c.metrics.flightTimeMin.toFixed(0)} minutes` : `flew ${c.metrics.flightTimeMin.toFixed(1)} minutes`}, protected ${c.metrics.cropProtectedPct.toFixed(0)}% of the crop` +
     (c.metrics.pestsKilled === undefined ? '.' : `, and killed ${c.metrics.pestsKilled} pests and ${c.metrics.helpersKilled ?? 0} bees and ladybugs.`);
   return `${f(nameA, a)} ${f(nameB, b)}`;
 }
@@ -341,6 +357,10 @@ export function describeChanges(before: RunSetup, after: RunSetup): string[] {
     if (x !== y) out.push(`${label}: ${x} → ${y}`);
   };
   add('Method', methodName(a.treatment), methodName(b.treatment));
+  if (usesSprayZones(a.treatment) && usesSprayZones(b.treatment)) {
+    const sprayer = (s: Settings) => (usesGroomba(s) ? 'groomba' : 'drone');
+    add('Sprayer', sprayer(a), sprayer(b));
+  }
   if (before.surveysDone !== undefined && after.surveysDone !== undefined) add('Surveys flown', before.surveysDone, after.surveysDone);
   add('Treatment starts', `Day ${a.run.treatStartDay ?? 1}`, `Day ${b.run.treatStartDay ?? 1}`);
 

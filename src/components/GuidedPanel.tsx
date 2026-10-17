@@ -1,6 +1,7 @@
 import type { Scenario, Settings, TreatmentPlan } from '../models/types';
 import type { Simulation } from '../simulation/Simulation';
-import { describeChanges, methodName, type NotebookEntry, type SessionRun } from '../notebook/notebook';
+import { describeChanges, methodName, runMethodName, workTimeText, type NotebookEntry, type SessionRun } from '../notebook/notebook';
+import { usesGroomba } from '../simulation/Groomba';
 import { activePlan } from '../simulation/Treatment';
 import { formatFieldClock } from '../utils/fieldTime';
 import { ReportButtons } from './ReportButtons';
@@ -112,6 +113,7 @@ const MISSION_INFO: Record<string, { icon: string; level: number }> = {
   critters: { icon: '🐞', level: 1 },
   sprayVsDevices: { icon: '⚖️', level: 2 },
   windy: { icon: '🌬️', level: 2 },
+  groundAir: { icon: '🤖', level: 2 },
   rainy: { icon: '🌧️', level: 2 },
   hotspots: { icon: '🎯', level: 2 },
   budget: { icon: '💰', level: 2 },
@@ -454,7 +456,7 @@ function runName(p: Props, r: SessionRun): string {
 function RunsTable(p: Props) {
   const { sim, settings, currentRunId } = p;
   const runs = missionRuns(p);
-  const rows: Array<{ key: string; name: string; saved: boolean; method: string; crop: number; kept: number; cost: number; killed: number | null; helpers: number | null; current: boolean }> = runs
+  const rows: Array<{ key: string; name: string; saved: boolean; method: string; crop: number; kept: number; cost: number; killed: number | null; helpers: number | null; current: boolean; groomba: boolean; time: string }> = runs
     .slice(-6)
     .map((r) => {
       const c = r.captured;
@@ -462,7 +464,9 @@ function RunsTable(p: Props) {
         key: r.id,
         name: runName(p, r),
         saved: !!r.entryId,
-        method: methodName(c.settings.treatment),
+        method: runMethodName(c.settings),
+        groomba: usesGroomba(c.settings),
+        time: workTimeText(c.settings, c.metrics.flightTimeMin),
         crop: c.metrics.cropProtectedPct,
         kept: c.metrics.pestsDeterredAvgPct,
         cost: c.metrics.cost.total,
@@ -477,7 +481,9 @@ function RunsTable(p: Props) {
       key: 'now',
       name: 'This run',
       saved: false,
-      method: methodName(settings.treatment),
+      method: runMethodName(settings),
+      groomba: usesGroomba(settings),
+      time: workTimeText(settings, m.flightTimeMin),
       crop: m.cropProtectedPct,
       kept: m.pestsDeterredAvgPct,
       cost: m.cost.total,
@@ -488,6 +494,8 @@ function RunsTable(p: Props) {
   }
   const best = Math.max(...rows.map((r) => r.crop));
   const hasBaseline = rows.some((r) => r.method === methodName('none'));
+  // How long the sprayer worked, when the groomba is part of the comparison.
+  const showTime = p.scenario.id === 'groundAir' || rows.some((r) => r.groomba);
   return (
     <div className="runs">
       <h3 className="runs-title">📊 Compare your runs on this mission</h3>
@@ -498,6 +506,7 @@ function RunsTable(p: Props) {
             <th scope="col">🌱 Crop safe</th>
             <th scope="col">🐞 Pests kept off (avg)</th>
             <th scope="col">💲 Cost</th>
+            {showTime && <th scope="col">⏱ Time spraying</th>}
             <th scope="col">🪲 Insects killed</th>
           </tr>
         </thead>
@@ -514,6 +523,7 @@ function RunsTable(p: Props) {
               </td>
               <td>{r.kept.toFixed(0)}%</td>
               <td>{formatMoney(r.cost)}</td>
+              {showTime && <td>{r.method === methodName('none') ? '—' : r.time}</td>}
               <td className={r.helpers ? 'bad' : ''}>
                 {r.killed === null ? '—' : r.killed}
                 {r.helpers ? <span className="runs-method">🐝 {r.helpers} helpful</span> : null}

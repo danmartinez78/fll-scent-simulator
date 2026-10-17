@@ -28,6 +28,7 @@ import {
   type DeviceState
 } from './Treatment';
 import { HelperSwarm } from './Helpers';
+import { sprayDriftFactor, sprayerCosts, sprayerSettings, usesGroomba } from './Groomba';
 import { pesticideKillRate, PESTICIDE_RULES } from './Pesticide';
 import { RAIN_DEVICE_FACTOR, rainingAt, rainSpans, RESPRAY_AFTER_RAIN, washoffLifetimeSec, type RainSpan } from './Weather';
 import { diffusionFor, RESIDUE_VAPOR_LIFETIME_SEC, RESIDUE_VAPOR_SHARE, scentDrift, sprayLanding } from './Wind';
@@ -212,7 +213,8 @@ export class Simulation {
     // Days stored in settings are farm days; pest rules run in model seconds.
     const buildUpSec = ((settings.pests.buildUpDays ?? 0) * SECONDS_PER_DAY) / TIME_LAPSE;
     this.pests.assignArrivals(buildUpSec, new Random(childSeed(seed, 5)));
-    this.drone = new Drone(settings.drone, this.home);
+    // The groomba does the spraying when it is chosen; it works the same jobs as the drone.
+    this.drone = new Drone(sprayerSettings(settings), this.home);
     this.setPlan(plan);
     this.recordHistory();
   }
@@ -239,7 +241,7 @@ export class Simulation {
       const k = zoneKey(z);
       if (this.zoneKeys.has(k)) continue;
       this.zoneKeys.add(k);
-      this.drone.tasks.push(...sprayTasksForZone(z, this.map, s.drone));
+      this.drone.tasks.push(...sprayTasksForZone(z, this.map, sprayerSettings(s)));
     }
     for (const k of [...this.zoneKeys]) if (!keys.has(k)) this.zoneKeys.delete(k);
 
@@ -280,7 +282,7 @@ export class Simulation {
   updateSettings(settings: Settings): void {
     const methodChanged = settings.treatment !== this.settings.treatment;
     this.settings = structuredClone(settings);
-    this.drone.settings = { ...settings.drone };
+    this.drone.settings = { ...sprayerSettings(settings) };
     // What is left in storage: the new limit minus what is already sprayed or in the tank.
     this.drone.stockL = Math.max(0, productLimitL(settings.drone) - this.drone.litersSprayed - this.drone.payloadL);
     if (methodChanged) this.setPlan(this.plan);
@@ -385,9 +387,14 @@ export class Simulation {
     if (!ended || !usesSprayZones(s.treatment) || s.drone.resprayEveryDays !== RESPRAY_AFTER_RAIN || !this.treatmentStarted) return;
     const zones = this.effectivePlan.sprayZones;
     if (zones.length && this.drone.stockL > 0.01 && !this.drone.outOfBudget) {
-      for (const z of zones) this.drone.tasks.push(...sprayTasksForZone(z, this.map, s.drone));
+      for (const z of zones) this.drone.tasks.push(...sprayTasksForZone(z, this.map, sprayerSettings(s)));
       this.resprays++;
     }
+  }
+
+  /** True while the groomba (not the drone) is out driving its jobs. */
+  get groombaDriving(): boolean {
+    return usesGroomba(this.settings) && this.treatmentStarted && this.drone.mode !== 'parked' && !this.surveying;
   }
 
   get surveying(): boolean {
@@ -434,13 +441,13 @@ export class Simulation {
     const devicesUsed = this.devices.filter((e) => e.activatedAt !== null).length;
     return computeCost(
       { sprayedAreaM2: d.sprayedAreaM2, litersUsed: d.litersSprayed, devicesUsed, flightMin: d.airborneSec / 60 },
-      this.settings.cost
+      sprayerCosts(this.settings)
     ).total;
   }
 
   /** The budget the drone works within, or undefined when there is none. */
   private droneBudget(): DroneBudget | undefined {
-    const c = this.settings.cost;
+    const c = sprayerCosts(this.settings);
     if (!c.budget || c.budget <= 0) return undefined;
     return {
       left: () => c.budget! - this.spentSoFar(),
@@ -459,7 +466,7 @@ export class Simulation {
     if (this.fieldTime < this.nextRespray || this.drone.busy) return;
     const zones = this.effectivePlan.sprayZones;
     if (zones.length && this.drone.stockL > 0.01 && !this.drone.outOfBudget) {
-      for (const z of zones) this.drone.tasks.push(...sprayTasksForZone(z, this.map, s.drone));
+      for (const z of zones) this.drone.tasks.push(...sprayTasksForZone(z, this.map, sprayerSettings(s)));
       this.resprays++;
     }
     this.nextRespray += every * SECONDS_PER_DAY;
@@ -501,7 +508,7 @@ export class Simulation {
         const amount = (liters / REFERENCE_RATE_L_PER_M2) * (isPesticide ? 1 : s.scent.strength);
         const target = isPesticide ? this.pesticide : this.sprayResidue;
         // Wind pushes the falling drops downwind; drops that land off the map are lost.
-        for (const part of sprayLanding(s.wind, this.time)) {
+        for (const part of sprayLanding(s.wind, this.time, sprayDriftFactor(s))) {
           target.addGaussian(x + part.dx, y + part.dy, amount * part.share, swath / 2.5 + part.spread);
         }
         const half = swath / 2;
@@ -748,7 +755,7 @@ export class Simulation {
     const devicesUsed = this.devices.filter((e) => e.activatedAt !== null).length;
     const cost = computeCost(
       { sprayedAreaM2: d.sprayedAreaM2, litersUsed: d.litersSprayed, devicesUsed, flightMin: d.airborneSec / 60 },
-      this.settings.cost
+      sprayerCosts(this.settings)
     );
     return {
       timeSec: this.time,

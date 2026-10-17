@@ -4,6 +4,8 @@ import { formatMoney } from '../utils/units';
 import { LineChart } from './Chart';
 import { modelToFieldSec } from '../utils/fieldTime';
 import { InfoButton } from './ui';
+import { usesGroomba } from '../simulation/Groomba';
+import { workTimeText } from '../notebook/notebook';
 
 function Card({ icon, label, value, sub, info, tone }: { icon: string; label: string; value: string; sub?: string; info?: string; tone?: string }) {
   return (
@@ -27,6 +29,7 @@ export function ResultsPanel({ sim, onSave, saved, showSave = true }: { sim: Sim
   const [more, setMore] = useState(false);
   const xs = sim.history.map((h) => modelToFieldSec(h.t) / 86400);
   const treat = sim.settings.treatment;
+  const groomba = usesGroomba(sim.settings);
   const treatStartDay = treat === 'none' ? 0 : sim.treatStartFieldSec / 86400;
   const killed = (m.pestsKilled ?? 0) + (m.helpersKilled ?? 0);
   // Rain, as shaded bands on the charts (x is in farm days).
@@ -48,7 +51,7 @@ export function ResultsPanel({ sim, onSave, saved, showSave = true }: { sim: Sim
           label="Estimated cost"
           info="cost"
           value={formatMoney(m.cost.total)}
-          sub={`${sim.settings.cost.budget ? `of your ${formatMoney(sim.settings.cost.budget)} budget${sim.drone.outOfBudget ? ' (used up)' : ''} · ` : ''}drone flying ${formatMoney(m.cost.application)} · product ${formatMoney(m.cost.material)} · devices ${formatMoney(m.cost.devices)}`}
+          sub={`${sim.settings.cost.budget ? `of your ${formatMoney(sim.settings.cost.budget)} budget${sim.drone.outOfBudget ? ' (used up)' : ''} · ` : ''}${groomba ? 'groomba driving' : 'drone flying'} ${formatMoney(m.cost.application)} · product ${formatMoney(m.cost.material)} · devices ${formatMoney(m.cost.devices)}`}
         />
         <Card
           icon="🪲"
@@ -76,8 +79,17 @@ export function ResultsPanel({ sim, onSave, saved, showSave = true }: { sim: Sim
         <div className="metrics">
           <Card icon="💧" label="Product used" value={`${m.productUsedGal.toFixed(1)} gal`} sub={m.productLeftGal == null ? 'no limit on product' : `${m.productLeftGal.toFixed(1)} gal left`} />
           <Card icon="⏳" label="Scent devices used" value={String(m.devicesUsed)} sub={treat === 'pushPull' || treat === 'slowRelease' ? `of ${sim.settings.devices.maxDevices}` : ''} />
-          <Card icon="🚁" label="Drone flight time" info="flightTime" value={`${m.flightTimeMin.toFixed(1)} min`} sub={`${m.distanceKm.toFixed(2)} km flown`} />
-          <Card icon="🔁" label="Flights" value={String(m.flights)} sub={`${m.refills} refills · ${m.batterySwaps} battery swaps`} />
+          {groomba ? (
+            <>
+              <Card icon="🤖" label="Groomba driving time" info="groomba" value={workTimeText(sim.settings, m.flightTimeMin).replace(' driving', '')} sub={`${m.distanceKm.toFixed(2)} km driven`} />
+              <Card icon="🔁" label="Trips" value={String(m.flights)} sub={`${m.refills} refills`} />
+            </>
+          ) : (
+            <>
+              <Card icon="🚁" label="Drone flight time" info="flightTime" value={`${m.flightTimeMin.toFixed(1)} min`} sub={`${m.distanceKm.toFixed(2)} km flown`} />
+              <Card icon="🔁" label="Flights" value={String(m.flights)} sub={`${m.refills} refills · ${m.batterySwaps} battery swaps`} />
+            </>
+          )}
           <Card icon="🗺️" label="Scent coverage now" info="scentCoverage" value={`${m.scentCoveragePct.toFixed(0)}%`} sub={`${m.acresSprayed.toFixed(2)} acres sprayed`} />
         </div>
       )}

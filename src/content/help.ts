@@ -63,6 +63,10 @@ export const HELP: Record<string, HelpTopic> = {
     title: 'Spraying',
     text: 'The drone flies back and forth and sprays scent over the zones you draw. Wind pushes the falling drops downwind, so in a breeze the spray lands a little downwind of the drone and some blows off the field. The spray stays on the plants and wears off in a few days, but its smell drifts downwind.'
   },
+  groomba: {
+    title: 'The groomba',
+    text: 'The groomba is a ground robot the team invented. It drives between the crop rows at about walking speed and sprays right onto the plants, so the wind barely moves its spray. It is much slower than the drone (about 2 hours for the whole field instead of 12 minutes) and sprays a narrower strip, but it costs less per minute. Its numbers are guesses, so change them if you find a real robot to compare with. Its drives play 10 times faster on screen so you are not waiting for hours.'
+  },
   scentStrength: {
     title: 'Scent strength',
     text: 'How powerful the scent product is. Stronger scent stays above the "noticing" level for longer and farther away.'

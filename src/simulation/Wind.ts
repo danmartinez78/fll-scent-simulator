@@ -24,13 +24,19 @@ export const SPRAY_FINE_REACH = 5;
 /**
  * Where spray released at a point lands: the main part shifted a little
  * downwind and a small share of fine drops carried farther. Shares add up to 1.
+ * `driftFactor` scales how far the wind moves it and how much blows away
+ * (1 for the drone; the groomba sprays from just above the plants).
  */
-export function sprayLanding(w: WindSettings, timeSec: number): Array<{ dx: number; dy: number; share: number; spread: number }> {
+export function sprayLanding(
+  w: WindSettings,
+  timeSec: number,
+  driftFactor = 1
+): Array<{ dx: number; dy: number; share: number; spread: number }> {
   const v = windVector(w, timeSec);
-  const dx = v.x * SPRAY_FALL_SEC;
-  const dy = v.y * SPRAY_FALL_SEC;
+  const dx = v.x * SPRAY_FALL_SEC * driftFactor;
+  const dy = v.y * SPRAY_FALL_SEC * driftFactor;
   const off = Math.hypot(dx, dy);
-  const fine = Math.min(SPRAY_FINE_SHARE_MAX, SPRAY_FINE_SHARE_PER_MPH * w.speedMph);
+  const fine = Math.min(SPRAY_FINE_SHARE_MAX, SPRAY_FINE_SHARE_PER_MPH * w.speedMph) * driftFactor;
   const parts = [{ dx, dy, share: 1 - fine, spread: 0.3 * off }];
   if (fine > 0) parts.push({ dx: dx * SPRAY_FINE_REACH, dy: dy * SPRAY_FINE_REACH, share: fine, spread: 1.5 * off });
   return parts;

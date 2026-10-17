@@ -14,6 +14,7 @@ import { cropRect, DEVICE_PLUME_LIFETIME_MIN, Simulation } from './Simulation';
 import { activePlan, allowedKinds, estimateSprayLiters, usesSprayZones } from './Treatment';
 import { estimatePlanCost } from './PlanCost';
 import { productLimitL } from './Drone';
+import { sprayerSettings } from './Groomba';
 import { scentDrift } from './Wind';
 
 export interface ScorePart {
@@ -80,7 +81,7 @@ export function knowledgePests(settings: Settings, knowledge: Knowledge, n: numb
 export function planWithinLimits(plan: TreatmentPlan, settings: Settings): boolean {
   const eff = activePlan(plan, settings.treatment);
   const map = { x: 0, y: 0, w: settings.field.width, h: settings.field.height };
-  const liters = estimateSprayLiters(eff.sprayZones, map, settings.drone);
+  const liters = estimateSprayLiters(eff.sprayZones, map, sprayerSettings(settings));
   if (liters > productLimitL(settings.drone) + 1e-6) return false;
   if (eff.devices.length > settings.devices.maxDevices) return false;
   return withinBudget(eff, settings);
@@ -383,7 +384,7 @@ export class Optimizer {
     const affordable = this.worstBlocks(this.blocks.length).length;
     if (this.zonesFit([crop])) add('Whole field', [crop]);
     else add(`As much as the product allows (worst ${affordable} areas first)`, this.zonesFor(this.worstBlocks(affordable)));
-    const border = Math.max(this.settings.drone.swathM * 2, 8);
+    const border = Math.max(sprayerSettings(this.settings).swathM * 2, 8);
     const strips = [
       { x: crop.x, y: crop.y, w: crop.w, h: border },
       { x: crop.x, y: crop.y + crop.h - border, w: crop.w, h: border },
@@ -619,7 +620,7 @@ export class Optimizer {
 
   private zonesFit(zones: Rect[]): boolean {
     const map = { x: 0, y: 0, w: this.settings.field.width, h: this.settings.field.height };
-    if (estimateSprayLiters(zones, map, this.settings.drone) > this.literLimit()) return false;
+    if (estimateSprayLiters(zones, map, sprayerSettings(this.settings)) > this.literLimit()) return false;
     return withinBudget({ sprayZones: zones, devices: [] }, this.settings);
   }
 

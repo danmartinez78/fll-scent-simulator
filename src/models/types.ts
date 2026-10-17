@@ -113,6 +113,25 @@ export interface DroneSettings {
   resprayEveryDays?: number;
 }
 
+/** Which machine sprays the spray and pesticide zones. */
+export type Sprayer = 'drone' | 'groomba';
+
+/** The groomba, a ground robot that sprays right onto the plants (see Groomba.ts). */
+export interface GroombaSettings {
+  /** Driving speed while working, meters per second. */
+  speed: number;
+  /** Width of the spray strip, meters. */
+  swathM: number;
+  /** How far the wind moves its spray, compared with the drone's (1 = the same). */
+  driftFactor: number;
+  /** Operating cost per minute of driving, dollars. */
+  costPerMin: number;
+  /** Spray tank, liters. */
+  tankL: number;
+  /** Hours of driving on one battery. */
+  batteryHours: number;
+}
+
 export interface DeviceSettings {
   /** Most slow-release devices the team can place. */
   maxDevices: number;
@@ -197,6 +216,10 @@ export interface Settings {
   weather?: WeatherSettings;
   /** Helpful insects. Missing (setups saved before they existed) = none. */
   helpers?: HelperSettings;
+  /** Which machine sprays (spray and pesticide only). Missing = the drone. */
+  sprayer?: Sprayer;
+  /** Groomba numbers. Missing = GROOMBA_REFERENCE. */
+  groomba?: GroombaSettings;
 }
 
 export interface DevicePlan {
