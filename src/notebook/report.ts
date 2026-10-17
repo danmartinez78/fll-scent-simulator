@@ -1,5 +1,6 @@
 import { compassName } from '../utils/geometry';
 import { formatMoney } from '../utils/units';
+import { compareChartHtml, runChartsHtml } from './reportCharts';
 import { ENTRY_FIELDS, methodName, summaryRows, type CapturedRun, type NotebookEntry } from './notebook';
 
 /** Short columns for the overview table and the spreadsheet. */
@@ -56,12 +57,17 @@ h1{color:#1f6f3c;margin:0 0 4px}h2{margin:28px 0 8px;color:#1f6f3c;border-bottom
 .note{background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:8px 12px;font-size:14px}
 table{border-collapse:collapse;width:100%;font-size:13.5px;margin:8px 0}th,td{border:1px solid #cbd5e1;padding:4px 8px;text-align:left;vertical-align:top}
 th{background:#f1f5f9}.overview td:first-child{font-weight:600}
-.entry{break-inside:avoid;page-break-inside:avoid}.cols{display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start}
+.cols,.chart-block,.compare-chart{break-inside:avoid;page-break-inside:avoid}.cols{display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start}
 .notes p{margin:4px 0}.notes strong{display:block;font-size:12px;color:#64748b;text-transform:uppercase;letter-spacing:.4px;margin-top:8px}
 .snap{width:100%;border:1px solid #cbd5e1;border-radius:6px}.muted{color:#94a3b8}
 .actions{margin:12px 0}.actions button{font:inherit;padding:6px 14px;border-radius:8px;border:1px solid #1f6f3c;background:#2f8f4e;color:#fff;cursor:pointer}
-@media (max-width:700px){.cols{grid-template-columns:1fr}}
-@media print{.actions{display:none}body{padding:0}}
+.charts{display:grid;grid-template-columns:1fr 1fr;gap:10px 16px;margin-top:12px}.compare-chart{max-width:560px;margin:12px 0}h3{font-size:15px;margin:16px 0 0;color:#334155}
+.chart{margin:0;border:1px solid #e2e8f0;border-radius:6px;padding:6px 8px}.chart figcaption{font-weight:600;font-size:13px;margin-bottom:2px}
+.chart svg{width:100%;height:auto;display:block}.chart text{font-size:10px;fill:#64748b}.chart .grid{stroke:#e2e8f0}.chart .marker{stroke:#475569;stroke-dasharray:4 3}
+.chart .rain{fill:#bfdbfe;opacity:.7}.legend{display:flex;flex-wrap:wrap;gap:2px 10px;font-size:11.5px;color:#475569}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:4px;vertical-align:-1px}.legend .rain-key{background:#bfdbfe}
+@media (max-width:700px){.cols,.charts{grid-template-columns:1fr}}
+@media print{.actions{display:none}body{padding:0}.entry{break-before:page}h2,h3{break-after:avoid}*{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
 `;
 
 /** A self-contained HTML report a coach can open, print or save. */
@@ -85,7 +91,9 @@ export function notebookReportHtml(entries: NotebookEntry[], now = new Date()): 
             .map(([k, v]) => `<tr><td>${esc(k)}</td><td>${esc(v)}</td></tr>`)
             .join('')}</tbody></table>`
         : '<p class="muted">No run saved for this experiment.</p>';
-      return `<section class="entry"><h2>${esc(e.name)}</h2><div class="cols"><div class="notes">${notes}</div><div>${results}</div></div></section>`;
+      const chartGrid = e.captured ? runChartsHtml(e.captured.charts) : '';
+      const charts = chartGrid && `<div class="chart-block"><h3>Charts for ${esc(e.name)}</h3>${chartGrid}</div>`;
+      return `<section class="entry"><h2>${esc(e.name)}</h2><div class="cols"><div class="notes">${notes}</div><div>${results}</div></div>${charts}</section>`;
     })
     .join('');
 
@@ -100,6 +108,7 @@ export function notebookReportHtml(entries: NotebookEntry[], now = new Date()): 
 <p class="note">⚠️ This is a simplified educational simulation, not the real world. Real insect behavior, scent movement, weather, crops and drones are much more complicated, so these numbers do not predict how a real product or method would perform.</p>
 <h2>Overview</h2>
 ${overviewTable}
+${compareChartHtml(withResults.map((e) => ({ name: e.name, charts: e.captured!.charts })), esc)}
 ${sections}
 </body></html>
 `;

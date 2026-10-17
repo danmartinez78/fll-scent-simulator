@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { captureRun, newEntry } from '../src/notebook/notebook';
+import { CHART_POINTS, captureRun, newEntry } from '../src/notebook/notebook';
 import { notebookCsv, notebookReportHtml } from '../src/notebook/report';
 import { Simulation } from '../src/simulation/Simulation';
 import { getScenario } from '../src/simulation/scenarios';
@@ -38,5 +38,26 @@ describe('notebook report', () => {
     const html = notebookReportHtml([good, bad]);
     expect(html.match(/<img /g)).toHaveLength(1);
     expect(html).not.toContain('javascript:');
+  });
+
+  it('draws the four Results charts for each saved run, and a comparison when there are two', () => {
+    const [run, notes] = sampleEntries();
+    expect(run.captured!.charts!.days.length).toBeGreaterThan(1);
+    expect(run.captured!.charts!.days.length).toBeLessThanOrEqual(CHART_POINTS + 1);
+    const one = notebookReportHtml([run, notes]);
+    expect(one.match(/<figure class="chart">/g)).toHaveLength(4);
+    expect(one).not.toContain('Crop damaged in each experiment');
+    const two = notebookReportHtml([run, { ...run, id: 'b', name: 'Experiment 1B' }]);
+    expect(two.match(/<figure class="chart">/g)).toHaveLength(9);
+    expect(two).toContain('Crop damaged in each experiment');
+  });
+
+  it('skips charts from older saves or tampered files', () => {
+    const [run] = sampleEntries();
+    const old = { ...run, captured: { ...run.captured!, charts: undefined } };
+    const bad = { ...run, id: 'x', captured: { ...run.captured!, charts: { ...run.captured!.charts!, crop: ['"/><script>'] } as never } };
+    const html = notebookReportHtml([old, bad]);
+    expect(html).not.toContain('<figure class="chart">');
+    expect(html).not.toContain('<script>');
   });
 });
