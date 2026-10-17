@@ -130,3 +130,43 @@ export function estimateSprayLiters(zones: Rect[], map: Rect, drone: DroneSettin
 export function deviceActive(d: DeviceState, timeSec: number, lifetimeMin: number): boolean {
   return d.activatedAt !== null && timeSec >= d.activatedAt && timeSec - d.activatedAt < lifetimeMin * 60;
 }
+
+/** How much of the crop a plan's scent reaches on paper, before wind and fading. */
+export interface PlanCoverage {
+  /** Percent of the crop inside at least one spray zone or repellent device circle. */
+  coveredPct: number;
+  /**
+   * Percent of the devices' circles (inside the crop) that land on crop another
+   * repellent circle already covers. 0 for spray, or with fewer than two devices.
+   */
+  overlapPct: number;
+}
+
+/**
+ * Share of the crop a plan covers in still air: inside a spray zone, or within
+ * the effective range of a repellent device. Checked on a 2 m grid, so it is
+ * quick enough to show while students plan.
+ */
+export function planCoverage(plan: TreatmentPlan, crop: Rect, rangeM: number): PlanCoverage {
+  const step = 2;
+  const repellers = plan.devices.filter((d) => d.kind === 'repellent');
+  const r2 = rangeM * rangeM;
+  let points = 0;
+  let covered = 0;
+  let deviceCovered = 0;
+  let circleHits = 0;
+  for (let y = crop.y + step / 2; y < crop.y + crop.h; y += step) {
+    for (let x = crop.x + step / 2; x < crop.x + crop.w; x += step) {
+      points++;
+      let hits = 0;
+      for (const d of repellers) if ((x - d.x) ** 2 + (y - d.y) ** 2 <= r2) hits++;
+      circleHits += hits;
+      if (hits > 0) deviceCovered++;
+      if (hits > 0 || plan.sprayZones.some((z) => x >= z.x && x <= z.x + z.w && y >= z.y && y <= z.y + z.h)) covered++;
+    }
+  }
+  return {
+    coveredPct: points ? (covered / points) * 100 : 0,
+    overlapPct: repellers.length > 1 && circleHits > 0 ? (1 - deviceCovered / circleHits) * 100 : 0
+  };
+}

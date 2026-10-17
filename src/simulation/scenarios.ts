@@ -51,6 +51,19 @@ export const SCENARIOS: Scenario[] = [
     plan: emptyPlan()
   },
   {
+    id: 'sprayVsDevices',
+    name: 'Spray or Devices?',
+    purpose:
+      'Spray the field with the drone, or drop up to 12 slow-release devices. Run both and compare how much crop each one saves, and what it costs.',
+    question: 'Can 12 devices protect as much crop as spraying? Which plan costs less?',
+    settings: settingsWith({
+      treatment: 'spray',
+      drone: { productAvailableGal: 30 },
+      devices: { maxDevices: 12 }
+    }),
+    plan: emptyPlan()
+  },
+  {
     id: 'windy',
     name: 'Windy Field',
     purpose: 'Watch how a steady crosswind carries scent across the field.',

@@ -61,8 +61,18 @@ export function droneStatus(sim: Simulation, detailed = true): string {
 function tipsFor(s: Settings, sim: Simulation): string[] {
   const tips: string[] = [];
   if (s.treatment === 'none') tips.push('No treatment is your baseline: it shows what happens naturally.');
-  if (s.treatment === 'spray') tips.push('Spray acts right away, but the scent drifts and fades over time.');
-  if (s.treatment === 'slowRelease') tips.push('A slow-release source stays in one place but can remain active longer.');
+  if (s.treatment === 'spray') {
+    tips.push('Spray coats the plants right away, then wears off over about a week. Watch the purple fade.');
+    tips.push('After the run, check the chart: when does scent coverage start to drop, and what do the pests do then?');
+    if ((s.drone.resprayEveryDays ?? 0) === 0) tips.push('This plan sprays only once. What would spraying again every week change, and what would it cost?');
+  }
+  if (s.treatment === 'slowRelease' || s.treatment === 'pushPull') {
+    tips.push('Each device only protects the dashed circle around it. Where are the gaps between circles?');
+    tips.push('Watch where the pests go. Do they leave the field, or just move to a spot with no scent?');
+  }
+  if (s.treatment === 'slowRelease') tips.push('Devices keep giving off scent for weeks. A spray wears off in about a week. Which matters more here?');
+  if ((s.treatment === 'slowRelease' || s.treatment === 'pushPull') && s.wind.speedMph > 0)
+    tips.push('Wind pushes each device\'s scent downwind. Does a device protect more crop upwind or downwind of it?');
   if (s.treatment === 'pushPull') tips.push('Push-pull: the repellent pushes pests off the crop while the attractant pulls them somewhere else.');
   if (s.wind.speedMph > 0) tips.push('Wind can carry scent farther in one direction.');
   if (s.wind.speedMph >= 12) tips.push('Strong wind carries scent far, but it also spreads it thin.');

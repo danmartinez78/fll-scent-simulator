@@ -1,6 +1,6 @@
 import type { Scenario, Settings, TreatmentPlan } from '../models/types';
 import type { Simulation } from '../simulation/Simulation';
-import { ENTRY_FIELDS, methodName, type NotebookEntry } from '../notebook/notebook';
+import { describeChanges, ENTRY_FIELDS, methodName, type NotebookEntry } from '../notebook/notebook';
 import { activePlan } from '../simulation/Treatment';
 import { formatFieldClock } from '../utils/fieldTime';
 import { ReportButtons } from './ReportButtons';
@@ -101,6 +101,7 @@ export function GuidedPanel(p: Props) {
 const MISSION_INFO: Record<string, { icon: string; level: number }> = {
   basic: { icon: '🌱', level: 1 },
   baseline: { icon: '📏', level: 1 },
+  sprayVsDevices: { icon: '⚖️', level: 2 },
   windy: { icon: '🌬️', level: 2 },
   hotspots: { icon: '🎯', level: 2 },
   limited: { icon: '🧴', level: 2 },
@@ -365,6 +366,52 @@ function RunsTable({ scenario, entries, sim, saved, settings }: Props) {
   );
 }
 
+/**
+ * What changed since the previous run on this mission, and how the results
+ * moved, so students can check they changed one thing at a time.
+ */
+function ChangeCheck({ scenario, entries, sim, saved, activeEntryId }: Props) {
+  const mine = entries.filter((e) => e.captured && e.captured.scenarioName === scenario.name);
+  const current = saved ? mine.find((e) => e.id === activeEntryId) : undefined;
+  const before = current ? mine.slice(0, mine.indexOf(current)) : mine;
+  const prev = before[before.length - 1];
+  if (!prev?.captured) return null;
+  const now = current?.captured ?? { settings: sim.settings, plan: sim.plan, metrics: sim.metrics() };
+  const changes = describeChanges(prev.captured, now);
+  const crop0 = prev.captured.metrics.cropProtectedPct;
+  const crop1 = now.metrics.cropProtectedPct;
+  const diff = Math.round(crop1) - Math.round(crop0);
+  const costDiff = now.metrics.cost.total - prev.captured.metrics.cost.total;
+  return (
+    <div className={`change-check ${changes.length > 1 ? 'warn' : ''}`}>
+      <h3 className="runs-title">🔬 What did you change since {prev.name}?</h3>
+      {changes.length === 0 ? (
+        <p className="hint small">
+          Nothing! With the same setup, the simulator gives the same result every time. Change one thing to test an idea.
+        </p>
+      ) : (
+        <>
+          <ul className="change-list">
+            {changes.map((c) => (
+              <li key={c}>{c}</li>
+            ))}
+          </ul>
+          <p className="hint small">
+            Crop safe went from <strong>{crop0.toFixed(0)}%</strong> to <strong>{crop1.toFixed(0)}%</strong> (
+            {diff > 0 ? `+${diff}` : diff}) and the cost {costDiff >= 0 ? 'went up' : 'went down'} by{' '}
+            <strong>{formatMoney(Math.abs(costDiff))}</strong>.
+          </p>
+          <p className="hint small">
+            {changes.length === 1
+              ? '✅ You changed one thing, so that change is what made the difference. That is a fair test!'
+              : `⚠️ You changed ${changes.length} things at once. It is hard to tell which one made the difference. Next time, try changing just one.`}
+          </p>
+        </>
+      )}
+    </div>
+  );
+}
+
 function guessVerdict(guess: number, actual: number): string {
   const off = Math.abs(guess - actual);
   if (off <= 5) return '🎯 Right on!';
@@ -400,6 +447,7 @@ function CompareStep(p: Props) {
       ) : (
         <>
           {tableFirst && <RunsTable {...p} />}
+          {tableFirst && <ChangeCheck {...p} />}
           {tableFirst && <h3 className="runs-title">This run in detail</h3>}
           <ResultsPanel sim={p.sim} onSave={p.onSave} saved={p.saved} />
         </>

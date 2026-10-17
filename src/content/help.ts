@@ -87,6 +87,14 @@ export const HELP: Record<string, HelpTopic> = {
     title: 'Two clocks',
     text: 'While a drone is flying, the clock runs in real time, so flight times are real minutes. When the drone is on the ground, the field runs as a time-lapse: at 1x, one second on screen is about four hours on the farm. Pests, crop damage and fading scent take days, just like on a real farm.'
   },
+  sprayVsDevices: {
+    title: 'Spray or devices?',
+    text: 'Spray covers every spot you draw, all at once, but it wears off over about a week, so you may need to spray again. A slow-release device keeps working for weeks, but only protects the circle around it, and you only have so many. Which one wins depends on how big the field is, where the pests are, the wind and your budget. Try both and compare!'
+  },
+  planCoverage: {
+    title: 'How much crop your plan covers',
+    text: 'This counts how much of the crop is inside a spray zone or a repellent circle, before anything happens. It is only a first guess: wind moves scent, spray wears off, and some pests ignore scent. Run it to see what really happens.'
+  },
   scentRange: {
     title: 'Effective range',
     text: 'How far from a slow-release device pests can notice its scent. A longer range means each device gives off more scent to fill a bigger circle, so fewer devices can cover the field.'

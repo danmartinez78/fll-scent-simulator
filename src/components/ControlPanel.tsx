@@ -2,7 +2,7 @@ import type { PestDistribution, Scenario, Settings, TreatmentMethod, TreatmentPl
 import { formatModelMin, modelMinToDays, TIME_LAPSE } from '../utils/fieldTime';
 import { cropRect } from '../simulation/Simulation';
 import { devicesPerTrip } from '../simulation/Drone';
-import { activePlan, estimateSprayLiters } from '../simulation/Treatment';
+import { activePlan, estimateSprayLiters, planCoverage } from '../simulation/Treatment';
 import { parseScenario } from '../simulation/scenarios';
 import { compassLabel, compassName } from '../utils/geometry';
 import { galToL, lToGal, m2ToAcres } from '../utils/units';
@@ -65,6 +65,9 @@ export function ControlPanel({ settings: s, plan, tool, simStarted, scenario, on
 
   const eff = activePlan(plan, s.treatment);
   const crop = cropRect(s.field);
+  // Still-air estimate of how much crop the plan reaches, so students can see gaps and overlaps.
+  const coverage = planCoverage(eff, crop, s.scent.rangeM);
+  const repellentCount = eff.devices.filter((d) => d.kind === 'repellent').length;
   const map = { x: 0, y: 0, w: s.field.width, h: s.field.height };
   const planLiters = estimateSprayLiters(eff.sprayZones, map, s.drone);
   const stockL = galToL(s.drone.productAvailableGal);
@@ -131,6 +134,12 @@ export function ControlPanel({ settings: s, plan, tool, simStarted, scenario, on
             </div>
           )}
 
+          {s.treatment !== 'none' && (
+            <p className="hint small">
+              Spray or devices? They protect the crop in different ways. <InfoButton topic="sprayVsDevices" />
+            </p>
+          )}
+
           {s.treatment === 'none' && (
             <p className="hint">Baseline: nothing is done. Run this first so you have something to compare treatments against.</p>
           )}
@@ -192,6 +201,11 @@ export function ControlPanel({ settings: s, plan, tool, simStarted, scenario, on
                 {s.drone.productAvailableGal} gal available
                 {totalLiters > stockL && ' — not enough product for all of it!'}
               </p>
+              {eff.sprayZones.length > 0 && (
+                <p className="plan-summary">
+                  Your zones cover about {coverage.coveredPct.toFixed(0)}% of the crop. <InfoButton topic="planCoverage" />
+                </p>
+              )}
             </>
           )}
 
@@ -231,6 +245,14 @@ export function ControlPanel({ settings: s, plan, tool, simStarted, scenario, on
                     : ` · the drone will fly them out in ${trips} trip${trips === 1 ? '' : 's'} (${perTrip} per trip)`
                   : ' · placed by hand at the start'}
               </p>
+              {repellentCount > 0 && (
+                <p className="plan-summary">
+                  The dashed circles show how far each repellent reaches ({s.scent.rangeM} m). Together they cover about{' '}
+                  {coverage.coveredPct.toFixed(0)}% of the crop in still air. <InfoButton topic="planCoverage" />
+                  {coverage.overlapPct >= 20 && ' Some circles overlap, so those devices protect the same spot twice.'}
+                  {s.wind.speedMph > 0 && ' Wind will push each scent patch downwind.'}
+                </p>
+              )}
             </>
           )}
         </Section>

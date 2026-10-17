@@ -224,6 +224,22 @@ export function drawScene(ctx: CanvasRenderingContext2D, sim: Simulation, o: Dra
   ctx.textBaseline = 'middle';
   ctx.fillText('H', sim.home.x, sim.home.y + pr * 0.05);
 
+  // How far each device's scent reaches in still air (its effective range),
+  // so students can see gaps and overlaps while they plan.
+  const reach = sim.settings.scent.rangeM;
+  ctx.lineWidth = 1.2 / s;
+  ctx.setLineDash([4 / s, 3 / s]);
+  for (const dev of sim.devices) {
+    const col = dev.kind === 'repellent' ? COLORS.repellent : COLORS.attractant;
+    ctx.strokeStyle = `rgba(${col[0] * 0.7},${col[1] * 0.7},${col[2] * 0.7},0.7)`;
+    ctx.fillStyle = `rgba(${col[0]},${col[1]},${col[2]},0.06)`;
+    ctx.beginPath();
+    ctx.arc(dev.x, dev.y, reach, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+  }
+  ctx.setLineDash([]);
+
   // Devices
   const lifetime = sim.settings.devices.lifetimeMin;
   for (const dev of sim.devices) {

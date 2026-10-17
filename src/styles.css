@@ -1844,3 +1844,24 @@ textarea {
     flex-direction: column;
   }
 }
+
+/* Guided Compare: what changed since the last run */
+.change-check {
+  margin-top: 12px;
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  border-radius: 10px;
+  padding: 8px 10px;
+}
+.change-check.warn {
+  background: #fff7ed;
+  border-color: #fed7aa;
+}
+.change-list {
+  margin: 0 0 6px;
+  padding-left: 20px;
+  font-size: 13.5px;
+}
+.change-check .hint {
+  margin: 4px 0;
+}
