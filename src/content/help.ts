@@ -91,6 +91,22 @@ export const HELP: Record<string, HelpTopic> = {
     title: 'Rain',
     text: 'Rain washes most of the sprayed scent off the leaves (about 70% each time it rains), and the drone cannot fly or spray in the rain, so it waits at home. Slow-release devices keep their scent inside, so they keep working, though their scent cloud is thinner while it rains. The forecast here is always right; real forecasts are not.'
   },
+  biodiversity: {
+    title: 'Biodiversity',
+    text: 'The variety of living things in a place. A healthy field has many kinds of insects, not just pests: bees pollinate the crops, and ladybugs and other predators eat pests. Killing insects, even pests, makes a field less diverse and can make pest problems worse later.'
+  },
+  helpfulInsects: {
+    title: 'Helpful insects',
+    text: 'Bees (yellow dots) and ladybugs (red dots) live in and around the field. Ladybugs eat pests for free. Scents do not hurt them. Pesticide kills them, and sticky traps catch a few by accident.'
+  },
+  insectsKilled: {
+    title: 'Insects killed',
+    text: 'Every insect a plan kills: pests caught in traps or killed by pesticide, plus bees and ladybugs. Pests eaten by ladybugs are nature at work, so they are not counted. The goal is to protect the crop while killing as few insects as possible, especially helpful ones.'
+  },
+  pesticide: {
+    title: 'Pesticide',
+    text: 'A spray that kills the insects it touches. It works on pests that ignore scents, except a few that have become resistant. It also kills bees and ladybugs, and with the ladybugs gone, pests that arrive later have nothing eating them. It wears off over a few days.'
+  },
   budget: {
     title: 'Budget',
     text: 'The money the team has for the whole season: drone flying time, scent product and devices all come out of it. The plan shows what it will cost before you run it. If the money runs out, the drone flies home and the rest of the plan does not happen. With a budget, the question is not just what works, but what works best for the money.'

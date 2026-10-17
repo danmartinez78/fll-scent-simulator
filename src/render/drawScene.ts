@@ -2,6 +2,9 @@ import type { Rect, SurveyResult, Vec, ViewOptions } from '../models/types';
 import { AFFECTED_DAMAGE, type Simulation } from '../simulation/Simulation';
 import { SURVEY_DRONE } from '../simulation/Survey';
 import { deviceActive, deviceReachM } from '../simulation/Treatment';
+import { BEE, LADYBUG } from '../simulation/Helpers';
+import { FATE_POISONED } from '../simulation/Pest';
+import { PESTICIDE_RULES } from '../simulation/Pesticide';
 import { scentDrift, windDirectionAt } from '../simulation/Wind';
 import { compassLabel } from '../utils/geometry';
 
@@ -30,6 +33,12 @@ export const COLORS = {
   damage: [150, 105, 50] as const,
   repellent: [128, 70, 214] as const,
   attractant: [240, 150, 20] as const,
+  /** Pesticide on the plants: a bright warning yellow that stands out on the green crop. */
+  pesticide: [234, 214, 0] as const,
+  bee: '#facc15',
+  ladybug: '#dc2626',
+  /** Marks where an insect was killed. */
+  dead: '#111827',
   pest: '#2b2118',
   pestAgitated: '#c2410c',
   /** Pests that ignore scent (shown only when a treatment is in use). */
@@ -133,11 +142,13 @@ export function drawScene(ctx: CanvasRenderingContext2D, sim: Simulation, o: Dra
 
   // Scent clouds
   if (o.view.showScent) {
-    const th = sim.settings.scent.threshold;
-    for (const [key, f, color] of [
-      ['rep', sim.repellent, COLORS.repellent],
-      ['att', sim.attractant, COLORS.attractant]
+    const scentTh = sim.settings.scent.threshold;
+    for (const [key, f, color, th] of [
+      ['rep', sim.repellent, COLORS.repellent, scentTh],
+      ['att', sim.attractant, COLORS.attractant, scentTh],
+      ['pst', sim.pesticide, COLORS.pesticide, PESTICIDE_RULES.lethal]
     ] as const) {
+      if (f.empty) continue;
       const c = layerCanvas(key, f.cols, f.rows);
       const g = c.getContext('2d')!;
       const img = g.createImageData(f.cols, f.rows);
@@ -267,6 +278,9 @@ export function drawScene(ctx: CanvasRenderingContext2D, sim: Simulation, o: Dra
     ctx.fillText(dev.kind === 'repellent' ? 'R' : 'A', dev.x, dev.y + r * 0.05);
     ctx.globalAlpha = 1;
   }
+
+  // Helpful insects: bees and ladybugs, and a small × where one was killed.
+  drawHelpers(ctx, sim, s);
 
   // Pests
   if (o.view.showPests) {
@@ -447,6 +461,52 @@ function drawWindStreaks(ctx: CanvasRenderingContext2D, sim: Simulation, clock: 
     ctx.moveTo(st.x, st.y);
     ctx.lineTo(st.x - ux * len, st.y - uy * len);
   }
+  ctx.stroke();
+}
+
+/** Bees (yellow) and ladybugs (red), plus × marks where insects were killed. */
+function drawHelpers(ctx: CanvasRenderingContext2D, sim: Simulation, s: number): void {
+  const h = sim.helpers;
+  const r = Math.max(0.7, 2 / s);
+  for (const [kind, color] of [
+    [BEE, COLORS.bee],
+    [LADYBUG, COLORS.ladybug]
+  ] as const) {
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    for (let i = 0; i < h.n; i++) {
+      if (h.died[i] || h.kind[i] !== kind) continue;
+      ctx.moveTo(h.x[i] + r, h.y[i]);
+      ctx.arc(h.x[i], h.y[i], r, 0, Math.PI * 2);
+    }
+    ctx.fill();
+  }
+  ctx.strokeStyle = 'rgba(17,24,39,0.55)';
+  ctx.lineWidth = 0.6 / s;
+  ctx.beginPath();
+  for (let i = 0; i < h.n; i++) {
+    if (h.died[i]) continue;
+    ctx.moveTo(h.x[i] + r, h.y[i]);
+    ctx.arc(h.x[i], h.y[i], r, 0, Math.PI * 2);
+  }
+  ctx.stroke();
+  // Killed insects: helpful ones where they fell, and pests killed by pesticide.
+  const m = Math.max(0.8, 2.2 / s);
+  const cross = (x: number, y: number) => {
+    ctx.moveTo(x - m, y - m);
+    ctx.lineTo(x + m, y + m);
+    ctx.moveTo(x + m, y - m);
+    ctx.lineTo(x - m, y + m);
+  };
+  ctx.lineWidth = 1.2 / s;
+  ctx.strokeStyle = COLORS.ladybug;
+  ctx.beginPath();
+  for (let i = 0; i < h.n; i++) if (h.died[i]) cross(h.x[i], h.y[i]);
+  ctx.stroke();
+  ctx.strokeStyle = 'rgba(17,24,39,0.6)';
+  ctx.beginPath();
+  const p = sim.pests;
+  for (let i = 0; i < p.n; i++) if (p.fate[i] === FATE_POISONED) cross(p.x[i], p.y[i]);
   ctx.stroke();
 }
 

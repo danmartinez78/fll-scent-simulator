@@ -19,7 +19,7 @@ function Card({ icon, label, value, sub, info, tone }: { icon: string; label: st
   );
 }
 
-type ChartKind = 'pests' | 'product' | 'scent';
+type ChartKind = 'pests' | 'insects' | 'product' | 'scent';
 
 export function ResultsPanel({ sim, onSave, saved }: { sim: Simulation; onSave: () => void; saved?: string | null }) {
   const m = sim.metrics();
@@ -28,6 +28,7 @@ export function ResultsPanel({ sim, onSave, saved }: { sim: Simulation; onSave: 
   const xs = sim.history.map((h) => modelToFieldSec(h.t) / 86400);
   const treat = sim.settings.treatment;
   const treatStartDay = treat === 'none' ? 0 : sim.treatStartFieldSec / 86400;
+  const killed = (m.pestsKilled ?? 0) + (m.helpersKilled ?? 0);
   // Rain, as shaded bands on the charts (x is in farm days).
   const rainBands = sim.rains.map((r) => ({ from: r.start / 86400, to: r.end / 86400, label: '🌧' }));
   return (
@@ -49,6 +50,24 @@ export function ResultsPanel({ sim, onSave, saved }: { sim: Simulation; onSave: 
           value={formatMoney(m.cost.total)}
           sub={`${sim.settings.cost.budget ? `of your ${formatMoney(sim.settings.cost.budget)} budget${sim.drone.outOfBudget ? ' (used up)' : ''} · ` : ''}drone flying ${formatMoney(m.cost.application)} · product ${formatMoney(m.cost.material)} · devices ${formatMoney(m.cost.devices)}`}
         />
+        <Card
+          icon="🪲"
+          label="Insects killed"
+          info="insectsKilled"
+          value={String(killed)}
+          sub={`${m.pestsKilled ?? 0} pests (${m.pestsTrapped} trapped${m.pestsPoisoned ? `, ${m.pestsPoisoned} poisoned` : ''}) · ${m.helpersKilled ?? 0} bees and ladybugs`}
+          tone={m.helpersKilled ? 'bad' : ''}
+        />
+        {(m.helpersTotal ?? 0) > 0 && (
+          <Card
+            icon="🐝"
+            label="Helpful insects alive"
+            info="helpfulInsects"
+            value={`${(m.helpersAlivePct ?? 100).toFixed(0)}%`}
+            sub={`${m.helpersAlive} of ${m.helpersTotal} bees and ladybugs · ladybugs ate ${m.pestsEaten ?? 0} pests`}
+            tone={(m.helpersAlivePct ?? 100) < 90 ? 'bad' : 'good'}
+          />
+        )}
       </div>
       <button className="link-btn" aria-expanded={more} onClick={() => setMore((x) => !x)}>
         {more ? '▾ Fewer numbers' : '▸ More numbers'}
@@ -67,6 +86,7 @@ export function ResultsPanel({ sim, onSave, saved }: { sim: Simulation; onSave: 
         {(
           [
             ['pests', 'Pests & crop'],
+            ['insects', 'Insects'],
             ['scent', 'Scent'],
             ['product', 'Product used']
           ] as Array<[ChartKind, string]>
@@ -97,6 +117,20 @@ export function ResultsPanel({ sim, onSave, saved }: { sim: Simulation; onSave: 
           Pests don't all show up on Day 1. They fly in over the first days. The gray line is how many have arrived so far, out of all the
           pests in this run. The gap between gray and orange is pests that are in the field but kept off the crop.
         </p>
+      )}
+      {chart === 'insects' && (
+        <LineChart
+          xs={xs}
+          xLabel="days"
+          bands={rainBands}
+          yMax={100}
+          yLabel="%"
+          marker={treatStartDay > 0 ? { x: treatStartDay, label: 'treatment starts' } : undefined}
+          series={[
+            { label: 'Helpful insects alive', color: '#ca8a04', values: sim.history.map((h) => h.helpersAlivePct ?? 100) },
+            { label: 'Pests killed by people', color: '#111827', values: sim.history.map((h) => h.pestsKilledPct ?? 0) }
+          ]}
+        />
       )}
       {chart === 'scent' && (
         <LineChart xs={xs} xLabel="days"

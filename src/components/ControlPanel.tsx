@@ -3,7 +3,7 @@ import type { PestDistribution, Scenario, Settings, TreatmentMethod, TreatmentPl
 import { formatModelMin, TIME_LAPSE } from '../utils/fieldTime';
 import { cropRect } from '../simulation/Simulation';
 import { devicesPerTrip, productLimitL } from '../simulation/Drone';
-import { activePlan, ATTRACTANT_REACH_FACTOR, estimateSprayLiters, planCoverage } from '../simulation/Treatment';
+import { activePlan, ATTRACTANT_REACH_FACTOR, estimateSprayLiters, planCoverage, usesSprayZones } from '../simulation/Treatment';
 import { parseScenario } from '../simulation/scenarios';
 import { compassLabel, compassName } from '../utils/geometry';
 import { formatMoney, lToGal, m2ToAcres } from '../utils/units';
@@ -32,7 +32,8 @@ const METHODS: Array<{ value: TreatmentMethod; label: string; icon: string; sub:
   { value: 'none', label: 'No treatment', icon: '🚫', sub: 'Do nothing, to compare' },
   { value: 'spray', label: 'Spray', icon: '💧', sub: 'Drone sprays scent on areas', info: 'spray' },
   { value: 'slowRelease', label: 'Slow-release', icon: '⏳', sub: 'Drop scent devices that last', info: 'slowRelease' },
-  { value: 'pushPull', label: 'Push-pull', icon: '↔️', sub: 'Push pests away, pull them to a trap', info: 'pushPull' }
+  { value: 'pushPull', label: 'Push-pull', icon: '↔️', sub: 'Push pests away, pull them to a trap', info: 'pushPull' },
+  { value: 'pesticide', label: 'Pesticide', icon: '☠️', sub: 'Kills pests, and helpful insects too', info: 'pesticide' }
 ];
 
 const DISTRIBUTIONS: Array<{ value: PestDistribution; label: string }> = [
@@ -98,7 +99,7 @@ export function ControlPanel({ settings: s, plan, tool, simStarted, scenario, on
 
   const chooseMethod = (m: TreatmentMethod) => {
     onSettings({ ...s, treatment: m });
-    onTool(m === 'spray' ? 'zone' : m === 'slowRelease' || m === 'pushPull' ? 'repellent' : 'none');
+    onTool(usesSprayZones(m) ? 'zone' : m === 'slowRelease' || m === 'pushPull' ? 'repellent' : 'none');
   };
 
   const border = Math.max(s.drone.swathM * 2, 8);
@@ -167,7 +168,13 @@ export function ControlPanel({ settings: s, plan, tool, simStarted, scenario, on
             <p className="hint">Baseline: nothing is done. Run this first so you have something to compare treatments against.</p>
           )}
 
-          {s.treatment === 'spray' && (
+          {s.treatment === 'pesticide' && (
+            <p className="pesticide-warn">
+              ☠️ Pesticide kills the pests it touches, but it also kills <strong>bees and ladybugs</strong>. Ladybugs eat pests for free,
+              so without them pests can come back. <InfoButton topic="pesticide" />
+            </p>
+          )}
+          {usesSprayZones(s.treatment) && (
             <>
               <p className="hint">
                 Drag on the map to draw spray zones. The drone flies back and forth over each zone. <InfoButton topic="spray" />
@@ -333,6 +340,15 @@ export function ControlPanel({ settings: s, plan, tool, simStarted, scenario, on
       {shows('pests') && (
         <Section title="Pests" icon="🐞" open={isOpen('pests')}>
           <Slider label="Number of pests" value={s.pests.count} min={50} max={1500} step={50} onChange={(v) => set('pests', { count: v })} />
+          <Slider
+            label="Helpful insects (bees and ladybugs)"
+            info="helpfulInsects"
+            value={s.helpers?.count ?? 0}
+            min={0}
+            max={300}
+            step={10}
+            onChange={(v) => set('helpers', { count: v, ladybugShare: s.helpers?.ladybugShare ?? 0.5 })}
+          />
           <Select label="Where they start" value={s.pests.distribution} options={DISTRIBUTIONS} onChange={(v) => set('pests', { distribution: v })} />
           {s.pests.distribution === 'hotspots' && (
             <Slider label="Number of hotspots" value={s.pests.hotspotCount} min={1} max={8} onChange={(v) => set('pests', { hotspotCount: v })} />

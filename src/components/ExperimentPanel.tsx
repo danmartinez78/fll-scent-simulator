@@ -22,7 +22,7 @@ export function droneStatus(sim: Simulation, detailed = true): string {
   const d = sim.drone;
   const mass = sim.settings.devices.massKg;
   const load =
-    sim.settings.treatment === 'spray'
+    sim.settings.treatment === 'spray' || sim.settings.treatment === 'pesticide'
       ? `tank ${lToGal(d.payloadL).toFixed(1)} gal`
       : d.devicesOnboard > 0
         ? `${d.devicesOnboard} device${d.devicesOnboard === 1 ? '' : 's'} on board`
@@ -82,6 +82,11 @@ function tipsFor(s: Settings, sim: Simulation): string[] {
   if (s.treatment === 'slowRelease') tips.push('Devices keep giving off scent for weeks. A spray of natural scent fades in a few days. Which matters more here?');
   if ((s.treatment === 'slowRelease' || s.treatment === 'pushPull') && s.wind.speedMph > 0)
     tips.push('Wind pushes each device\'s scent downwind. Does a device protect more crop upwind or downwind of it?');
+  if (s.treatment === 'pesticide') {
+    tips.push('Pesticide kills pests, but watch the bees and ladybugs too. Every × on the map is an insect that died.');
+    tips.push('Ladybugs eat pests for free. What happens to the pests after the pesticide kills the ladybugs?');
+  }
+  if (s.treatment !== 'none' && s.treatment !== 'pesticide') tips.push('Yellow dots are bees and red dots are ladybugs. Scents don\'t hurt them, and ladybugs eat pests.');
   if (s.treatment === 'pushPull') tips.push('Push-pull: the repellent pushes pests off the crop while the attractant pulls them somewhere else.');
   if (sim.rains.length) {
     tips.push('Rain washes most of the spray off the leaves. Devices keep their scent inside, so they keep working.');

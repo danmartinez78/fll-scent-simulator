@@ -57,10 +57,16 @@ export function zoneKey(z: Rect): string {
   return `${Math.round(z.x * 10)},${Math.round(z.y * 10)},${Math.round(z.w * 10)},${Math.round(z.h * 10)}`;
 }
 
+/** Methods where the drone sprays zones (scent spray or pesticide). */
+export function usesSprayZones(method: TreatmentMethod): boolean {
+  return method === 'spray' || method === 'pesticide';
+}
+
 /** Keep only the plan pieces the chosen treatment method uses. */
 export function activePlan(plan: TreatmentPlan, method: TreatmentMethod): TreatmentPlan {
   switch (method) {
     case 'spray':
+    case 'pesticide':
       return { sprayZones: plan.sprayZones, devices: [] };
     case 'slowRelease':
       return { sprayZones: [], devices: plan.devices.filter((d) => d.kind === 'repellent') };

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type MutableRefObject } from 'react';
 import type { Rect, Settings, SurveyResult, TreatmentPlan, Vec, ViewOptions } from '../models/types';
 import type { Simulation } from '../simulation/Simulation';
-import { activePlan, allowedKinds } from '../simulation/Treatment';
+import { activePlan, allowedKinds, usesSprayZones } from '../simulation/Treatment';
 import { computeViewport, drawScene, toWorld, type SurveyLayer, type Viewport } from '../render/drawScene';
 import { clamp, dist, inRect, rectFromPoints } from '../utils/geometry';
 import { ClickGuard, type Press } from './clickGuard';
@@ -183,7 +183,7 @@ export function SimulationCanvas(props: Props) {
     }
     if (!guardRef.current.down(pressOf(e), performance.now(), e.isPrimary && e.button === 0)) return;
     (e.target as Element).setPointerCapture(e.pointerId);
-    if (tool === 'zone' && settings.treatment === 'spray') {
+    if (tool === 'zone' && usesSprayZones(settings.treatment)) {
       const pt = worldPoint(e);
       dragRef.current = { start: pt, cur: pt };
     }

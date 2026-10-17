@@ -148,12 +148,16 @@ export function OptimizerPanel({ settings, plan, surveys, onSettings, onUsePlan 
           <br />− {w.material} × gallons used
           <br />− {w.flightTime} × minutes of flight
           <br />− {w.cost} × (cost ÷ $10)
+          <br />− {w.pestsKilled ?? 0} × pests killed (trapped or poisoned)
+          <br />− {w.helpersKilled ?? 0} × helpful insects killed (bees and ladybugs)
         </div>
         <Slider label="Crop protected" value={w.protection} min={0} max={3} step={0.1} onChange={(v) => setW('protection', v)} />
         <Slider label="Pests kept off crop" value={w.pestsDeterred} min={0} max={3} step={0.1} onChange={(v) => setW('pestsDeterred', v)} />
         <Slider label="Product used (penalty)" value={w.material} min={0} max={10} step={0.5} onChange={(v) => setW('material', v)} />
         <Slider label="Flight time (penalty)" value={w.flightTime} min={0} max={5} step={0.25} onChange={(v) => setW('flightTime', v)} />
         <Slider label="Cost (penalty)" value={w.cost} min={0} max={5} step={0.25} onChange={(v) => setW('cost', v)} />
+        <Slider label="Pests killed (penalty, each)" value={w.pestsKilled ?? 0} min={0} max={0.5} step={0.01} onChange={(v) => setW('pestsKilled', v)} />
+        <Slider label="Helpful insects killed (penalty, each)" value={w.helpersKilled ?? 0} min={0} max={5} step={0.1} onChange={(v) => setW('helpersKilled', v)} />
         <p className="hint small">Try making product very expensive in the score. Does the computer choose a different plan?</p>
       </details>
 

@@ -1,7 +1,7 @@
 // Shared data types. Everything here is plain data so it can be saved to
 // JSON (scenarios, notebook entries) and copied safely.
 
-export type TreatmentMethod = 'none' | 'spray' | 'slowRelease' | 'pushPull';
+export type TreatmentMethod = 'none' | 'spray' | 'slowRelease' | 'pushPull' | 'pesticide';
 
 export type PestDistribution = 'uniform' | 'hotspots' | 'edge' | 'scattered';
 
@@ -69,6 +69,14 @@ export interface ScentSettings {
    * ignore repellent and attractant, as some real insects do.
    */
   effectivenessPct: number;
+}
+
+/** Helpful insects that live in and around the field (see Helpers.ts). */
+export interface HelperSettings {
+  /** How many helpful insects (0 = none). */
+  count: number;
+  /** Share of them that are ladybugs, which eat pests (the rest are bees). Default 0.5. */
+  ladybugShare?: number;
 }
 
 export interface WeatherSettings {
@@ -157,6 +165,10 @@ export interface ScoreWeights {
   flightTime: number;
   /** Points lost per $10 of estimated cost. */
   cost: number;
+  /** Points lost per pest killed by people (trapped or poisoned). Missing = 0. */
+  pestsKilled?: number;
+  /** Points lost per helpful insect killed (bees and ladybugs). Missing = 0. */
+  helpersKilled?: number;
 }
 
 export interface RunSettings {
@@ -183,6 +195,8 @@ export interface Settings {
   run: RunSettings;
   /** Rain on the farm clock. Missing (setups saved before rain existed) = dry. */
   weather?: WeatherSettings;
+  /** Helpful insects. Missing (setups saved before they existed) = none. */
+  helpers?: HelperSettings;
 }
 
 export interface DevicePlan {
@@ -243,6 +257,18 @@ export interface Metrics {
   acresSprayed: number;
   scentCoveragePct: number;
   cost: CostBreakdown;
+  /** Pests killed by people: caught in traps plus killed by pesticide (missing in old saves). */
+  pestsKilled?: number;
+  /** Pests killed by pesticide. */
+  pestsPoisoned?: number;
+  /** Pests eaten by ladybugs (nature's own pest control). */
+  pestsEaten?: number;
+  /** Helpful insects at the start, still alive, and killed (missing in old saves). */
+  helpersTotal?: number;
+  helpersAlive?: number;
+  /** Percent of helpful insects still alive (100 when there are none). */
+  helpersAlivePct?: number;
+  helpersKilled?: number;
 }
 
 export interface CostBreakdown {
@@ -262,6 +288,10 @@ export interface HistoryPoint {
   cropAffectedPct: number;
   productUsedGal: number;
   scentCoveragePct: number;
+  /** Percent of helpful insects alive (missing in old saves). */
+  helpersAlivePct?: number;
+  /** Pests killed by people so far, as a percent of all pests (missing in old saves). */
+  pestsKilledPct?: number;
 }
 
 export type SurveyCategory = 'healthy' | 'possible' | 'high' | 'uncertain' | 'none';

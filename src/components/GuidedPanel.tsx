@@ -105,6 +105,7 @@ export function GuidedPanel(p: Props) {
 const MISSION_INFO: Record<string, { icon: string; level: number }> = {
   baseline: { icon: '📏', level: 1 },
   basic: { icon: '🌱', level: 1 },
+  critters: { icon: '🐞', level: 1 },
   sprayVsDevices: { icon: '⚖️', level: 2 },
   windy: { icon: '🌬️', level: 2 },
   rainy: { icon: '🌧️', level: 2 },
@@ -294,6 +295,15 @@ function BigNumbers({ sim }: { sim: Simulation }) {
         <span className="big-value">{formatMoney(m.cost.total)}</span>
         <span className="big-label">💲 cost</span>
       </div>
+      <div className={m.helpersKilled ? 'big-bad' : ''}>
+        <span className="big-value">{(m.pestsKilled ?? 0) + (m.helpersKilled ?? 0)}</span>
+        <span className="big-label">🪲 insects killed</span>
+        {(m.helpersTotal ?? 0) > 0 && (
+          <span className="big-sub">
+            🐝 {m.helpersKilled ?? 0} helpful · {(m.helpersAlivePct ?? 100).toFixed(0)}% alive
+          </span>
+        )}
+      </div>
     </div>
   );
 }
@@ -301,7 +311,7 @@ function BigNumbers({ sim }: { sim: Simulation }) {
 /** What the student still has to place on the map, or null when the plan has something in it. */
 function missingPlan(settings: Settings, plan: TreatmentPlan): string | null {
   const eff = activePlan(plan, settings.treatment);
-  if (settings.treatment === 'spray' && !eff.sprayZones.length) return 'spray zones';
+  if ((settings.treatment === 'spray' || settings.treatment === 'pesticide') && !eff.sprayZones.length) return 'spray zones';
   if ((settings.treatment === 'slowRelease' || settings.treatment === 'pushPull') && !eff.devices.length) return 'scent devices';
   return null;
 }
@@ -325,7 +335,9 @@ function RunStep({ sim, running, onStep, settings, plan }: Props) {
         {!sim.runStarted
           ? 'Press ▶ Run above the map to start.'
           : running
-            ? 'Watch the pests. Orange pests are bothered by repellent. Blue pests ignore the scent.'
+            ? settings.treatment === 'pesticide'
+              ? 'Watch the × marks: each one is an insect killed. A red × is a bee or ladybug.'
+              : 'Watch the pests. Orange pests are bothered by repellent. Blue pests ignore the scent. Red dots are ladybugs eating pests.'
             : 'Paused. Press ▶ Resume to keep going.'}
       </p>
       {!sim.runStarted && <p className="hint">Tip: 5x and 20x make the days go by faster.</p>}
@@ -345,6 +357,43 @@ function RunStep({ sim, running, onStep, settings, plan }: Props) {
         )
       )}
     </>
+  );
+}
+
+/** The cost to insect life: shown on every Compare, in plain words. */
+function InsectNote({ sim }: { sim: Simulation }) {
+  const m = sim.metrics();
+  const helpers = m.helpersKilled ?? 0;
+  const pests = m.pestsKilled ?? 0;
+  const total = m.helpersTotal ?? 0;
+  if (helpers > 0)
+    return (
+      <div className="insect-note bad">
+        <h3 className="runs-title">☠️ This plan killed {helpers} bees and ladybugs</h3>
+        <p className="hint small">
+          That is {Math.round((helpers / Math.max(1, total)) * 100)}% of the helpful insects in the field, plus {pests} pests. Bees pollinate crops,
+          and ladybugs eat pests for free. Who pollinates the crop next season, and who eats the pests now?
+        </p>
+      </div>
+    );
+  if (pests > 0)
+    return (
+      <div className="insect-note">
+        <h3 className="runs-title">🪲 This plan killed {pests} pests</h3>
+        <p className="hint small">
+          Traps protect the crop, but every pest they catch dies. Pests are part of nature too. Could fewer traps, or more repellent, protect
+          the crop as well?
+        </p>
+      </div>
+    );
+  return (
+    <div className="insect-note good">
+      <h3 className="runs-title">💚 No insects were killed</h3>
+      <p className="hint small">
+        Every bee and ladybug is still alive{m.pestsEaten ? `, and the ladybugs ate ${m.pestsEaten} pests for free` : ''}. Scents move pests
+        instead of killing them.
+      </p>
+    </div>
   );
 }
 
@@ -384,7 +433,7 @@ function SurveyReveal({ sim, surveyLayer, onSurveyLayer }: Props) {
  * saved yet, so the Compare step has something to compare against.
  */
 function RunsTable({ scenario, entries, sim, saved, settings }: Props) {
-  const rows: Array<{ key: string; name: string; method: string; crop: number; kept: number; cost: number; current: boolean }> = entries
+  const rows: Array<{ key: string; name: string; method: string; crop: number; kept: number; cost: number; killed: number | null; helpers: number | null; current: boolean }> = entries
     .filter((e) => e.captured && e.captured.scenarioName === scenario.name)
     .slice(-6)
     .map((e) => {
@@ -396,6 +445,8 @@ function RunsTable({ scenario, entries, sim, saved, settings }: Props) {
         crop: c.metrics.cropProtectedPct,
         kept: c.metrics.pestsDeterredAvgPct,
         cost: c.metrics.cost.total,
+        killed: c.metrics.pestsKilled === undefined ? null : c.metrics.pestsKilled + (c.metrics.helpersKilled ?? 0),
+        helpers: c.metrics.helpersKilled ?? null,
         current: !!saved && e.name === saved
       };
     });
@@ -408,6 +459,8 @@ function RunsTable({ scenario, entries, sim, saved, settings }: Props) {
       crop: m.cropProtectedPct,
       kept: m.pestsDeterredAvgPct,
       cost: m.cost.total,
+      killed: (m.pestsKilled ?? 0) + (m.helpersKilled ?? 0),
+      helpers: m.helpersKilled ?? 0,
       current: true
     });
   }
@@ -423,6 +476,7 @@ function RunsTable({ scenario, entries, sim, saved, settings }: Props) {
             <th scope="col">🌱 Crop safe</th>
             <th scope="col">🐞 Pests kept off (avg)</th>
             <th scope="col">💲 Cost</th>
+            <th scope="col">🪲 Insects killed</th>
           </tr>
         </thead>
         <tbody>
@@ -437,6 +491,10 @@ function RunsTable({ scenario, entries, sim, saved, settings }: Props) {
               </td>
               <td>{r.kept.toFixed(0)}%</td>
               <td>{formatMoney(r.cost)}</td>
+              <td className={r.helpers ? 'bad' : ''}>
+                {r.killed === null ? '—' : r.killed}
+                {r.helpers ? <span className="runs-method">🐝 {r.helpers} helpful</span> : null}
+              </td>
             </tr>
           ))}
         </tbody>
@@ -522,6 +580,7 @@ function CompareStep(p: Props) {
       )}
       {p.prediction.trim() && <p className="guided-question">You predicted: “{p.prediction.trim()}”</p>}
       {ran && p.scenario.view?.showPests === false && <SurveyReveal {...p} />}
+      {ran && <InsectNote sim={p.sim} />}
       {ran && p.guess !== null && (
         <div className="guess-result">
           <span>

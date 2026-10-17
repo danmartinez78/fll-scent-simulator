@@ -12,7 +12,8 @@ export function needsReset(current: Settings, next: Settings): boolean {
     current.pests.hotspotCount !== next.pests.hotspotCount ||
     (current.pests.buildUpDays ?? 0) !== (next.pests.buildUpDays ?? 0) ||
     current.run.seed !== next.run.seed ||
-    current.devices.deployByDrone !== next.devices.deployByDrone
+    current.devices.deployByDrone !== next.devices.deployByDrone ||
+    JSON.stringify(current.helpers ?? null) !== JSON.stringify(next.helpers ?? null)
   );
 }
 
@@ -29,6 +30,7 @@ export function liveSettings(current: Settings, next: Settings): Settings {
       buildUpDays: current.pests.buildUpDays
     },
     run: { ...next.run, seed: current.run.seed },
-    devices: { ...next.devices, deployByDrone: current.devices.deployByDrone }
+    devices: { ...next.devices, deployByDrone: current.devices.deployByDrone },
+    helpers: current.helpers
   };
 }

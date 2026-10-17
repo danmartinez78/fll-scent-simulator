@@ -3,7 +3,8 @@ import { settingsWith } from '../src/simulation/scenarios';
 import { AFFECTED_DAMAGE, BARE_DAMAGE_FACTOR, cropRect, Simulation } from '../src/simulation/Simulation';
 import type { DevicePlan } from '../src/models/types';
 
-const s = settingsWith({ treatment: 'pushPull', devices: { maxDevices: 4 } });
+// No helpful insects here: this checks lure behavior alone (ladybugs would eat some pests first).
+const s = settingsWith({ treatment: 'pushPull', devices: { maxDevices: 4 }, helpers: { count: 0 } });
 const c = cropRect(s.field);
 const border = [
   { x: c.x + c.w / 2, y: c.y - 10 },

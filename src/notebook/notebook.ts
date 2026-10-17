@@ -66,7 +66,8 @@ const METHOD_NAMES: Record<string, string> = {
   none: 'No treatment',
   spray: 'Spray',
   slowRelease: 'Slow-release devices',
-  pushPull: 'Push-pull'
+  pushPull: 'Push-pull',
+  pesticide: 'Pesticide'
 };
 
 export function methodName(m: string): string {
@@ -178,7 +179,11 @@ export function summaryRows(c: CapturedRun): Array<[string, string]> {
     ['Drone flight time', `${m.flightTimeMin.toFixed(1)} min`],
     ['Flights', String(m.flights)],
     ['Estimated cost', formatMoney(m.cost.total)],
-    ...(s.cost.budget ? [['Budget', formatMoney(s.cost.budget)] as [string, string]] : []),
+    // Always present (even when empty) so two runs line up row by row.
+    ['Budget', s.cost.budget ? formatMoney(s.cost.budget) : 'No limit'],
+    ['Insects killed', m.pestsKilled === undefined ? '—' : `${m.pestsKilled + (m.helpersKilled ?? 0)} (${m.pestsKilled} pests, ${m.helpersKilled ?? 0} bees and ladybugs)`],
+    ['Helpful insects alive', m.helpersAlivePct === undefined || !m.helpersTotal ? '—' : `${m.helpersAlivePct.toFixed(0)}% (${m.helpersAlive} of ${m.helpersTotal})`],
+    ['Pests eaten by ladybugs', m.pestsEaten === undefined ? '—' : String(m.pestsEaten)],
     ['Survey', `${c.surveysDone} done; camera ${s.survey.detectionPct}% detection`],
     ['Random seed', String(s.run.seed)]
   ];
@@ -200,7 +205,8 @@ export function compareRows(a: CapturedRun, b: CapturedRun): CompareRow[] {
 /** Plain facts, no verdict. The student decides what they mean. */
 export function neutralSummary(nameA: string, a: CapturedRun, nameB: string, b: CapturedRun): string {
   const f = (n: string, c: CapturedRun) =>
-    `${n} used ${c.metrics.productUsedGal.toFixed(1)} gallons and ${c.metrics.devicesUsed} devices, flew ${c.metrics.flightTimeMin.toFixed(1)} minutes, and protected ${c.metrics.cropProtectedPct.toFixed(0)}% of the crop.`;
+    `${n} used ${c.metrics.productUsedGal.toFixed(1)} gallons and ${c.metrics.devicesUsed} devices, flew ${c.metrics.flightTimeMin.toFixed(1)} minutes, protected ${c.metrics.cropProtectedPct.toFixed(0)}% of the crop` +
+    (c.metrics.pestsKilled === undefined ? '.' : `, and killed ${c.metrics.pestsKilled} pests and ${c.metrics.helpersKilled ?? 0} bees and ladybugs.`);
   return `${f(nameA, a)} ${f(nameB, b)}`;
 }
 
@@ -294,7 +300,7 @@ export function describeChanges(before: RunSetup, after: RunSetup): string[] {
 
   const pa = activePlan(before.plan, a.treatment);
   const pb = activePlan(after.plan, b.treatment);
-  if (a.treatment === 'spray' && b.treatment === 'spray') {
+  if (a.treatment === b.treatment && (a.treatment === 'spray' || a.treatment === 'pesticide')) {
     const ra = a.drone.resprayEveryDays ?? 0;
     const rb = b.drone.resprayEveryDays ?? 0;
     add('How often to spray', RESPRAY_NAMES[ra] ?? `every ${ra} days`, RESPRAY_NAMES[rb] ?? `every ${rb} days`);
@@ -327,6 +333,7 @@ export function describeChanges(before: RunSetup, after: RunSetup): string[] {
   add('Device lifetime', formatModelMin(a.devices.lifetimeMin), formatModelMin(b.devices.lifetimeMin));
   add('Lure reach', `${a.devices.lureReach ?? 3}x`, `${b.devices.lureReach ?? 3}x`);
   add('Number of pests', a.pests.count, b.pests.count);
+  add('Helpful insects', a.helpers?.count ?? 0, b.helpers?.count ?? 0);
   add('Where pests start', a.pests.distribution, b.pests.distribution);
   add('Pest sensitivity', a.pests.sensitivity, b.pests.sensitivity);
   add('Crop attraction', a.pests.cropAttraction, b.pests.cropAttraction);

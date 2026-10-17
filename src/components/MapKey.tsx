@@ -46,6 +46,11 @@ const Ring = ({ color }: { color: readonly number[] }) => (
     <circle cx="9" cy="9" r="7.5" fill={rgb(color, 0.08)} stroke={rgb(color.map((c) => c * 0.7), 0.8)} strokeWidth="1.2" strokeDasharray="2.5 2" />
   </svg>
 );
+const Cross = ({ color }: { color: string }) => (
+  <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true">
+    <path d="M5 5 L13 13 M13 5 L5 13" stroke={color} strokeWidth="2" />
+  </svg>
+);
 const Line = ({ color, dashed }: { color: string; dashed?: boolean }) => (
   <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true">
     <path d="M2 13 L8 6 L16 9" fill="none" stroke={color} strokeWidth="1.8" strokeDasharray={dashed ? '2.5 2' : undefined} />
@@ -105,12 +110,21 @@ export function MapKey({ settings: s, view, survey }: Props) {
     if (treated) rows.push([<Dot color={COLORS.pestAgitated} />, 'Pest bothered by repellent']);
     if (ignorers) rows.push([<Dot color={COLORS.pestIgnores} />, 'Pest that ignores the scent']);
   }
+  if (s.helpers?.count) {
+    rows.push([<Dot color={COLORS.bee} />, 'Bee (helpful insect)']);
+    rows.push([<Dot color={COLORS.ladybug} />, 'Ladybug (helpful, eats pests)']);
+  }
+  if (treated) rows.push([<Cross color={COLORS.ladybug} />, 'Red ×: a bee or ladybug was killed here']);
+  if (t === 'pesticide') {
+    rows.push([<Cross color="rgba(17,24,39,0.7)" />, 'Black ×: a pest was killed by pesticide']);
+    if (view.showScent) rows.push([<Cloud color={COLORS.pesticide} />, 'Pesticide on the plants (kills insects)']);
+  }
   rows.push([<Crop />, 'Crop']);
   rows.push([<Patch fill={COLORS.grass} />, 'Grass (no crop)']);
   if (view.showDamage) rows.push([<Patch fill={rgb(COLORS.damage, 0.8)} />, 'Crop eaten by pests']);
   if (view.showScent && treated) rows.push([<Cloud color={COLORS.repellent} />, 'Repellent scent (darker = stronger)']);
   if (view.showScent && t === 'pushPull') rows.push([<Cloud color={COLORS.attractant} />, 'Attractant scent']);
-  if (t === 'spray') {
+  if (t === 'spray' || t === 'pesticide') {
     rows.push([<Patch fill="rgba(37,99,235,0.1)" stroke={COLORS.zone} dashed />, 'Spray zone you drew']);
     rows.push([<Dot color="rgba(96,165,250,0.8)" />, 'Spray coming out of the drone']);
   }
