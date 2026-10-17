@@ -32,7 +32,7 @@ There is no backend, database, login or network dependency. Everything runs in t
 The simulator has two modes, switched at the top right (the choice is remembered in the browser):
 
 - A **welcome pop-up** explains the idea, the five steps and the two clocks the first time someone opens the site (remembered in the browser; "👋 How this works" at the bottom reopens it).
-- **Guided** (the default) walks students through five steps: *Mission* (pick a scenario; missions are sorted easiest first and marked Starter, Next step or Challenge), *Predict* (write what they think will happen, and optionally guess how much of the crop will be protected with a slider), *Plan* (treatment method and wind only; each method button has a one-line description), *Run*, and *Compare*. A run that reaches the end is saved to the notebook automatically and opens Compare, which shows the guess against the real number, a table of every saved run on this mission side by side (best crop result marked, with a nudge to also try No treatment as a baseline), the three big results and the chart. "Stopping early" is a plain secondary button so students don't cut runs short by accident. "Change one thing and run again" goes back to Plan with the same mission. A **map key** under the map (Guided and Playground, can be folded away) explains every color and mark, and lists only what the current setup can draw: pest colors, crop, damage, scent clouds, spray zones, devices and traps, the drone path, wind streaks and survey squares. Guided mode uses slightly larger text and a simpler drone status line (gallons and battery percent only). The survey mission adds a Fly survey button to the Plan step. Each step unlocks only what it needs: Mission and Predict show the map as a still preview with no run buttons, Plan turns on drawing, and Run, Reset and the speed buttons appear only in the Run step (drawing is locked there). Going back to Plan after a run starts the run over.
+- **Guided** (the default) walks students through five steps: *Mission* (pick a scenario; missions are sorted easiest first and marked Starter, Next step or Challenge), *Predict* (write what they think will happen, and optionally guess how much of the crop will be protected with a slider), *Plan* (treatment method and wind only; each method button has a one-line description), *Run*, and *Compare*. A run that reaches the end is saved to the notebook automatically and opens Compare, which shows the guess against the real number, a table of every saved run on this mission side by side (best crop result marked, with a nudge to also try No treatment as a baseline), the three big results, the chart, and a **Write it down** section with the notebook fields for that run (variables changed and kept the same, result, surprises, next steps, real-world check). A **📓 Notebook** button at the top of the steps opens the full notebook in a pop-up (every experiment, compare two, duplicate, load a setup, report, spreadsheet, export/import); loading a setup from it goes straight to Plan. Switching from Playground to Guided reloads the current mission with its own settings, so anything changed in the Playground (pest count, scent, drone, costs, map layers, instructor view) does not leak into a mission. "Stopping early" is a plain secondary button so students don't cut runs short by accident. "Change one thing and run again" goes back to Plan with the same mission. A **map key** under the map (Guided and Playground, can be folded away) explains every color and mark, and lists only what the current setup can draw: pest colors, crop, damage, scent clouds, spray zones, devices and traps, the drone path, wind streaks and survey squares. Guided mode uses slightly larger text and a simpler drone status line (gallons and battery percent only). The survey mission adds a Fly survey button to the Plan step. Each step unlocks only what it needs: Mission and Predict show the map as a still preview with no run buttons, Plan turns on drawing, and Run, Reset and the speed buttons appear only in the Run step (drawing is locked there). Going back to Plan after a run starts the run over.
 - **Playground** is the full sandbox below. Settings sections start closed, map layers are in the Map menu, and the results show three numbers with the rest under "More numbers".
 
 | | |
@@ -43,7 +43,7 @@ The simulator has two modes, switched at the top right (the choice is remembered
 | **Fly the drone** | A T50-style drone flies the plan, sprays or drops devices, uses battery and payload, and returns home for refills and battery swaps. |
 | **Survey** | A separate survey drone scans the field. Its pretend computer-vision output labels squares as healthy, possible damage, high pest activity or uncertain. Fly another survey later to compare before and after. |
 | **Let the computer try** | A simple optimizer searches for a plan with the same method and limits, using only what it knows (nothing, or a survey map). Both plans are then tested in the full simulation. Students can change the score weights to decide what "best" means. |
-| **Keep a notebook** | Question, prediction, variables changed and kept the same, result, surprises, next steps. Results and settings are saved automatically from the run. Duplicate an experiment to change one thing, compare two side by side, open a printable **report** (with a map picture of each run) or download a **spreadsheet (CSV)** of every experiment, and export/import JSON. Guided mode offers the report and spreadsheet on the Compare step. Stored in the browser's local storage. |
+| **Keep a notebook** | Question, prediction, variables changed and kept the same, result, surprises, next steps. Results and settings are saved automatically from the run. Duplicate an experiment to change one thing, compare two side by side, open a printable **report** (with a map picture of each run) or download a **spreadsheet (CSV)** of every experiment, and export/import JSON. Guided mode has the same notebook behind its 📓 Notebook button, plus the write-up fields on the Compare step. Stored in the browser's local storage. |
 
 Results shown: crop protected, pests kept off the crop (now and run average), product used and left, devices used, drone flight time, flights, refills and battery swaps, scent coverage, acres sprayed, and estimated cost with its parts. Charts show pests feeding, crop affected, scent coverage and product over time.
 
@@ -110,19 +110,25 @@ Settings are stored in model minutes and shown as farm time (1 model minute = 1 
 
 Scent leaving the map edge is lost. A steady source in wind makes an elongated plume downwind.
 
-**Pests** (`src/simulation/Pest.ts`, `PEST_RULES`). Each pest has a position and heading. Each step its heading is the direction of the sum of:
+**Pests** (`src/simulation/Pest.ts`, `PEST_RULES`). Each pest has a position and heading. A pest that is *not* bothered by repellent (`C_rep ≤ threshold`) picks its heading as the direction of the sum of:
 
 - wandering: its current heading plus random turning (≈1.1 rad/√s),
 - pull toward the nearest point of the crop when off the crop: `1.4 × cropAttraction`,
-- away from repellent when `C_rep > 0.5 × threshold`: `−2.6 × sensitivity × min(2, C_rep / threshold) × unit(∇C_rep)`,
+- steering away from the edge of a repellent cloud it can already smell (`0.5 × threshold < C_rep ≤ threshold`): `−2.6 × sensitivity × (C_rep / threshold) × unit(∇C_rep)`,
 - toward attractant when `C_att > 0.5 × threshold`: `+2.2 × sensitivity × min(2, C_att / threshold) × unit(∇C_att)`,
 - a push back inside within 4 m of the map edge.
 
-**Giving up.** Each second a pest is bothered by repellent above the threshold, it has a 10% chance to give up on that patch: it turns to a random direction and flies for 60 s, ignoring the crop and both scents, then goes back to the rules above. Without this rule, every pest fled straight down the scent slope, which in front of a spray pass points into the next unsprayed strip, so spraying herded pests into piles at the crop's edges.
+**Fleeing.** A pest bothered by repellent (`C_rep > threshold`) does not follow the local slope step by step, because inside a sprayed field the slope is nearly flat and bumpy (each spray pass leaves a faint stripe), and a pest that chased it just milled about inside the cloud. Instead it flies in *runs*, the way real insects cast through a plume:
+
+1. When a run starts it compares the smell 10 m either side of it (`fleeLookM`). If the smell changes by at least 15% over that distance, it heads down the slope, give or take ≈0.5 rad of scatter. If the cloud is flat, it keeps the heading it had (a straight line gets out of a flat patch fastest). If it is checking because the smell got worse (see 3), it turns around instead.
+2. It flies that way at `speed × 1.6` for about 20 s (10 to 30 s), with only a little random turning (0.12 rad/√s). Attractant still pulls it while it flees, so push-pull works.
+3. If the smell climbs to 1.5× what it was when the run began, it checks again right away. Otherwise it checks again when the run ends.
+
+**Wary.** When a pest gets out of the cloud it stays *wary* for 60 s (one farm day): it keeps flying at normal speed without feeding, turns less, and is only a quarter as drawn to the crop. So pests driven off a sprayed patch land somewhere else instead of settling on the first untreated plant at the cloud's edge and testing the same edge over and over. After that it goes back to the rules above.
 
 **Scent effectiveness.** Not every pest reacts to a scent. Each pest gets a fixed random toughness between 0 and 1 at the start of a run (from its own seeded stream, so starting positions don't change). A pest whose toughness is at or above the effectiveness (default 80%) ignores repellent and attractant completely: it is never bothered, never gives up, and keeps feeding inside a scent cloud. Because toughness is fixed, changing the slider mid-run switches the same pests on or off, and the same seed always picks the same pests. These pests are drawn in blue when a treatment is in use. Setups saved before this setting existed load at 100%.
 
-Speed is `speed × 0.2` while feeding (on the crop, repellent below threshold, not giving up), `speed × 1.6` while bothered by repellent above threshold, and `speed` otherwise. Pests within 4 m of an attractant trap are caught. There is no breeding or death, so pests relocate rather than disappear.
+Speed is `speed × 0.2` while feeding (on the crop, not bothered by repellent, not wary), `speed × 1.6` while fleeing, and `speed` otherwise. Pests within 4 m of an attractant trap are caught. There is no breeding or death, so pests relocate rather than disappear.
 
 **Crop damage** (`Simulation.ts`). Each feeding pest adds `dt / cellArea` pest-seconds per m² to its grid square. A crop square is *affected* once it reaches 12 pest-seconds/m². *Crop protected* = % of crop squares not affected. *Pests kept off the crop* = % of pests not feeding right now (off the crop, trapped, or bothered by repellent); the notebook also records its average over the run.
 
@@ -137,18 +143,21 @@ Speed is `speed × 0.2` while feeding (on the crop, repellent below threshold, n
 
 **Survey** (`src/simulation/Survey.ts`). A generic camera drone (12 m/s, 24 m wide view) flies back and forth over the map. Each 10 m square is looked at once, when the drone passes. Each pest in it is detected with the chosen probability and reported at its position plus Gaussian noise; fake detections are added at the chosen rate per 1000 m². The pretend computer-vision labels are: *uncertain* (random, at the chosen rate), *high pest activity* (≥ 4.5 estimated pests per 100 m²), *possible damage* (≥ 1.5 per 100 m², or visible damage), otherwise *healthy*.
 
-**Pests kept off** counts pests on the crop that are not feeding: trapped, flying off after giving up, or bothered by repellent. Pests that ignore the scent keep feeding inside it, the same rule crop damage uses.
+**Pests kept off** counts pests that are not feeding: off the crop, trapped, fleeing repellent, or wary after escaping it. Pests that ignore the scent keep feeding inside it, the same rule crop damage uses.
 
 **Cost** (`src/simulation/CostModel.ts`). `drone flying = minutes in the air × $/min` for every mission, spraying or dropping devices (default $5/min, about $300 an hour, which matches the $12 to $16 per acre benchmark for drone spraying at the simulator's ~22 acres an hour), `material = gallons used × $/gal` (placeholder), `devices = devices used × $/device` (placeholder). The simulator does not know the actual cost of the team's product.
 
-**Optimizer** (`src/simulation/Optimizer.ts`). Random search followed by hill climbing:
+**Optimizer** (`src/simulation/Optimizer.ts`). Obvious ideas first, then small improvements:
 
-1. Build "test pests" from what the computer knows: survey detections (with a little jitter), or pests spread evenly over the crop if there is no survey.
-2. For the first 35% of tries, make a random plan; afterward, make a small change to the best plan so far (move, add, remove or swap a device or spray block).
-3. Reject any plan that breaks the limits (product available, devices available).
-4. Score each plan with a quick, coarser simulation (200 pests, `dt = 1` s, grid squares twice as big):
-   `score = w₁·%crop protected + w₂·%pests kept off (average) − w₃·gallons − w₄·flight minutes − w₅·(cost / $10)`.
-5. Keep the best. At the end, both the student's plan and the computer's plan are run in the full simulation with the real pests and the same seed, and shown side by side. The panel says "The computer found a plan that scored higher using these rules" (or the opposite) and asks why.
+1. Build "test pests" from what the computer knows: survey detections (with a little jitter), or pests spread evenly over the crop if there is no survey. There are as many test pests as the scenario has real ones.
+2. Try the named *starting ideas* and keep the best. Spray: whole field (or as much as the product allows, worst areas first), border strips, the worst 25%, 50% and 75% of the affordable areas, the single worst area. Devices: all (and half) of the devices spread evenly over the crop, all (and half) at the centers of the pest clusters (k-means on the test pests), and in wind a set shifted upwind of the clusters and a row along the upwind edge. Push-pull adds repellent on the crop with a quarter of the devices as attractant traps in the border downwind. "Do nothing" is always tried too, so the computer can say honestly when nothing beats it. "Worst areas" are 30 m blocks of the crop ranked by test pests; chosen blocks are merged back into the fewest rectangles so the drone flies long passes, as it would over a hand-drawn zone (18 separate blocks took twice the flight time of one whole-field zone).
+3. Spend the rest of the tries on small changes to the best plan so far (add, remove or swap a block, weighted toward blocks with more pests; nudge, move, re-place, add, remove or swap a device), keeping a change only if the score goes up.
+4. Reject any plan that breaks the limits (product available, devices available).
+5. Score each plan with a quick run of the simulation: the real grid and the real number of pests, `dt = 1` s instead of 0.5. Crop damage is a fixed amount of feeding per square, so a coarser grid or fewer pests made every plan look better than it was and the old optimizer learned to spray almost nothing. (If fewer test pests are used, each one counts for several when it feeds: `SimOptions.pestWeight`.)
+   `score = w₁·%crop protected + w₂·%pests kept off (average) − w₃·gallons − w₄·flight minutes − w₅·(cost / $10)`, with default weights 2, 0.5, 2, 1, 0.5.
+6. At the end, both the student's plan and the computer's plan are run in the full simulation with the real pests and the same seed, and shown side by side, with the list of starting ideas and their quick-test scores, which idea the final plan grew from and how many improvements it kept. The panel says "The computer found a plan that scored higher using these rules" (or the opposite) and asks why. When "Do nothing" wins, it says so and explains that repellent mostly moves pests to untreated crop.
+
+Each quick run takes about half a second, so 60 plans take about a minute. In the default scenarios the computer confirms that a whole-field spray is the best spray plan when there is product for it, and finds device layouts that score well above an even grid or the mission's starting plan (Push-Pull: about 87 against 56 for the mission's own layout).
 
 ## Architecture
 
@@ -162,7 +171,7 @@ src/
     Drone.ts         T50-style drone: tasks, payload, battery, logistics
     Treatment.ts     plan → drone tasks, devices, method filtering
     Survey.ts        survey drone and pretend computer vision
-    Optimizer.ts     scoring, random search + hill climbing
+    Optimizer.ts     scoring, starting ideas + small improvements
     CostModel.ts     cost calculations
     scenarios.ts     preset scenarios, defaults, JSON parsing
     settingsRules.ts which settings need a reset
@@ -229,7 +238,8 @@ Then open `http://<host>:8095`. To update, pull the new `:latest` (on Unraid: Do
 - [ ] Push-pull: repellent pushes pests, attractant pulls them, traps catch some (trapped count rises).
 - [ ] Fly survey: the scan footprint moves across the field, then the survey map appears and the run pauses. Camera labels / estimated count switch. Instructor view shows real pests.
 - [ ] Run a treatment, fly a second survey, and compare before and after in the Survey tab.
-- [ ] Computer tab: Let the computer try shows progress, then a comparison table; Show computer plan / Back to my plan work.
+- [ ] Computer tab: Let the computer try shows progress, then a comparison table and "What the computer tried first"; Show computer plan / Back to my plan work.
+- [ ] Guided: the 📓 Notebook button opens the notebook; Compare shows Write it down; switching Playground → Guided puts changed settings back.
 - [ ] Notebook: new experiment, save a finished run, duplicate, load setup, change one thing, run, save, compare two, refresh the page (entries remain), export and import, open the report and download the spreadsheet.
 - [ ] Results and charts update while running; the honesty note is visible at the bottom.
 - [ ] Layout is usable at tablet width (about 1024 px).
@@ -238,7 +248,7 @@ Then open `http://<host>:8095`. To update, pull the new `:latest` (on Unraid: Do
 
 - Pest behavior is a weighted-rules model, not insect biology. There is no breeding, death (except traps), day/night or species differences. Pests arrive at a steady random rate over the build-up days; real arrivals come in waves.
 - Scent drift is a grid shift plus blur, and spray drift is a fixed downwind shift with no droplet sizes or boom height; there is no terrain, canopy, rain, temperature or 3D movement. Strong wind blows most scent off a small field quickly.
-- Repellent pushes pests into untreated crop, where they keep feeding. A spray front can still herd some pests ahead of it, and after a whole-field spray more of them collect near the crop's edges, where the scent is weakest. The "giving up" rule reduces this but does not remove it. It is a property of the simple rules, worth discussing rather than trusting.
+- Repellent pushes pests into untreated crop, where they keep feeding, so with limited product "where to spray" matters less than "how much", and spraying only a hotspot can spread its pests over more of the crop. After a whole-field spray, pests collect in the grass border and along the crop's edges, where the scent is weakest. It is a property of the simple rules (no breeding, no death, strong crop fidelity), worth discussing rather than trusting.
 - The drone flies straight lines at constant speed. It spends 6 s slowing down and turning at the end of each spray pass. Each flight adds takeoff and landing time (default 30 s each) and each device drop adds loiter time (default 30 s to descend, steady, release and climb). Both are fixed in `src/simulation/Drone.ts`. The battery model is a straight line between two hover times.
 - A crop square counts as "affected" only after enough feeding has built up there, so the Crop affected line stays near 0 for the first few days even with pests feeding. Light early feeding is real, but it is below what the model counts as damage.
 - The time-lapse uses one speed-up for everything biological. Real pests, products and crops each have their own timescales.

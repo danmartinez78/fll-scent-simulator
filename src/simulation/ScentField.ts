@@ -13,6 +13,11 @@ export class ScentField {
   readonly cell: number;
   data: Float32Array;
   private tmp: Float32Array;
+  /**
+   * True while every square is 0, so stepping and fading can be skipped.
+   * Code that writes to `data` directly must call `touch()`.
+   */
+  empty = true;
 
   constructor(width: number, height: number, cell: number) {
     this.cell = cell;
@@ -24,6 +29,12 @@ export class ScentField {
 
   clear(): void {
     this.data.fill(0);
+    this.empty = true;
+  }
+
+  /** Tell the field its data was written to directly. */
+  touch(): void {
+    this.empty = false;
   }
 
   /** Value stored at a grid square (0 outside the map). */
@@ -34,6 +45,7 @@ export class ScentField {
 
   /** Smoothly interpolated concentration at a point in meters. */
   sample(x: number, y: number): number {
+    if (this.empty) return 0;
     const gx = x / this.cell - 0.5;
     const gy = y / this.cell - 0.5;
     const c0 = Math.floor(gx);
@@ -54,9 +66,12 @@ export class ScentField {
     return this.data[rr * this.cols + cc];
   }
 
-  /** Direction of increasing scent at a point (units per meter). */
-  gradient(x: number, y: number): { x: number; y: number } {
-    const h = this.cell;
+  /**
+   * Direction of increasing scent at a point (units per meter), measured over
+   * `h` meters each way (default one grid square; longer smooths out small bumps).
+   */
+  gradient(x: number, y: number, h = this.cell): { x: number; y: number } {
+    if (this.empty) return { x: 0, y: 0 };
     return {
       x: (this.sample(x + h, y) - this.sample(x - h, y)) / (2 * h),
       y: (this.sample(x, y + h) - this.sample(x, y - h)) / (2 * h)
@@ -89,6 +104,7 @@ export class ScentField {
       }
     }
     if (wsum <= 0) return;
+    this.empty = false;
     let i = 0;
     for (let r = cr - reach; r <= cr + reach; r++) {
       for (let c = cc - reach; c <= cc + reach; c++) {
@@ -106,6 +122,8 @@ export class ScentField {
    * @param lifetimeSec time for scent to fade to about 37%
    */
   step(dt: number, windX: number, windY: number, diffusion: number, lifetimeSec: number, fadeDt = dt): void {
+    // Nothing here: nothing to carry, spread or fade.
+    if (this.empty) return;
     const { cols, rows, cell } = this;
     const src = this.data;
     const dst = this.tmp;
@@ -133,6 +151,7 @@ export class ScentField {
     const k = Math.min(0.24, (diffusion * dt) / (cell * cell));
     // 3. Fade over time.
     const fade = lifetimeSec > 0 ? Math.exp(-fadeDt / lifetimeSec) : 0;
+    let any = false;
     for (let r = 0; r < rows; r++) {
       for (let c = 0; c < cols; c++) {
         const i = r * cols + c;
@@ -143,24 +162,38 @@ export class ScentField {
         const w = c > 0 ? dst[i - 1] : 0;
         const e = c < cols - 1 ? dst[i + 1] : 0;
         const next = v + k * (n + s + w + e - 4 * v);
-        src[i] = next > 1e-6 ? next * fade : 0;
+        if (next > 1e-6) {
+          src[i] = next * fade;
+          any = true;
+        } else src[i] = 0;
       }
     }
+    this.empty = !any;
   }
 
-  /** Total scent on the map (concentration x area). */
   /** Fade in place without moving (for spray residue stuck to plants). */
   fade(dt: number, lifetimeSec: number): void {
+    if (this.empty) return;
     const f = lifetimeSec > 0 ? Math.exp(-dt / lifetimeSec) : 0;
     const d = this.data;
-    for (let i = 0; i < d.length; i++) d[i] = d[i] > 1e-6 ? d[i] * f : 0;
+    let any = false;
+    for (let i = 0; i < d.length; i++) {
+      if (d[i] > 1e-6) {
+        d[i] *= f;
+        any = true;
+      } else d[i] = 0;
+    }
+    this.empty = !any;
   }
 
   /** Set this field to the sum of two others of the same size. */
   sumOf(a: ScentField, b: ScentField): void {
     const d = this.data;
     for (let i = 0; i < d.length; i++) d[i] = a.data[i] + b.data[i];
+    this.empty = a.empty && b.empty;
   }
+
+  /** Total scent on the map (concentration x area). */
 
   total(): number {
     let sum = 0;

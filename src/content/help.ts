@@ -129,7 +129,7 @@ export const HELP: Record<string, HelpTopic> = {
   },
   optimization: {
     title: 'Optimization',
-    text: 'Optimization means trying many possible answers and looking for one that works better according to the goal you choose.'
+    text: 'Optimization means trying many possible answers and looking for one that works better according to the goal you choose. The computer here tries the obvious plans first, keeps the best, then makes small changes and keeps each one only if the score goes up.'
   },
   score: {
     title: 'Score',

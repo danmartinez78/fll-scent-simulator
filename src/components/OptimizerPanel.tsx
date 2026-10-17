@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { Metrics, Settings, SurveyResult, TreatmentPlan } from '../models/types';
-import { Optimizer, runFull, scoreMetrics, type Knowledge, type ScoreBreakdown } from '../simulation/Optimizer';
+import { Optimizer, runFull, scoreMetrics, type Knowledge, type ScoreBreakdown, type StartingIdea } from '../simulation/Optimizer';
 import { activePlan } from '../simulation/Treatment';
 import { formatMoney } from '../utils/units';
 import { methodName } from '../notebook/notebook';
@@ -20,10 +20,17 @@ interface Outcome {
   computer: { plan: TreatmentPlan; metrics: Metrics; score: ScoreBreakdown };
   knowledgeLabel: string;
   settings: Settings;
+  /** The named ideas the computer tried first, with the scores from its quick tests. */
+  starts: StartingIdea[];
+  /** Which idea the final plan grew from, and how many small improvements it kept. */
+  bestFrom: string;
+  improvements: number;
+  /** The computer's quick-test score for its final plan. */
+  quickBest: number;
 }
 
 export function OptimizerPanel({ settings, plan, surveys, onSettings, onUsePlan }: Props) {
-  const [tries, setTries] = useState(120);
+  const [tries, setTries] = useState(60);
   const [knowledgeId, setKnowledgeId] = useState<number>(0);
   const [progress, setProgress] = useState<{ tried: number; total: number; best: number; trace: number[] } | null>(null);
   const [phase, setPhase] = useState<'idle' | 'searching' | 'comparing' | 'done'>('idle');
@@ -70,7 +77,11 @@ export function OptimizerPanel({ settings, plan, surveys, onSettings, onUsePlan 
           mine: { plan: myPlan, metrics: mineM, score: scoreMetrics(mineM, frozen.weights) },
           computer: { plan: opt.best, metrics: compM, score: scoreMetrics(compM, frozen.weights) },
           knowledgeLabel,
-          settings: frozen
+          settings: frozen,
+          starts: opt.starts,
+          bestFrom: opt.bestFrom,
+          improvements: opt.improvements,
+          quickBest: opt.bestScore
         });
         setShowing('mine');
         setPhase('done');
@@ -117,11 +128,15 @@ export function OptimizerPanel({ settings, plan, surveys, onSettings, onUsePlan 
       <label className="control control-row">
         <span className="control-label">Plans to try</span>
         <select value={tries} onChange={(e) => setTries(Number(e.target.value))}>
-          <option value={50}>50 (quick)</option>
-          <option value={120}>120</option>
-          <option value={300}>300 (slow)</option>
+          <option value={30}>30 (about half a minute)</option>
+          <option value={60}>60 (about a minute)</option>
+          <option value={120}>120 (a few minutes)</option>
         </select>
       </label>
+      <p className="hint small">
+        The computer tries the obvious plans first (treat everything, the border, the worst areas, devices spread out or where the pests are),
+        keeps the best one, then makes small changes and keeps each change only if the score goes up.
+      </p>
 
       <details className="weights">
         <summary>
@@ -154,6 +169,7 @@ export function OptimizerPanel({ settings, plan, surveys, onSettings, onUsePlan 
             Trying strategy {progress.tried} of {progress.total}
           </div>
           <div>Best score so far: {Number.isFinite(progress.best) ? progress.best.toFixed(0) : '—'}</div>
+          <div className="hint small">Each plan is a full {Math.round(settings.run.durationMin)}-day run in a quick version of the simulation.</div>
           <div className="bar">
             <span style={{ width: `${(progress.tried / progress.total) * 100}%` }} />
           </div>
@@ -182,6 +198,7 @@ export function OptimizerPanel({ settings, plan, surveys, onSettings, onUsePlan 
       {outcome && phase === 'done' && (
         <div className="opt-result">
           <p className="hint small">The computer planned using: {outcome.knowledgeLabel}. Both plans were then tested in the full simulation with the real pests and the same seed.</p>
+          <StartingIdeas outcome={outcome} />
           <table className="table">
             <thead>
               <tr>
@@ -240,5 +257,36 @@ export function OptimizerPanel({ settings, plan, surveys, onSettings, onUsePlan 
         </div>
       )}
     </div>
+  );
+}
+
+/** What the computer tried first and where its final plan came from. */
+function StartingIdeas({ outcome }: { outcome: Outcome }) {
+  const ranked = [...outcome.starts].sort((a, b) => b.score - a.score);
+  const compEmpty = outcome.computer.plan.sprayZones.length === 0 && outcome.computer.plan.devices.length === 0;
+  return (
+    <details className="ideas">
+      <summary>What the computer tried first</summary>
+      <ol className="ideas-list">
+        {ranked.map((st) => (
+          <li key={st.label} className={st.label === outcome.bestFrom ? 'best' : ''}>
+            <span>{st.label}</span>
+            <strong>{st.allowed ? st.score.toFixed(0) : 'over the limit'}</strong>
+          </li>
+        ))}
+      </ol>
+      <p className="hint small">
+        Scores from its quick tests, using only what it knew about the pests.{' '}
+        {outcome.improvements > 0
+          ? `It started from "${outcome.bestFrom}" and kept ${outcome.improvements} small improvement${outcome.improvements === 1 ? '' : 's'}, reaching ${outcome.quickBest.toFixed(0)}.`
+          : `None of its small changes beat "${outcome.bestFrom}".`}
+      </p>
+      {compEmpty && (
+        <p className="hint warn">
+          By these score rules, doing nothing beat every plan the computer tried. Pests pushed off a treated area move to the nearest untreated
+          crop and keep eating, so a little treatment mostly moves the problem. If protecting the crop matters more to you, raise its weight above.
+        </p>
+      )}
+    </details>
   );
 }
