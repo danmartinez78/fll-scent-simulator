@@ -21,7 +21,7 @@ function Card({ icon, label, value, sub, info, tone }: { icon: string; label: st
 
 type ChartKind = 'pests' | 'insects' | 'product' | 'scent';
 
-export function ResultsPanel({ sim, onSave, saved }: { sim: Simulation; onSave: () => void; saved?: string | null }) {
+export function ResultsPanel({ sim, onSave, saved, showSave = true }: { sim: Simulation; onSave: () => void; saved?: string | null; showSave?: boolean }) {
   const m = sim.metrics();
   const [chart, setChart] = useState<ChartKind>('pests');
   const [more, setMore] = useState(false);
@@ -141,13 +141,14 @@ export function ResultsPanel({ sim, onSave, saved }: { sim: Simulation; onSave: 
           bands={rainBands} yLabel="gal" series={[{ label: 'Product used (gal)', color: '#2563eb', values: sim.history.map((h) => h.productUsedGal) }]} />
       )}
 
-      {saved ? (
-        <p className="saved-note">✓ Saved in the notebook as {saved}.</p>
-      ) : (
-        <button className="btn primary wide" onClick={onSave} disabled={!sim.runStarted}>
-          📓 Save these results to the notebook
-        </button>
-      )}
+      {showSave &&
+        (saved ? (
+          <p className="saved-note">✓ Saved in the notebook as {saved}.</p>
+        ) : (
+          <button className="btn primary wide" onClick={onSave} disabled={!sim.runStarted}>
+            📓 Save this experiment
+          </button>
+        ))}
     </div>
   );
 }

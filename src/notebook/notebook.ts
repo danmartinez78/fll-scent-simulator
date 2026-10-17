@@ -343,3 +343,22 @@ export function describeChanges(before: RunSetup, after: RunSetup): string[] {
   if (JSON.stringify(a.field) !== JSON.stringify(b.field)) out.push('Field size changed');
   return out;
 }
+
+/**
+ * A run from this visit, kept out of sight so Compare can line runs up and
+ * say what changed. It goes into the notebook only if the student saves it.
+ */
+export interface SessionRun {
+  id: string;
+  /** "Run 3": its number among this visit's runs. */
+  label: string;
+  captured: CapturedRun;
+  /** The notebook experiment it was saved as, or null if not saved. */
+  entryId: string | null;
+}
+
+let runCounter = 0;
+export function newSessionRun(captured: CapturedRun, count: number): SessionRun {
+  runCounter++;
+  return { id: `run-${Date.now().toString(36)}-${runCounter}`, label: `Run ${count + 1}`, captured, entryId: null };
+}
