@@ -40,7 +40,7 @@ interface Props {
 
 const SPEEDS = [1, 5, 20];
 
-const LAYERS: Array<[keyof ViewOptions, string, string]> = [
+const LAYERS: Array<[Exclude<keyof ViewOptions, 'spotlight'>, string, string]> = [
   ['showPests', '🐞', 'Pests'],
   ['showScent', '💨', 'Scent'],
   ['showDamage', '🍂', 'Damage'],

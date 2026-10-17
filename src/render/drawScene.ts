@@ -282,43 +282,25 @@ export function drawScene(ctx: CanvasRenderingContext2D, sim: Simulation, o: Dra
     ctx.globalAlpha = 1;
   }
 
+  // Insects. Tapping a group in the map key fades the other group.
+  const spot = o.view.spotlight ?? null;
   // Helpful insects: bees and ladybugs, and a small × where one was killed.
+  ctx.globalAlpha = spot === 'pests' ? FADED : 1;
   drawHelpers(ctx, sim, s);
 
-  // Pests
+  // Pests: small bugs with two feelers, so they never look like the round bees and ladybugs.
+  ctx.globalAlpha = spot === 'helpers' ? FADED : 1;
   if (o.view.showPests) {
     const p = sim.pests;
-    const pr2 = Math.max(0.55, 1.6 / s);
     const eff = (sim.settings.scent.effectivenessPct ?? 100) / 100;
     const markIgnorers = sim.settings.treatment !== 'none' && eff < 1;
     const ignores = (i: number) => markIgnorers && !p.reacts(i, eff);
-    ctx.fillStyle = COLORS.pest;
-    ctx.beginPath();
-    for (let i = 0; i < p.n; i++) {
-      if (p.trapped[i] || !p.present(i) || p.repelled[i] || ignores(i)) continue;
-      ctx.moveTo(p.x[i] + pr2, p.y[i]);
-      ctx.arc(p.x[i], p.y[i], pr2, 0, Math.PI * 2);
-    }
-    ctx.fill();
-    if (markIgnorers) {
-      ctx.fillStyle = COLORS.pestIgnores;
-      ctx.beginPath();
-      for (let i = 0; i < p.n; i++) {
-        if (p.trapped[i] || !p.present(i) || !ignores(i)) continue;
-        ctx.moveTo(p.x[i] + pr2, p.y[i]);
-        ctx.arc(p.x[i], p.y[i], pr2, 0, Math.PI * 2);
-      }
-      ctx.fill();
-    }
-    ctx.fillStyle = COLORS.pestAgitated;
-    ctx.beginPath();
-    for (let i = 0; i < p.n; i++) {
-      if (p.trapped[i] || !p.present(i) || !p.repelled[i]) continue;
-      ctx.moveTo(p.x[i] + pr2, p.y[i]);
-      ctx.arc(p.x[i], p.y[i], pr2, 0, Math.PI * 2);
-    }
-    ctx.fill();
+    const usual = (i: number) => !p.trapped[i] && p.present(i);
+    drawPests(ctx, p, s, COLORS.pest, (i) => usual(i) && !p.repelled[i] && !ignores(i));
+    if (markIgnorers) drawPests(ctx, p, s, COLORS.pestIgnores, (i) => usual(i) && ignores(i));
+    drawPests(ctx, p, s, COLORS.pestAgitated, (i) => usual(i) && p.repelled[i] === 1);
   }
+  ctx.globalAlpha = 1;
 
   // Survey drone and its camera footprint
   if (sim.survey && !sim.survey.done) {
@@ -514,30 +496,83 @@ function drawWindStreaks(ctx: CanvasRenderingContext2D, sim: Simulation, clock: 
   ctx.stroke();
 }
 
-/** Bees (yellow) and ladybugs (red), plus × marks where insects were killed. */
+/** How see-through the faded insects are while the other group is in the spotlight. */
+const FADED = 0.12;
+
+/** Pests matching `which`, in one color: a small oval body with two feelers, like an aphid. */
+function drawPests(ctx: CanvasRenderingContext2D, p: Simulation['pests'], s: number, color: string, which: (i: number) => boolean): void {
+  const pr = Math.max(0.7, 2 / s);
+  const rx = pr * 0.75;
+  const ry = pr * 1.15;
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  for (let i = 0; i < p.n; i++) {
+    if (!which(i)) continue;
+    const x = p.x[i];
+    const y = p.y[i] + pr * 0.2;
+    ctx.moveTo(x + rx, y);
+    ctx.ellipse(x, y, rx, ry, 0, 0, Math.PI * 2);
+  }
+  ctx.fill();
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 0.7 / s;
+  ctx.beginPath();
+  for (let i = 0; i < p.n; i++) {
+    if (!which(i)) continue;
+    const x = p.x[i];
+    const y = p.y[i];
+    ctx.moveTo(x - pr * 0.25, y - pr * 0.8);
+    ctx.lineTo(x - pr * 0.8, y - pr * 1.7);
+    ctx.moveTo(x + pr * 0.25, y - pr * 0.8);
+    ctx.lineTo(x + pr * 0.8, y - pr * 1.7);
+  }
+  ctx.stroke();
+}
+
+/** Bees (yellow with a black stripe) and ladybugs (red with spots), plus × marks where insects were killed. */
 function drawHelpers(ctx: CanvasRenderingContext2D, sim: Simulation, s: number): void {
   const h = sim.helpers;
-  const r = Math.max(0.7, 2 / s);
-  for (const [kind, color] of [
-    [BEE, COLORS.bee],
-    [LADYBUG, COLORS.ladybug]
+  const r = Math.max(1.1, 3 / s);
+  const alive = (kind: number) => (i: number) => !h.died[i] && h.kind[i] === kind;
+  const isBee = alive(BEE);
+  const isLadybug = alive(LADYBUG);
+  // Bodies with a thin dark outline.
+  ctx.strokeStyle = '#111827';
+  ctx.lineWidth = 0.7 / s;
+  for (const [is, color, rx, ry] of [
+    [isBee, COLORS.bee, r * 1.25, r * 0.85],
+    [isLadybug, COLORS.ladybug, r, r]
   ] as const) {
     ctx.fillStyle = color;
     ctx.beginPath();
     for (let i = 0; i < h.n; i++) {
-      if (h.died[i] || h.kind[i] !== kind) continue;
-      ctx.moveTo(h.x[i] + r, h.y[i]);
-      ctx.arc(h.x[i], h.y[i], r, 0, Math.PI * 2);
+      if (!is(i)) continue;
+      ctx.moveTo(h.x[i] + rx, h.y[i]);
+      ctx.ellipse(h.x[i], h.y[i], rx, ry, 0, 0, Math.PI * 2);
     }
     ctx.fill();
+    ctx.stroke();
   }
-  ctx.strokeStyle = 'rgba(17,24,39,0.55)';
-  ctx.lineWidth = 0.6 / s;
+  // Markings: a stripe across each bee, two spots and a wing line on each ladybug.
+  ctx.fillStyle = '#111827';
   ctx.beginPath();
   for (let i = 0; i < h.n; i++) {
-    if (h.died[i]) continue;
-    ctx.moveTo(h.x[i] + r, h.y[i]);
-    ctx.arc(h.x[i], h.y[i], r, 0, Math.PI * 2);
+    const x = h.x[i];
+    const y = h.y[i];
+    if (isBee(i)) ctx.rect(x - r * 0.18, y - r * 0.8, r * 0.36, r * 1.6);
+    else if (isLadybug(i)) {
+      ctx.moveTo(x - r * 0.18, y + r * 0.1);
+      ctx.arc(x - r * 0.4, y + r * 0.1, r * 0.22, 0, Math.PI * 2);
+      ctx.moveTo(x + r * 0.62, y + r * 0.1);
+      ctx.arc(x + r * 0.4, y + r * 0.1, r * 0.22, 0, Math.PI * 2);
+    }
+  }
+  ctx.fill();
+  ctx.beginPath();
+  for (let i = 0; i < h.n; i++) {
+    if (!isLadybug(i)) continue;
+    ctx.moveTo(h.x[i], h.y[i] - r);
+    ctx.lineTo(h.x[i], h.y[i] + r);
   }
   ctx.stroke();
   // Killed insects: helpful ones where they fell, and pests killed by pesticide.

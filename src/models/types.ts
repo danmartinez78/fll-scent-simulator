@@ -242,7 +242,12 @@ export interface ViewOptions {
   showSurvey: boolean;
   showDamage: boolean;
   showPath: boolean;
+  /** Tapped in the map key: show this group of insects and fade the other one. */
+  spotlight?: InsectGroup | null;
 }
+
+/** Pests, or the helpful insects (bees and ladybugs). */
+export type InsectGroup = 'pests' | 'helpers';
 
 export interface Scenario {
   id: string;
