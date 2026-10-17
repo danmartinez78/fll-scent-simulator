@@ -154,7 +154,7 @@ export const SCENARIOS: Scenario[] = [
       field: { width: 420, height: 260, border: 20 },
       pests: { count: 900 },
       treatment: 'spray',
-      drone: { productAvailableGal: 40, reservePct: 25 },
+      drone: { reservePct: 25 },
       run: { durationMin: 28 }
     }),
     plan: emptyPlan()

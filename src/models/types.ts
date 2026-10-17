@@ -85,7 +85,7 @@ export interface DroneSettings {
   appRateGalPerAcre: number;
   /** Seconds on the ground for a refill or battery swap. */
   turnaroundSec: number;
-  /** Total scent product the team has for this run, in gallons. */
+  /** Total scent product the team has for this run, in gallons. 0 = no limit (the usual case; a budget limits spending instead). */
   productAvailableGal: number;
   /** Seconds to take off, and again to land, on each flight. */
   takeoffLandingSec?: number;
@@ -220,7 +220,8 @@ export interface Metrics {
   pestsDeterredAvgPct: number;
   pestsTrapped: number;
   productUsedGal: number;
-  productLeftGal: number;
+  /** Product still available, gallons; null when there is no limit. */
+  productLeftGal: number | null;
   flightTimeMin: number;
   flights: number;
   refills: number;

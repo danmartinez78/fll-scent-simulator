@@ -53,7 +53,7 @@ export function ResultsPanel({ sim, onSave, saved }: { sim: Simulation; onSave: 
       </button>
       {more && (
         <div className="metrics">
-          <Card icon="💧" label="Product used" value={`${m.productUsedGal.toFixed(1)} gal`} sub={`${m.productLeftGal.toFixed(1)} gal left`} />
+          <Card icon="💧" label="Product used" value={`${m.productUsedGal.toFixed(1)} gal`} sub={m.productLeftGal == null ? 'no limit on product' : `${m.productLeftGal.toFixed(1)} gal left`} />
           <Card icon="⏳" label="Scent devices used" value={String(m.devicesUsed)} sub={treat === 'pushPull' || treat === 'slowRelease' ? `of ${sim.settings.devices.maxDevices}` : ''} />
           <Card icon="🚁" label="Drone flight time" info="flightTime" value={`${m.flightTimeMin.toFixed(1)} min`} sub={`${m.distanceKm.toFixed(2)} km flown`} />
           <Card icon="🔁" label="Flights" value={String(m.flights)} sub={`${m.refills} refills · ${m.batterySwaps} battery swaps`} />

@@ -2,11 +2,11 @@ import { useMemo } from 'react';
 import type { PestDistribution, Scenario, Settings, TreatmentMethod, TreatmentPlan } from '../models/types';
 import { formatModelMin, TIME_LAPSE } from '../utils/fieldTime';
 import { cropRect } from '../simulation/Simulation';
-import { devicesPerTrip } from '../simulation/Drone';
+import { devicesPerTrip, productLimitL } from '../simulation/Drone';
 import { activePlan, ATTRACTANT_REACH_FACTOR, estimateSprayLiters, planCoverage } from '../simulation/Treatment';
 import { parseScenario } from '../simulation/scenarios';
 import { compassLabel, compassName } from '../utils/geometry';
-import { formatMoney, galToL, lToGal, m2ToAcres } from '../utils/units';
+import { formatMoney, lToGal, m2ToAcres } from '../utils/units';
 import { estimatePlanCost, sprayRounds } from '../simulation/PlanCost';
 import type { Tool } from './SimulationCanvas';
 import { downloadText, InfoButton, NumberField, pickTextFile, Section, Select, Slider, Toggle } from './ui';
@@ -72,7 +72,7 @@ export function ControlPanel({ settings: s, plan, tool, simStarted, scenario, on
   const repellentCount = eff.devices.filter((d) => d.kind === 'repellent').length;
   const map = { x: 0, y: 0, w: s.field.width, h: s.field.height };
   const planLiters = estimateSprayLiters(eff.sprayZones, map, s.drone);
-  const stockL = galToL(s.drone.productAvailableGal);
+  const stockL = productLimitL(s.drone);
   // Repeat sprays: one on the start day, then one every N days until the run ends.
   const startDay = s.run.treatStartDay ?? 1;
   const sprays = sprayRounds(s);
@@ -204,7 +204,9 @@ export function ControlPanel({ settings: s, plan, tool, simStarted, scenario, on
                 {sprays > 1 ? ` × ${sprays} sprays` : ''} · needs about {lToGal(totalLiters).toFixed(1)} gal
                 {totalLiters > stockL
                   ? `, but this setup only has ${s.drone.productAvailableGal} gal. The drone will run out partway through, so some spraying won't happen.`
-                  : ` (${s.drone.productAvailableGal} gal available)`}
+                  : Number.isFinite(stockL)
+                    ? ` (${s.drone.productAvailableGal} gal available)`
+                    : ''}
               </p>
               {eff.sprayZones.length > 0 && (
                 <p className="plan-summary">
@@ -351,9 +353,9 @@ export function ControlPanel({ settings: s, plan, tool, simStarted, scenario, on
             label="Product available"
             info="product"
             value={s.drone.productAvailableGal}
-            min={1}
+            format={(v) => (v === 0 ? 'no limit' : `${v} gal`)}
+            min={0}
             max={100}
-            unit="gal"
             onChange={(v) => set('drone', { productAvailableGal: v })}
           />
           <Slider

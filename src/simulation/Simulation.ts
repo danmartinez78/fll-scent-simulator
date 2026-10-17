@@ -12,7 +12,7 @@ import { childSeed, Random } from '../utils/random';
 import { inRect } from '../utils/geometry';
 import { galPerAcreToLPerM2, lToGal } from '../utils/units';
 import { computeCost, DEFAULT_COSTS } from './CostModel';
-import { Drone, type DroneBudget } from './Drone';
+import { Drone, productLimitL, type DroneBudget } from './Drone';
 import { PestSwarm, type PestEnvironment } from './Pest';
 import { ScentField } from './ScentField';
 import { SurveyRun } from './Survey';
@@ -256,11 +256,10 @@ export class Simulation {
    */
   updateSettings(settings: Settings): void {
     const methodChanged = settings.treatment !== this.settings.treatment;
-    const oldStock = this.settings.drone.productAvailableGal;
     this.settings = structuredClone(settings);
-    const keepStock = this.drone.stockL;
     this.drone.settings = { ...settings.drone };
-    this.drone.stockL = Math.max(0, keepStock + (settings.drone.productAvailableGal - oldStock) * 3.78541);
+    // What is left in storage: the new limit minus what is already sprayed or in the tank.
+    this.drone.stockL = Math.max(0, productLimitL(settings.drone) - this.drone.litersSprayed - this.drone.payloadL);
     if (methodChanged) this.setPlan(this.plan);
   }
 
@@ -639,7 +638,7 @@ export class Simulation {
       pestsDeterredAvgPct: this.awayN ? this.awaySum / this.awayN : 100 - core.pestsFeedingPct,
       pestsTrapped: this.pests.countTrapped(),
       productUsedGal: core.productUsedGal,
-      productLeftGal: lToGal(d.stockL + d.payloadL),
+      productLeftGal: Number.isFinite(d.stockL) ? lToGal(d.stockL + d.payloadL) : null,
       flightTimeMin: d.airborneSec / 60,
       flights: d.flights,
       refills: Math.max(0, d.tankFills - 1),

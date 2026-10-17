@@ -37,7 +37,7 @@ export const HELP: Record<string, HelpTopic> = {
   },
   product: {
     title: 'Available product',
-    text: 'The total amount of scent liquid the team has for this run. When it runs out, spraying stops.'
+    text: 'The total amount of scent liquid the team has for this run. Usually there is no limit: a farm can buy what it needs, and a budget limits the money instead. Set a limit to see what happens when product runs out partway: spraying stops.'
   },
   pheromone: {
     title: 'Pheromone',

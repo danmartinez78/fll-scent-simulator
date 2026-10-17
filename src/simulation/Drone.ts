@@ -23,9 +23,8 @@ export const T50_REFERENCE: DroneSettings = {
   swathM: 7,
   appRateGalPerAcre: 2,
   turnaroundSec: 60,
-  // Enough to spray the standard field every 3 days for the whole run, so
-  // product only runs short in missions that limit it on purpose.
-  productAvailableGal: 70,
+  // No limit: a farm can buy what it needs. Money is limited with a budget instead.
+  productAvailableGal: 0,
   takeoffLandingSec: TAKEOFF_LANDING_SEC,
   dropLoiterSec: DROP_LOITER_SEC
 };
@@ -63,6 +62,11 @@ export interface DroneBudget {
   perLiter: number;
   /** Dollars per device dropped. */
   perDevice: number;
+}
+
+/** Product the team has, in liters (Infinity when there is no limit). */
+export function productLimitL(s: DroneSettings): number {
+  return s.productAvailableGal > 0 ? galToL(s.productAvailableGal) : Infinity;
 }
 
 /** How many devices fit on one trip: the drop rack's slots or the weight limit, whichever is smaller. */
@@ -132,7 +136,7 @@ export class Drone {
     this.home = { ...home };
     this.x = home.x;
     this.y = home.y;
-    this.stockL = galToL(settings.productAvailableGal);
+    this.stockL = productLimitL(settings);
   }
 
   get payloadKg(): number {

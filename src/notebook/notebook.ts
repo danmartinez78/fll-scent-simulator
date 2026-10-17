@@ -312,7 +312,8 @@ export function describeChanges(before: RunSetup, after: RunSetup): string[] {
   }
 
   add('Wind', windWords(a), windWords(b));
-  add('Product available', `${a.drone.productAvailableGal} gal`, `${b.drone.productAvailableGal} gal`);
+  const product = (g: number) => (g > 0 ? `${g} gal` : 'no limit');
+  add('Product available', product(a.drone.productAvailableGal), product(b.drone.productAvailableGal));
   add('Budget', a.cost.budget ? formatMoney(a.cost.budget) : 'no limit', b.cost.budget ? formatMoney(b.cost.budget) : 'no limit');
   add('Device range', `${a.scent.rangeM} m`, `${b.scent.rangeM} m`);
   add('Scent strength', a.scent.strength, b.scent.strength);
