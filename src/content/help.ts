@@ -49,7 +49,7 @@ export const HELP: Record<string, HelpTopic> = {
   },
   attractant: {
     title: 'Attractant',
-    text: 'A scent that pests tend to move toward. Pests notice a faint attractant from much farther away than a repellent (about three times as far for the usual lure) and fly toward it. Put a trap with it and pests that reach it get caught. It is a generic "Attractant B", not a real product.'
+    text: 'A scent that pests tend to move toward. Pests notice a faint attractant from much farther away than a repellent (about three times as far for the usual lure) and fly toward it. Without a trap, pests hang around the lure for about a day, lose interest and go back to the crop for a few days. Put a trap with it and pests that reach it get caught for good. It is a generic "Attractant B", not a real product.'
   },
   pushPull: {
     title: 'Push-pull',
