@@ -105,7 +105,7 @@ export function ResultsPanel({ sim, onSave, saved }: { sim: Simulation; onSave: 
       {saved ? (
         <p className="saved-note">✓ Saved in the notebook as {saved}.</p>
       ) : (
-        <button className="btn primary wide" onClick={onSave} disabled={sim.time === 0}>
+        <button className="btn primary wide" onClick={onSave} disabled={!sim.runStarted}>
           📓 Save these results to the notebook
         </button>
       )}

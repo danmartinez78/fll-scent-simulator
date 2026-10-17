@@ -3,7 +3,7 @@ import type { PestDistribution, Scenario, Settings, TreatmentMethod, TreatmentPl
 import { formatModelMin, TIME_LAPSE } from '../utils/fieldTime';
 import { cropRect } from '../simulation/Simulation';
 import { devicesPerTrip } from '../simulation/Drone';
-import { activePlan, estimateSprayLiters, planCoverage } from '../simulation/Treatment';
+import { activePlan, ATTRACTANT_REACH_FACTOR, estimateSprayLiters, planCoverage } from '../simulation/Treatment';
 import { parseScenario } from '../simulation/scenarios';
 import { compassLabel, compassName } from '../utils/geometry';
 import { formatMoney, galToL, lToGal, m2ToAcres } from '../utils/units';
@@ -386,6 +386,16 @@ export function ControlPanel({ settings: s, plan, tool, simStarted, scenario, on
           <Slider label="Devices available" value={s.devices.maxDevices} min={1} max={40} onChange={(v) => set('devices', { maxDevices: v })} />
           <Slider label="Release rate" value={s.devices.releaseRate} min={0.25} max={3} step={0.25} format={(v) => `${v}x standard`} onChange={(v) => set('devices', { releaseRate: v })} />
           <Slider label="Device lifetime" value={s.devices.lifetimeMin} min={7} max={120} format={formatModelMin} onChange={(v) => set('devices', { lifetimeMin: v })} />
+          <Slider
+            label="Lure reach (attractant)"
+            info="attractant"
+            value={s.devices.lureReach ?? ATTRACTANT_REACH_FACTOR}
+            min={1}
+            max={4}
+            step={0.5}
+            format={(v) => `${v}x the range (${Math.round(v * s.scent.rangeM)} m)`}
+            onChange={(v) => set('devices', { lureReach: v })}
+          />
           <Slider label="Mass per device" info="payload" value={s.devices.massKg} min={0.1} max={5} step={0.1} unit="kg" onChange={(v) => set('devices', { massKg: v })} />
           <Slider label="Devices per trip (drop rack)" info="perTrip" value={s.devices.perTrip ?? 20} min={1} max={20} onChange={(v) => set('devices', { perTrip: v })} />
           <p className="hint small">

@@ -4,6 +4,7 @@ import type {
   DroneSettings,
   Rect,
   ScentKind,
+  Settings,
   TreatmentMethod,
   TreatmentPlan,
   Vec
@@ -31,8 +32,8 @@ export const DEVICE_REFERENCE_RANGE_M = 12;
 export const ATTRACTANT_REACH_FACTOR = 3;
 
 /** How far a device's scent reaches in still air, in meters. */
-export function deviceReachM(kind: ScentKind, rangeM: number): number {
-  return kind === 'attractant' ? rangeM * ATTRACTANT_REACH_FACTOR : rangeM;
+export function deviceReachM(kind: ScentKind, s: Pick<Settings, 'scent' | 'devices'>): number {
+  return kind === 'attractant' ? s.scent.rangeM * (s.devices.lureReach ?? ATTRACTANT_REACH_FACTOR) : s.scent.rangeM;
 }
 
 /**

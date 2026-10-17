@@ -28,6 +28,8 @@ interface Props {
   controls?: boolean;
   /** Shown in place of the run buttons while they are locked. */
   lockedNote?: string;
+  /** The run itself has begun (a survey flown first does not count). Default: the clock has moved. */
+  started?: boolean;
 }
 
 const SPEEDS = [1, 5, 20];
@@ -49,7 +51,7 @@ export function Toolbar(p: Props) {
       ) : (
       <div className="toolbar-group">
         <button className={`btn big ${p.running ? 'pause' : 'run'}`} onClick={p.onRun}>
-          {p.running ? '⏸ Pause' : p.time > 0 ? '▶ Resume' : '▶ Run'}
+          {p.running ? '⏸ Pause' : (p.started ?? p.time > 0) ? '▶ Resume' : '▶ Run'}
         </button>
         <button className={`btn big ${p.pendingReset ? 'attention' : ''}`} onClick={p.onReset} title="Start this experiment over with the same settings and seed">
           ↺ Reset

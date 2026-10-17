@@ -64,6 +64,36 @@ export interface PestEnvironment {
   cropAttraction: number;
   speed: number;
   traps: Vec[];
+  /**
+   * Working attractant devices (with or without a trap). A pest that notices
+   * attractant flies toward the nearest one, the way insects follow a smell
+   * to where it comes from. Missing = follow the smell's slope instead.
+   */
+  lures?: Vec[];
+}
+
+/**
+ * Which way a pest that notices attractant flies (unit vector): toward the
+ * nearest lure. Heading for the source, not just up the smell's slope, keeps
+ * pests from hovering between two lures where their smells add up.
+ */
+function lureDirection(px: number, py: number, env: PestEnvironment): Vec | null {
+  if (env.lures && env.lures.length) {
+    let best = env.lures[0];
+    let bestD = Infinity;
+    for (const l of env.lures) {
+      const d = (l.x - px) ** 2 + (l.y - py) ** 2;
+      if (d < bestD) {
+        bestD = d;
+        best = l;
+      }
+    }
+    const d = Math.sqrt(bestD);
+    return d > 1e-6 ? { x: (best.x - px) / d, y: (best.y - py) / d } : null;
+  }
+  const g = env.attractant.gradient(px, py);
+  const gl = Math.hypot(g.x, g.y);
+  return gl > 1e-7 ? { x: g.x / gl, y: g.y / gl } : null;
 }
 
 /** All pests stored in flat arrays (fast with hundreds of pests). */
@@ -263,12 +293,11 @@ export class PestSwarm {
         dy = Math.sin(h);
         // Attractant still pulls while fleeing (push-pull: the "pull" side).
         if (att > th * R.attractNoticeFraction) {
-          const g = env.attractant.gradient(px, py);
-          const gl = Math.hypot(g.x, g.y);
-          if (gl > 1e-7) {
+          const g = lureDirection(px, py, env);
+          if (g) {
             const w = R.attractPull * sens * Math.min(2, att / th);
-            dx += (g.x / gl) * w;
-            dy += (g.y / gl) * w;
+            dx += g.x * w;
+            dy += g.y * w;
           }
         }
       } else {
@@ -307,12 +336,11 @@ export class PestSwarm {
 
         // 4. Follow attractant up the slope.
         if (sens > 0 && att > th * R.attractNoticeFraction) {
-          const g = env.attractant.gradient(px, py);
-          const gl = Math.hypot(g.x, g.y);
-          if (gl > 1e-7) {
+          const g = lureDirection(px, py, env);
+          if (g) {
             const w = R.attractPull * sens * Math.min(2, att / th);
-            dx += (g.x / gl) * w;
-            dy += (g.y / gl) * w;
+            dx += g.x * w;
+            dy += g.y * w;
           }
         }
       }

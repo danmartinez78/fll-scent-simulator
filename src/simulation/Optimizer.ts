@@ -427,14 +427,18 @@ export class Optimizer {
       ideas.push({ label: 'A row of devices along the upwind edge of the crop', plan: this.devicePlan(this.upwindRow(max, drift)) });
     }
     if (pushPull && max > 1) {
-      // Push-pull: repellent on the crop to push, traps out in the grass to pull.
+      // Push-pull: repellent to push, traps to pull. Traps can go in the grass
+      // border or right where the pests are (a trap catches them for good).
       const trapCounts = [...new Set([1, 2, 3, Math.round(max / 3)])].filter((t) => t >= 1 && t < max);
       const plural = (t: number) => `${t} attractant trap${t === 1 ? '' : 's'}`;
       for (const t of trapCounts) {
         ideas.push({ label: `Repellent spread evenly, ${plural(t)} spaced around the border`, plan: this.devicePlan(this.evenPoints(max - t), this.ringTraps(t)) });
+        ideas.push({ label: `Repellent spread evenly, ${plural(t)} where the pests are`, plan: this.devicePlan(this.evenPoints(max - t), this.clusterPoints(t)) });
       }
       const t = Math.max(1, Math.round(max / 4));
       ideas.push({ label: `Repellent where the pests are, ${plural(t)} spaced around the border`, plan: this.devicePlan(this.clusterPoints(max - t), this.ringTraps(t)) });
+      ideas.push({ label: `Only traps: all ${max} where the pests are`, plan: this.devicePlan([], this.clusterPoints(max)) });
+      ideas.push({ label: `Only traps: all ${max} spread evenly`, plan: this.devicePlan([], this.evenPoints(max)) });
       if (windy) ideas.push({ label: `Repellent spread evenly, ${plural(t)} on the downwind side`, plan: this.devicePlan(this.evenPoints(max - t), this.borderTraps(t, drift)) });
     }
     return ideas;
@@ -616,16 +620,15 @@ export class Optimizer {
   }
 
   /**
-   * A new device. Attractant traps always go in the grass border (a trap on
-   * the crop would pull pests onto it); repellent goes on the crop, usually
-   * near a known pest.
+   * A new device, usually near a known pest. An attractant trap sometimes goes
+   * in the grass border instead, to pull pests off the crop.
    */
   private randomDevice(kind?: 'repellent' | 'attractant'): DevicePlan {
     const kinds = allowedKinds(this.settings.treatment);
     const attract = kind ? kind === 'attractant' : kinds.includes('attractant') && this.rng.chance(0.25);
     const crop = cropRect(this.settings.field);
     let p: Vec;
-    if (attract) p = this.ringPoint(this.rng.next());
+    if (attract && this.rng.chance(0.4)) p = this.ringPoint(this.rng.next());
     else {
       const near = this.pests.length && this.rng.chance(0.7) ? this.pests[this.rng.int(0, this.pests.length - 1)] : null;
       p = near
@@ -635,10 +638,10 @@ export class Optimizer {
     return this.placed(p, attract ? 'attractant' : 'repellent');
   }
 
-  /** A device at a point, kept on the map (and attractants on the border loop). */
+  /** A device at a point, kept on the map. */
   private placed(p: Vec, kind: 'repellent' | 'attractant'): DevicePlan {
     const f = this.settings.field;
-    const q = kind === 'attractant' ? this.toRing(p) : p;
+    const q = p;
     return {
       id: this.nextId++,
       x: clamp(q.x, 3, f.width - 3),
@@ -722,11 +725,14 @@ export class Optimizer {
       const others = devices.filter((_, k) => k !== i);
       devices[i] = { ...(d.kind === 'repellent' ? this.placed(this.gapSpot(others), 'repellent') : this.randomDevice('attractant')), id: d.id };
     } else if (r < 0.72 && allowedKinds(s.treatment).length > 1 && devices.length) {
-      // Swap a repellent for a trap in the nearest border spot, or a trap for a repellent in a gap.
+      // Swap a repellent for a trap (in the same spot or the nearest border spot), or a trap for a repellent in a gap.
       const i = pick();
       const d = devices[i];
       const others = devices.filter((_, k) => k !== i);
-      devices[i] = d.kind === 'repellent' ? { ...this.placed(d, 'attractant'), id: d.id } : { ...this.placed(this.gapSpot(others), 'repellent'), id: d.id };
+      devices[i] =
+        d.kind === 'repellent'
+          ? { ...this.placed(rng.chance(0.5) ? d : this.toRing(d), 'attractant'), id: d.id }
+          : { ...this.placed(this.gapSpot(others), 'repellent'), id: d.id };
     } else if (r < 0.88 && devices.length < s.devices.maxDevices) {
       devices.push(rng.chance(0.6) ? this.placed(this.gapSpot(devices), 'repellent') : this.randomDevice());
     } else if (devices.length > 1) {
