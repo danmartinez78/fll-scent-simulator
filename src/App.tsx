@@ -22,6 +22,8 @@ import { SimToRealDialog } from './components/SimToReal';
 import { WelcomeDialog } from './components/WelcomeDialog';
 import { NotebookDialog } from './components/NotebookDialog';
 import { MapKey } from './components/MapKey';
+import { TeamPage } from './components/TeamPage';
+import { mapSnapshot } from './components/ui';
 import {
   captureRun,
   describeChanges,
@@ -55,7 +57,7 @@ export function defaultTool(method: Settings['treatment']): Tool {
 }
 
 type Tab = 'results' | 'survey' | 'computer' | 'notebook' | 'learn';
-type Mode = 'guided' | 'playground';
+type Mode = 'guided' | 'playground' | 'team';
 
 const MODE_KEY = 'scent-sim-mode';
 const PHONE_NOTE_KEY = 'scent-sim-phone-note';
@@ -93,29 +95,12 @@ function loadPhoneNoteHidden(): boolean {
   }
 }
 
-/** A small JPEG of the map for the notebook report, or nothing if it can't be drawn. */
-function mapSnapshot(): string | undefined {
-  const src = document.querySelector<HTMLCanvasElement>('.sim-canvas canvas');
-  if (!src || !src.width || !src.height) return undefined;
-  try {
-    const w = Math.min(480, src.width);
-    const out = document.createElement('canvas');
-    out.width = w;
-    out.height = Math.round((src.height / src.width) * w);
-    const ctx = out.getContext('2d');
-    if (!ctx) return undefined;
-    ctx.fillStyle = '#fff';
-    ctx.fillRect(0, 0, out.width, out.height);
-    ctx.drawImage(src, 0, 0, out.width, out.height);
-    return out.toDataURL('image/jpeg', 0.7);
-  } catch {
-    return undefined;
-  }
-}
-
 function loadMode(): Mode {
+  // A link ending in #team opens the Team presentation page.
+  if (typeof location !== 'undefined' && location.hash === '#team') return 'team';
   try {
-    return localStorage.getItem(MODE_KEY) === 'playground' ? 'playground' : 'guided';
+    const m = localStorage.getItem(MODE_KEY);
+    return m === 'playground' || m === 'team' ? m : 'guided';
   } catch {
     return 'guided';
   }
@@ -148,8 +133,8 @@ export default function App() {
   const [saveOpen, setSaveOpen] = useState(false);
   const [savedMode, setModeState] = useState<Mode>(loadMode);
   const phone = usePhone();
-  // Phones always get Guided mode; the saved choice comes back on a bigger screen.
-  const mode: Mode = phone ? 'guided' : savedMode;
+  // Phones get Guided mode (or the Team page, if that is open); the saved choice comes back on a bigger screen.
+  const mode: Mode = phone && savedMode === 'playground' ? 'guided' : savedMode;
   const [phoneNoteHidden, setPhoneNoteHidden] = useState(loadPhoneNoteHidden);
   const [step, setStepState] = useState<GuidedStep>('mission');
   const [prediction, setPrediction] = useState('');
@@ -317,6 +302,12 @@ export default function App() {
     (m: Mode) => {
       if (m === mode) return;
       setMode(m);
+      setRunning(false);
+      try {
+        history.replaceState(null, '', m === 'team' ? '#team' : location.pathname + location.search);
+      } catch {
+        // Some embeds block history changes; the page still switches.
+      }
       if (m === 'guided') {
         loadScenario(scenario);
         setInstructor(false);
@@ -484,8 +475,8 @@ export default function App() {
             <p className="tagline">Explore how drones and scents might help keep pests off crops.</p>
           </div>
         </div>
-        <ScenarioSelector scenario={scenario} onLoad={loadScenario} pickable={mode === 'playground'} />
-        {!phone && (
+        {mode !== 'team' && <ScenarioSelector scenario={scenario} onLoad={loadScenario} pickable={mode === 'playground'} />}
+        {(!phone || mode === 'team') && (
         <div className="mode-switch" role="tablist" aria-label="Mode">
           <button role="tab" aria-selected={mode === 'guided'} className={mode === 'guided' ? 'active' : ''} onClick={() => switchMode('guided')}>
             🧭 Guided
@@ -493,10 +484,13 @@ export default function App() {
           <button role="tab" aria-selected={mode === 'playground'} className={mode === 'playground' ? 'active' : ''} onClick={() => switchMode('playground')}>
             🛝 Playground
           </button>
+          <button role="tab" aria-selected={mode === 'team'} className={mode === 'team' ? 'active' : ''} onClick={() => switchMode('team')}>
+            🎤 Team presentation
+          </button>
         </div>
         )}
       </header>
-      {phone && !phoneNoteHidden && !welcomeOpen && (
+      {phone && mode !== 'team' && !phoneNoteHidden && !welcomeOpen && (
         <div className="phone-note" role="note">
           <span>📱 You can try the guided missions here. The full simulator works best on a tablet or computer.</span>
           <button
@@ -516,6 +510,9 @@ export default function App() {
         </div>
       )}
 
+      {mode === 'team' ? (
+        <TeamPage />
+      ) : (
       <main className={`layout ${mode}${guided ? ` step-${step}` : ''}${phone ? ' phone' : ''}`}>
         <aside className="panel left" aria-label={mode === 'guided' ? 'Steps' : 'Controls'}>
           {mode === 'guided' ? (
@@ -727,6 +724,7 @@ export default function App() {
           </aside>
         )}
       </main>
+      )}
 
       <footer className="footer">
         <span className="honesty">

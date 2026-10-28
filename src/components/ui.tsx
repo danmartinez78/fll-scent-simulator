@@ -246,3 +246,23 @@ export function openHtml(filename: string, html: string): void {
   // The new tab keeps its own copy, so the link can go after it loads.
   setTimeout(() => URL.revokeObjectURL(url), 60_000);
 }
+
+/** A small JPEG of the map on screen, for reports, or nothing if it can't be drawn. */
+export function mapSnapshot(maxWidth = 480, root: ParentNode = document): string | undefined {
+  const src = root.querySelector<HTMLCanvasElement>('.sim-canvas canvas');
+  if (!src || !src.width || !src.height) return undefined;
+  try {
+    const w = Math.min(maxWidth, src.width);
+    const out = document.createElement('canvas');
+    out.width = w;
+    out.height = Math.round((src.height / src.width) * w);
+    const ctx = out.getContext('2d');
+    if (!ctx) return undefined;
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(0, 0, out.width, out.height);
+    ctx.drawImage(src, 0, 0, out.width, out.height);
+    return out.toDataURL('image/jpeg', 0.7);
+  } catch {
+    return undefined;
+  }
+}
